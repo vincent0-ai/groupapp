@@ -48,6 +48,31 @@ def allowed_file(filename):
     """Check if file extension is allowed"""
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
+@files_bp.route('', methods=['GET'])
+@require_auth
+def get_all_files():
+    """Get all files accessible by the user"""
+    db = Database()
+    user_id_obj = ObjectId(g.user_id)
+    
+    # Get user's groups
+    user_groups = list(db.find('groups', {'members': user_id_obj}))
+    group_ids = [grp['_id'] for grp in user_groups]
+    
+    # Get files from user's groups or uploaded by user
+    files = list(db.find('files', {
+        '$or': [
+            {'group_id': {'$in': group_ids}},
+            {'uploaded_by': user_id_obj}
+        ]
+    }))
+    
+    # Add id field for frontend
+    for f in files:
+        f['id'] = str(f['_id'])
+    
+    return success_response({'files': [serialize_document(f) for f in files]}, 'Files retrieved successfully', 200)
+
 @files_bp.route('/upload', methods=['POST'])
 @require_auth
 def upload_file():

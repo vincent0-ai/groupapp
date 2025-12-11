@@ -182,7 +182,7 @@
                     headers: { 'Authorization': `Bearer ${token}` }
                 });
                 const data = await res.json();
-                const user = data.user;
+                const user = data.data;
 
                 // Update profile info
                 document.getElementById('avatar').src = user.avatar_url || 'https://api.dicebear.com/7.x/avataaars/svg?seed=' + user.username;
@@ -204,7 +204,7 @@
                     headers: { 'Authorization': `Bearer ${token}` }
                 });
                 const groupData = await groupRes.json();
-                document.getElementById('groupsCount').textContent = groupData.groups?.length || 0;
+                document.getElementById('groupsCount').textContent = groupData.data?.groups?.length || 0;
                 document.getElementById('competitionsCount').textContent = '0';
                 document.getElementById('badgesCount').textContent = user.badges?.length || 0;
 

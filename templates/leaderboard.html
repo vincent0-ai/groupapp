@@ -147,7 +147,7 @@
                     headers: { 'Authorization': `Bearer ${token}` }
                 });
                 const data = await res.json();
-                const users = data.leaderboard || [];
+                const users = data.data?.leaderboard || [];
 
                 const tbody = document.getElementById('leaderboardBody');
                 const medals = ['🥇', '🥈', '🥉'];
@@ -188,7 +188,7 @@
                     headers: { 'Authorization': `Bearer ${token}` }
                 });
                 const data = await res.json();
-                const user = data.user;
+                const user = data.data;
 
                 document.getElementById('myAvatar').src = user.avatar_url || 'https://api.dicebear.com/7.x/avataaars/svg?seed=' + user.username;
                 document.getElementById('myUsername').textContent = user.username;

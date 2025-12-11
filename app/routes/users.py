@@ -115,11 +115,14 @@ def get_leaderboard():
     total = db.count('users')
     
     for user in users:
-        del user['password_hash']
-        del user['preferences']
+        if 'password_hash' in user:
+            del user['password_hash']
+        if 'preferences' in user:
+            del user['preferences']
     
     return success_response({
-        'users': [serialize_document(u) for u in users],
+        'leaderboard': [serialize_document(u) for u in users],
+        'users': [serialize_document(u) for u in users],  # Keep for backward compatibility
         'total': total,
         'page': page,
         'per_page': per_page
@@ -138,12 +141,17 @@ def get_current_user_groups():
     # Get groups where user is a member
     groups = list(db.find('groups', {'members': ObjectId(g.user_id)}))
     
-    # Add member count to each group
+    # Add member count and id field to each group
     for group in groups:
         group['member_count'] = len(group.get('members', []))
-        group['channels'] = list(db.find('channels', {'group_id': group['_id']}))
+        channels = list(db.find('channels', {'group_id': group['_id']}))
+        # Add id field to each channel
+        for channel in channels:
+            channel['id'] = str(channel['_id'])
+        group['channels'] = channels
+        group['id'] = str(group['_id'])  # Add 'id' field for frontend
     
-    return success_response({'groups': [serialize_document(g) for g in groups]}, 'User groups retrieved successfully', 200)
+    return success_response({'groups': [serialize_document(grp) for grp in groups]}, 'User groups retrieved successfully', 200)
 
 @users_bp.route('/<user_id>/groups', methods=['GET'])
 @require_auth

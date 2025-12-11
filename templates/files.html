@@ -125,7 +125,7 @@
                     headers: { 'Authorization': `Bearer ${token}` }
                 });
                 const data = await res.json();
-                const files = data.files || [];
+                const files = data.data?.files || [];
 
                 const html = files.length ? files.map(f => `
                     <div class="col-md-4 mb-3">
@@ -150,8 +150,9 @@
                     headers: { 'Authorization': `Bearer ${token}` }
                 });
                 const groupData = await groupRes.json();
+                const groups = groupData.data?.groups || [];
                 [document.getElementById('uploadGroup'), document.getElementById('filterGroup')].forEach(select => {
-                    groupData.groups?.forEach(g => {
+                    groups.forEach(g => {
                         const option = document.createElement('option');
                         option.value = g.id;
                         option.textContent = g.name;

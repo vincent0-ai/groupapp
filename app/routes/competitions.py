@@ -55,6 +55,10 @@ def get_competitions():
     
     competitions = list(db.find('competitions', query))
     
+    # Add id field for frontend
+    for comp in competitions:
+        comp['id'] = str(comp['_id'])
+    
     return success_response({'competitions': [serialize_document(c) for c in competitions]}, 'Competitions retrieved successfully', 200)
 
 @competitions_bp.route('', methods=['POST'])

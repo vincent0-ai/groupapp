@@ -87,6 +87,7 @@
         const token = localStorage.getItem('token');
         const userId = localStorage.getItem('userId');
         let currentChannelId = null;
+        let currentGroupId = null;
         const socket = io();
 
         async function loadChannels() {
@@ -95,24 +96,40 @@
                     headers: { 'Authorization': `Bearer ${token}` }
                 });
                 const data = await res.json();
-                const html = data.groups?.map(g => `
-                    <div class="list-group-item border-0 bg-light fw-bold mt-2 rounded-top">
+                const groups = data.data?.groups || [];
+                const selectedGroupId = localStorage.getItem('selectedGroupId');
+                
+                const html = groups.map(g => `
+                    <div class="list-group-item border-0 bg-light fw-bold mt-2 rounded-top ${selectedGroupId === g.id ? 'bg-primary text-white' : ''}">
                         <strong>${g.name}</strong>
                     </div>
                     ${g.channels?.map(c => `
-                        <button class="list-group-item list-group-item-action border-0 ps-4" onclick="selectChannel('${c.id}', '${c.name}')">
+                        <button class="list-group-item list-group-item-action border-0 ps-4" onclick="selectChannel('${c.id}', '${c.name}', '${g.id}')">
                             <i class="fas fa-hashtag text-muted small me-1"></i> ${c.name}
                         </button>
                     `).join('') || '<div class="list-group-item border-0 ps-4 text-muted small">No channels</div>'}
                 `).join('') || '<div class="p-3 text-center text-muted">No groups found</div>';
                 document.getElementById('channelsList').innerHTML = html;
+                
+                // Clear selected group after loading
+                localStorage.removeItem('selectedGroupId');
+                
+                // Auto-select first channel of selected group
+                if (selectedGroupId) {
+                    const selectedGroup = groups.find(g => g.id === selectedGroupId);
+                    if (selectedGroup && selectedGroup.channels?.length > 0) {
+                        const firstChannel = selectedGroup.channels[0];
+                        selectChannel(firstChannel.id, firstChannel.name, selectedGroupId);
+                    }
+                }
             } catch (error) {
                 console.error('Error loading channels:', error);
             }
         }
 
-        async function selectChannel(channelId, channelName) {
+        async function selectChannel(channelId, channelName, groupId) {
             currentChannelId = channelId;
+            currentGroupId = groupId;
             document.getElementById('channelName').textContent = '#' + channelName;
             await loadMessages();
             socket.emit('join_room', { room: channelId, user_id: userId });
@@ -120,11 +137,12 @@
 
         async function loadMessages() {
             try {
-                const res = await fetch(`/api/messages/${currentChannelId}`, {
+                const res = await fetch(`/api/messages/channel/${currentChannelId}`, {
                     headers: { 'Authorization': `Bearer ${token}` }
                 });
                 const data = await res.json();
-                const html = data.messages?.map(m => `
+                const messages = data.data?.messages || [];
+                const html = messages.map(m => `
                     <div class="mb-3 ${m.user_id === userId ? 'text-end' : ''}">
                         <div class="d-inline-block p-2 rounded" style="background-color: ${m.user_id === userId ? '#007bff' : '#e9ecef'};color: ${m.user_id === userId ? 'white' : '#212529'};max-width: 70%;">
                             <small style="opacity: 0.8;">${m.user_id === userId ? 'You' : m.user_id}</small>

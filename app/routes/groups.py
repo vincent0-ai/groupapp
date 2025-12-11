@@ -39,6 +39,29 @@ def require_auth(f):
     
     return decorated
 
+@groups_bp.route('', methods=['GET'])
+@require_auth
+def get_all_groups():
+    """Get all groups (public or member of)"""
+    db = Database()
+    user_id_obj = ObjectId(g.user_id)
+    
+    # Get all public groups or groups user is member of
+    groups = list(db.find('groups', {
+        '$or': [
+            {'is_private': False},
+            {'members': user_id_obj}
+        ]
+    }))
+    
+    # Add member count and id field
+    for group in groups:
+        group['member_count'] = len(group.get('members', []))
+        group['id'] = str(group['_id'])
+        group['is_member'] = user_id_obj in group.get('members', [])
+    
+    return success_response({'groups': [serialize_document(grp) for grp in groups]}, 'Groups retrieved successfully', 200)
+
 @groups_bp.route('', methods=['POST'])
 @require_auth
 def create_group():
@@ -59,13 +82,20 @@ def create_group():
     db = Database()
     group_doc = Group.create_group_doc(name, description, g.user_id, is_private, avatar_url)
     
-    group_id = db.insert_one('groups', group_doc)
+    # Insert returns the string ID, but the doc already has _id as ObjectId
+    inserted_id = db.insert_one('groups', group_doc)
     
-    if not group_id:
+    if not inserted_id:
         return error_response('Failed to create group', 500)
     
-    group_doc['_id'] = group_id
-    return success_response(serialize_document(group_doc), 'Group created successfully', 201)
+    # Create a default "general" channel for the group
+    channel_doc = Channel.create_channel_doc('general', str(group_doc['_id']), 'General discussion channel')
+    db.insert_one('channels', channel_doc)
+    
+    # Fetch the created group to return complete document
+    created_group = db.find_one('groups', {'_id': group_doc['_id']})
+    created_group['id'] = str(created_group['_id'])
+    return success_response(serialize_document(created_group), 'Group created successfully', 201)
 
 @groups_bp.route('/<group_id>', methods=['GET'])
 @require_auth
