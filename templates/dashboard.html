@@ -60,9 +60,9 @@
         </div>
 
         <!-- Quick Stats -->
-        <div class="row mb-4">
+        <div class="row g-4 mb-4">
             <div class="col-md-3 mb-3">
-                <div class="card text-white bg-primary">
+                <div class="card text-white bg-primary h-100 shadow-sm border-0">
                     <div class="card-body">
                         <h5 class="card-title">My Groups</h5>
                         <p class="card-text display-6" id="groupsCount">0</p>
@@ -71,7 +71,7 @@
                 </div>
             </div>
             <div class="col-md-3 mb-3">
-                <div class="card text-white bg-success">
+                <div class="card text-white bg-success h-100 shadow-sm border-0">
                     <div class="card-body">
                         <h5 class="card-title">Points</h5>
                         <p class="card-text display-6" id="pointsCount">0</p>
@@ -80,7 +80,7 @@
                 </div>
             </div>
             <div class="col-md-3 mb-3">
-                <div class="card text-white bg-info">
+                <div class="card text-white bg-info h-100 shadow-sm border-0">
                     <div class="card-body">
                         <h5 class="card-title">Competitions</h5>
                         <p class="card-text display-6" id="competitionsCount">0</p>
@@ -89,7 +89,7 @@
                 </div>
             </div>
             <div class="col-md-3 mb-3">
-                <div class="card text-white bg-warning">
+                <div class="card text-white bg-warning h-100 shadow-sm border-0">
                     <div class="card-body">
                         <h5 class="card-title">Unread Messages</h5>
                         <p class="card-text display-6" id="messagesCount">0</p>
@@ -100,9 +100,9 @@
         </div>
 
         <!-- Recent Activity -->
-        <div class="row">
+        <div class="row g-4">
             <div class="col-lg-6 mb-4">
-                <div class="card">
+                <div class="card h-100 shadow-sm border-0">
                     <div class="card-header bg-dark text-white">
                         <h5><i class="fas fa-history"></i> Recent Groups</h5>
                     </div>
@@ -112,7 +112,7 @@
                 </div>
             </div>
             <div class="col-lg-6 mb-4">
-                <div class="card">
+                <div class="card h-100 shadow-sm border-0">
                     <div class="card-header bg-dark text-white">
                         <h5><i class="fas fa-star"></i> Top Performers</h5>
                     </div>
@@ -126,7 +126,7 @@
         <!-- Quick Actions -->
         <div class="row">
             <div class="col-lg-12 mb-4">
-                <div class="card">
+                <div class="card shadow-sm border-0">
                     <div class="card-header bg-dark text-white">
                         <h5><i class="fas fa-flash"></i> Quick Actions</h5>
                     </div>
@@ -228,6 +228,11 @@
                 const userRes = await fetch('/api/users/profile', {
                     headers: { 'Authorization': `Bearer ${token}` }
                 });
+                if (userRes.status === 401) {
+                    localStorage.removeItem('token');
+                    window.location.href = '/auth';
+                    return;
+                }
                 const userData = await userRes.json();
                 
                 // Load groups
@@ -306,13 +311,63 @@
                         is_private: document.getElementById('isPrivate').checked
                     })
                 });
+                if (res.status === 401) {
+                    localStorage.removeItem('token');
+                    window.location.href = '/auth';
+                    return;
+                }
                 if (res.ok) {
                     alert('Group created successfully!');
                     document.getElementById('createGroupForm').reset();
+                    const modal = bootstrap.Modal.getInstance(document.getElementById('createGroupModal'));
+                    if (modal) {
+                        modal.hide();
+                    }
                     loadDashboard();
                 }
             } catch (error) {
                 console.error('Error creating group:', error);
+            }
+        });
+
+        // Create competition
+        document.getElementById('createCompetitionForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            try {
+                const token = localStorage.getItem('token');
+                const duration = parseInt(document.getElementById('compDuration').value);
+                const startTime = new Date();
+                const endTime = new Date(startTime.getTime() + duration * 60000);
+
+                const res = await fetch('/api/competitions', {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        title: document.getElementById('compName').value,
+                        group_id: document.getElementById('compGroup').value,
+                        start_time: startTime.toISOString(),
+                        end_time: endTime.toISOString()
+                    })
+                });
+                if (res.status === 401) {
+                    localStorage.removeItem('token');
+                    window.location.href = '/auth';
+                    return;
+                }
+                if (res.ok) {
+                    alert('Competition created successfully!');
+                    document.getElementById('createCompetitionForm').reset();
+                    const modal = bootstrap.Modal.getInstance(document.getElementById('createCompetitionModal'));
+                    if (modal) {
+                        modal.hide();
+                    }
+                    loadDashboard();
+                }
+            } catch (error) {
+                console.error('Error creating competition:', error);
             }
         });
 

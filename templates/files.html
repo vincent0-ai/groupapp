@@ -76,7 +76,7 @@
         </div>
 
         <!-- Files List -->
-        <div class="row" id="filesList">
+        <div class="row g-4" id="filesList">
             <div class="col-12 text-center text-muted py-5">
                 <p><i class="fas fa-spinner fa-spin"></i> Loading files...</p>
             </div>
@@ -129,12 +129,12 @@
 
                 const html = files.length ? files.map(f => `
                     <div class="col-md-4 mb-3">
-                        <div class="card">
-                            <div class="card-body">
+                        <div class="card h-100 shadow-sm border-0">
+                            <div class="card-body d-flex flex-column">
                                 <h5 class="card-title"><i class="fas fa-file"></i> ${f.filename}</h5>
                                 <p class="card-text text-body-secondary small">${f.size} bytes</p>
                                 <small>${f.uploaded_by}</small>
-                                <div class="mt-3">
+                                <div class="mt-auto pt-3">
                                     <a href="#" class="btn btn-sm btn-primary" onclick="downloadFile('${f.id}')">Download</a>
                                     <button class="btn btn-sm btn-danger" onclick="deleteFile('${f.id}')">Delete</button>
                                 </div>
@@ -210,6 +210,10 @@
                 if (res.ok) {
                     alert('File uploaded!');
                     document.getElementById('uploadForm').reset();
+                    const modal = bootstrap.Modal.getInstance(document.getElementById('uploadModal'));
+                    if (modal) {
+                        modal.hide();
+                    }
                     loadFiles();
                 }
             } catch (error) {

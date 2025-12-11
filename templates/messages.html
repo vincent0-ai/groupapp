@@ -52,18 +52,18 @@
 
     <!-- Main Content -->
     <main class="container-fluid py-4">
-        <div class="row" style="height: 70vh;">
+        <div class="row g-3" style="height: calc(100vh - 100px);">
             <!-- Channels List -->
-            <div class="col-md-3">
-                <h4>Channels</h4>
-                <div id="channelsList" class="list-group">
-                    <p class="text-body-secondary small">Loading channels...</p>
+            <div class="col-md-3 h-100 d-flex flex-column">
+                <h4 class="mb-3">Channels</h4>
+                <div id="channelsList" class="list-group overflow-auto flex-grow-1 shadow-sm">
+                    <div class="p-3 text-center text-muted">Loading channels...</div>
                 </div>
             </div>
 
             <!-- Chat Area -->
-            <div class="col-md-9">
-                <div class="card h-100 d-flex flex-column">
+            <div class="col-md-9 h-100">
+                <div class="card h-100 d-flex flex-column shadow-sm border-0">
                     <div class="card-header">
                         <h5 id="channelName">Select a channel</h5>
                     </div>
@@ -96,15 +96,15 @@
                 });
                 const data = await res.json();
                 const html = data.groups?.map(g => `
-                    <div class="list-group-item list-group-item-action">
+                    <div class="list-group-item border-0 bg-light fw-bold mt-2 rounded-top">
                         <strong>${g.name}</strong>
-                        ${g.channels?.map(c => `
-                            <div class="ms-3 small" onclick="selectChannel('${c.id}', '${c.name}')" style="cursor: pointer;" class="link-primary">
-                                # ${c.name}
-                            </div>
-                        `).join('') || '<small class="text-body-secondary ms-3">No channels</small>'}
-                    </ul>
-                `).join('') || '<p class="text-secondary small">No groups</p>';
+                    </div>
+                    ${g.channels?.map(c => `
+                        <button class="list-group-item list-group-item-action border-0 ps-4" onclick="selectChannel('${c.id}', '${c.name}')">
+                            <i class="fas fa-hashtag text-muted small me-1"></i> ${c.name}
+                        </button>
+                    `).join('') || '<div class="list-group-item border-0 ps-4 text-muted small">No channels</div>'}
+                `).join('') || '<div class="p-3 text-center text-muted">No groups found</div>';
                 document.getElementById('channelsList').innerHTML = html;
             } catch (error) {
                 console.error('Error loading channels:', error);
