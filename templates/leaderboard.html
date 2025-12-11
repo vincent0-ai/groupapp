@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Leaderboard - GroupApp</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+    <!-- Navigation -->
+    <nav class="navbar navbar-expand-lg navbar-dark bg-dark sticky-top">
+        <div class="container-fluid">
+            <a class="navbar-brand" href="/"><i class="fas fa-book-open"></i> GroupApp</a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav ms-auto">
+                    <li class="nav-item">
+                        <a class="nav-link" href="/dashboard"><i class="fas fa-home"></i> Dashboard</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/groups"><i class="fas fa-users"></i> Groups</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/messages"><i class="fas fa-comments"></i> Messages</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/competitions"><i class="fas fa-trophy"></i> Competitions</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/files"><i class="fas fa-file"></i> Files</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link active" href="/leaderboard"><i class="fas fa-chart-bar"></i> Leaderboard</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/profile"><i class="fas fa-user"></i> Profile</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/whiteboard"><i class="fas fa-chalkboard"></i> Whiteboard</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" id="logoutBtn" href="#"><i class="fas fa-sign-out-alt"></i> Logout</a>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <main class="container-fluid py-4">
+        <div class="row mb-4">
+            <div class="col-lg-12">
+                <h1><i class="fas fa-chart-bar"></i> Global Leaderboard</h1>
+                <p class="text-body-secondary">Compete and climb the ranks!</p>
+            </div>
+        </div>
+
+        <!-- Filter Options -->
+        <div class="row mb-4">
+            <div class="col-lg-3">
+                <select class="form-control" id="filterPeriod">
+                    <option value="all">All Time</option>
+                    <option value="week">This Week</option>
+                    <option value="month">This Month</option>
+                </select>
+            </div>
+            <div class="col-lg-3">
+                <input type="text" class="form-control" id="searchUser" placeholder="Search user...">
+            </div>
+        </div>
+
+        <!-- Leaderboard Table -->
+        <div class="row">
+            <div class="col-lg-12">
+                <div class="card">
+                    <div class="card-header">
+                        <h5><i class="fas fa-trophy"></i> Top Performers</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="table-responsive">
+                            <table class="table table-hover">
+                                <thead class="table-dark">
+                                    <tr>
+                                        <th style="width: 80px;">Rank</th>
+                                        <th style="width: 50px;">Avatar</th>
+                                        <th>Username</th>
+                                        <th>Points</th>
+                                        <th>Badges</th>
+                                        <th>Groups</th>
+                                        <th>Action</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="leaderboardBody">
+                                    <tr>
+                                        <td colspan="7" class="text-center text-secondary py-5">
+                                            <i class="fas fa-spinner fa-spin"></i> Loading leaderboard...
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Your Rank -->
+        <div class="row mt-4">
+            <div class="col-lg-12">
+                <div class="card" id="myRankCard">
+                    <div class="card-header">
+                        <h5><i class="fas fa-medal"></i> Your Rank</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-2">
+                                <img id="myAvatar" src="" alt="Avatar" class="rounded-circle" width="80" height="80">
+                            </div>
+                            <div class="col-md-10">
+                                <h5 id="myUsername">Loading...</h5>
+                                <p class="text-body-secondary" id="myRankText">-</p>
+                                <div class="progress mt-2">
+                                    <div id="myProgressBar" class="progress-bar" role="progressbar" style="width: 0%"></div>
+                                </div>
+                                <small id="myPointsText">-</small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        const token = localStorage.getItem('token');
+        const userId = localStorage.getItem('userId');
+
+        async function loadLeaderboard() {
+            try {
+                const period = document.getElementById('filterPeriod').value;
+                const res = await fetch(`/api/users/leaderboard?period=${period}`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                const data = await res.json();
+                const users = data.leaderboard || [];
+
+                const tbody = document.getElementById('leaderboardBody');
+                const medals = ['🥇', '🥈', '🥉'];
+
+                const rows = users.map((user, index) => {
+                    const medal = index < 3 ? medals[index] : `${index + 1}`;
+                    const isCurrentUser = user.id === userId ? 'table-primary' : '';
+                    return `
+                        <tr class="${isCurrentUser}">
+                            <td><strong>${medal}</strong></td>
+                            <td>
+                                <img src="${user.avatar_url || 'https://api.dicebear.com/7.x/avataaars/svg?seed=' + user.username}" 
+                                     alt="Avatar" class="rounded-circle" width="40" height="40">
+                            </td>
+                            <td><strong>${user.username}</strong></td>
+                            <td><span class="badge bg-success">${user.points || 0}</span></td>
+                            <td>${user.badges?.length || 0}</td>
+                            <td>${user.groups_count || 0}</td>
+                            <td>
+                                <a href="#" class="btn btn-sm btn-primary">View</a>
+                            </td>
+                        </tr>
+                    `;
+                }).join('');
+
+                tbody.innerHTML = rows || '<tr><td colspan="7" class="text-center text-muted">No users found</td></tr>';
+
+                // Load current user rank
+                loadMyRank(users);
+            } catch (error) {
+                console.error('Error loading leaderboard:', error);
+            }
+        }
+
+        async function loadMyRank(allUsers) {
+            try {
+                const res = await fetch('/api/users/profile', {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                const data = await res.json();
+                const user = data.user;
+
+                document.getElementById('myAvatar').src = user.avatar_url || 'https://api.dicebear.com/7.x/avataaars/svg?seed=' + user.username;
+                document.getElementById('myUsername').textContent = user.username;
+                document.getElementById('myPointsText').textContent = `${user.points || 0} points`;
+
+                // Find rank
+                const rank = allUsers.findIndex(u => u.id === userId) + 1;
+                if (rank > 0) {
+                    document.getElementById('myRankText').textContent = `You are ranked #${rank} of ${allUsers.length}`;
+                    const percentage = (rank / allUsers.length) * 100;
+                    document.getElementById('myProgressBar').style.width = (100 - percentage) + '%';
+                } else {
+                    document.getElementById('myRankText').textContent = 'Not ranked yet';
+                    document.getElementById('myProgressBar').style.width = '0%';
+                }
+            } catch (error) {
+                console.error('Error loading user rank:', error);
+            }
+        }
+
+        document.getElementById('filterPeriod').addEventListener('change', loadLeaderboard);
+
+        document.getElementById('searchUser').addEventListener('input', async (e) => {
+            const query = e.target.value;
+            if (query.length < 2) {
+                loadLeaderboard();
+                return;
+            }
+
+            try {
+                const res = await fetch(`/api/users/search?query=${query}`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                const data = await res.json();
+                const users = data.users || [];
+
+                const tbody = document.getElementById('leaderboardBody');
+                const rows = users.map((user, index) => `
+                    <tr>
+                        <td><strong>${index + 1}</strong></td>
+                        <td>
+                            <img src="${user.avatar_url || 'https://api.dicebear.com/7.x/avataaars/svg?seed=' + user.username}" 
+                                 alt="Avatar" class="rounded-circle" width="40" height="40">
+                        </td>
+                        <td><strong>${user.username}</strong></td>
+                        <td><span class="badge bg-success">${user.points || 0}</span></td>
+                        <td>${user.badges?.length || 0}</td>
+                        <td>0</td>
+                        <td>
+                            <a href="#" class="btn btn-sm btn-primary">View</a>
+                        </td>
+                    </tr>
+                `).join('');
+
+                tbody.innerHTML = rows || '<tr><td colspan="7" class="text-center text-muted">No users found</td></tr>';
+            } catch (error) {
+                console.error('Error searching users:', error);
+            }
+        });
+
+        document.getElementById('logoutBtn').addEventListener('click', (e) => {
+            e.preventDefault();
+            localStorage.removeItem('token');
+            localStorage.removeItem('userId');
+            window.location.href = '/auth';
+        });
+
+        document.addEventListener('DOMContentLoaded', () => {
+            if (!token) window.location.href = '/auth';
+            loadLeaderboard();
+        });
+    </script>
+</body>
+</html>

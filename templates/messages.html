@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Messages - GroupApp</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+    <!-- Navigation -->
+    <nav class="navbar navbar-expand-lg navbar-dark bg-dark sticky-top">
+        <div class="container-fluid">
+            <a class="navbar-brand" href="/"><i class="fas fa-book-open"></i> GroupApp</a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav ms-auto">
+                    <li class="nav-item">
+                        <a class="nav-link" href="/dashboard"><i class="fas fa-home"></i> Dashboard</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/groups"><i class="fas fa-users"></i> Groups</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link active" href="/messages"><i class="fas fa-comments"></i> Messages</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/competitions"><i class="fas fa-trophy"></i> Competitions</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/files"><i class="fas fa-file"></i> Files</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/leaderboard"><i class="fas fa-chart-bar"></i> Leaderboard</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/profile"><i class="fas fa-user"></i> Profile</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/whiteboard"><i class="fas fa-chalkboard"></i> Whiteboard</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" id="logoutBtn" href="#"><i class="fas fa-sign-out-alt"></i> Logout</a>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <main class="container-fluid py-4">
+        <div class="row" style="height: 70vh;">
+            <!-- Channels List -->
+            <div class="col-md-3">
+                <h4>Channels</h4>
+                <div id="channelsList" class="list-group">
+                    <p class="text-body-secondary small">Loading channels...</p>
+                </div>
+            </div>
+
+            <!-- Chat Area -->
+            <div class="col-md-9">
+                <div class="card h-100 d-flex flex-column">
+                    <div class="card-header">
+                        <h5 id="channelName">Select a channel</h5>
+                    </div>
+                    <div class="card-body overflow-auto" id="messagesArea">
+                        <p class="text-secondary text-center">Select a channel to view messages</p>
+                    </div>
+                    <div class="card-footer">
+                        <div class="input-group">
+                            <input type="text" class="form-control" id="messageInput" placeholder="Type a message...">
+                            <button class="btn btn-primary" id="sendBtn" type="button">Send</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
+    <script>
+        const token = localStorage.getItem('token');
+        const userId = localStorage.getItem('userId');
+        let currentChannelId = null;
+        const socket = io();
+
+        async function loadChannels() {
+            try {
+                const res = await fetch('/api/users/groups', {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                const data = await res.json();
+                const html = data.groups?.map(g => `
+                    <div class="list-group-item list-group-item-action">
+                        <strong>${g.name}</strong>
+                        ${g.channels?.map(c => `
+                            <div class="ms-3 small" onclick="selectChannel('${c.id}', '${c.name}')" style="cursor: pointer;" class="link-primary">
+                                # ${c.name}
+                            </div>
+                        `).join('') || '<small class="text-body-secondary ms-3">No channels</small>'}
+                    </ul>
+                `).join('') || '<p class="text-secondary small">No groups</p>';
+                document.getElementById('channelsList').innerHTML = html;
+            } catch (error) {
+                console.error('Error loading channels:', error);
+            }
+        }
+
+        async function selectChannel(channelId, channelName) {
+            currentChannelId = channelId;
+            document.getElementById('channelName').textContent = '#' + channelName;
+            await loadMessages();
+            socket.emit('join_room', { room: channelId, user_id: userId });
+        }
+
+        async function loadMessages() {
+            try {
+                const res = await fetch(`/api/messages/${currentChannelId}`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                const data = await res.json();
+                const html = data.messages?.map(m => `
+                    <div class="mb-3 ${m.user_id === userId ? 'text-end' : ''}">
+                        <div class="d-inline-block p-2 rounded" style="background-color: ${m.user_id === userId ? '#007bff' : '#e9ecef'};color: ${m.user_id === userId ? 'white' : '#212529'};max-width: 70%;">
+                            <small style="opacity: 0.8;">${m.user_id === userId ? 'You' : m.user_id}</small>
+                            <p class="mb-0">${m.content}</p>
+                        </div>
+                    </div>
+                `).join('') || '<p class="text-secondary text-center">No messages yet</p>';
+                document.getElementById('messagesArea').innerHTML = html;
+            } catch (error) {
+                console.error('Error loading messages:', error);
+            }
+        }
+
+        document.getElementById('sendBtn').addEventListener('click', async () => {
+            const content = document.getElementById('messageInput').value;
+            if (!content.trim() || !currentChannelId) return;
+
+            try {
+                const res = await fetch('/api/messages', {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        channel_id: currentChannelId,
+                        content: content
+                    })
+                });
+                if (res.ok) {
+                    document.getElementById('messageInput').value = '';
+                    loadMessages();
+                }
+            } catch (error) {
+                console.error('Error sending message:', error);
+            }
+        });
+
+        socket.on('new_message', (data) => {
+            if (data.room === currentChannelId) {
+                loadMessages();
+            }
+        });
+
+        document.getElementById('logoutBtn').addEventListener('click', (e) => {
+            e.preventDefault();
+            localStorage.removeItem('token');
+            localStorage.removeItem('userId');
+            window.location.href = '/auth';
+        });
+
+        document.addEventListener('DOMContentLoaded', () => {
+            if (!token) window.location.href = '/auth';
+            loadChannels();
+        });
+    </script>
+</body>
+</html>

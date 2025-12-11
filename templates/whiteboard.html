@@ -1,0 +1,298 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Whiteboard - GroupApp</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <style>
+        canvas {
+            border: 2px solid #007bff;
+            background: white;
+            cursor: crosshair;
+            border-radius: 5px;
+        }
+        .controls {
+            margin-bottom: 15px;
+        }
+    </style>
+</head>
+<body>
+    <!-- Navigation -->
+    <nav class="navbar navbar-expand-lg navbar-dark bg-dark sticky-top">
+        <div class="container-fluid">
+            <a class="navbar-brand" href="/"><i class="fas fa-book-open"></i> GroupApp</a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav ms-auto">
+                    <li class="nav-item">
+                        <a class="nav-link" href="/dashboard"><i class="fas fa-home"></i> Dashboard</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/groups"><i class="fas fa-users"></i> Groups</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/messages"><i class="fas fa-comments"></i> Messages</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/competitions"><i class="fas fa-trophy"></i> Competitions</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/files"><i class="fas fa-file"></i> Files</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/leaderboard"><i class="fas fa-chart-bar"></i> Leaderboard</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/profile"><i class="fas fa-user"></i> Profile</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link active" href="/whiteboard"><i class="fas fa-chalkboard"></i> Whiteboard</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" id="logoutBtn" href="#"><i class="fas fa-sign-out-alt"></i> Logout</a>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <main class="container-fluid py-4">
+        <div class="row">
+            <div class="col-lg-12">
+                <h1><i class="fas fa-chalkboard"></i> Collaborative Whiteboard</h1>
+            </div>
+        </div>
+
+        <div class="row mt-4">
+            <!-- Controls -->
+            <div class="col-lg-2">
+                <div class="card">
+                    <div class="card-body">
+                        <h6 class="card-title">Drawing Tools</h6>
+                        <div class="controls mb-3">
+                            <label for="colorPicker" class="form-label">Color</label>
+                            <input type="color" class="form-control form-control-color" id="colorPicker" value="#000000">
+                        </div>
+                        <div class="controls mb-3">
+                            <label for="brushSize" class="form-label">Brush Size: <span id="sizeValue">3</span>px</label>
+                            <input type="range" class="form-range" id="brushSize" min="1" max="20" value="3">
+                        </div>
+                        <div class="controls mb-3">
+                            <label for="opacity" class="form-label">Opacity</label>
+                            <input type="range" class="form-range" id="opacity" min="0" max="1" step="0.1" value="1">
+                        </div>
+                        <div class="btn-group-vertical w-100">
+                            <button id="clearBtn" class="btn btn-warning mb-2">
+                                <i class="fas fa-trash"></i> Clear Canvas
+                            </button>
+                            <button id="undoBtn" class="btn btn-secondary mb-2">
+                                <i class="fas fa-undo"></i> Undo
+                            </button>
+                            <button id="downloadBtn" class="btn btn-info">
+                                <i class="fas fa-download"></i> Download
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Participants -->
+                <div class="card mt-3">
+                    <div class="card-header">
+                        <h6><i class="fas fa-users"></i> Participants</h6>
+                    </div>
+                    <div class="card-body" id="participants">
+                        <small class="text-body-secondary">Connecting...</small>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Canvas Area -->
+            <div class="col-lg-10">
+                <div class="card">
+                    <div class="card-body">
+                        <canvas id="whiteboard" width="1200" height="600"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
+    <script>
+        const token = localStorage.getItem('token');
+        const userId = localStorage.getItem('userId');
+        const canvas = document.getElementById('whiteboard');
+        const ctx = canvas.getContext('2d');
+        
+        let isDrawing = false;
+        let lastX = 0;
+        let lastY = 0;
+        let history = [];
+        const socket = io();
+
+        // Get canvas properties
+        const colorPicker = document.getElementById('colorPicker');
+        const brushSize = document.getElementById('brushSize');
+        const opacity = document.getElementById('opacity');
+
+        // Update brush size display
+        brushSize.addEventListener('input', (e) => {
+            document.getElementById('sizeValue').textContent = e.target.value;
+        });
+
+        // Handle mouse events
+        canvas.addEventListener('mousedown', (e) => {
+            isDrawing = true;
+            const rect = canvas.getBoundingClientRect();
+            lastX = e.clientX - rect.left;
+            lastY = e.clientY - rect.top;
+            saveHistory();
+        });
+
+        canvas.addEventListener('mousemove', (e) => {
+            if (!isDrawing) return;
+            
+            const rect = canvas.getBoundingClientRect();
+            const x = e.clientX - rect.left;
+            const y = e.clientY - rect.top;
+            
+            draw(lastX, lastY, x, y);
+            
+            // Emit drawing to other users
+            socket.emit('whiteboard_draw', {
+                room: 'whiteboard',
+                x0: lastX,
+                y0: lastY,
+                x1: x,
+                y1: y,
+                color: colorPicker.value,
+                size: brushSize.value,
+                opacity: opacity.value,
+                user_id: userId
+            });
+            
+            lastX = x;
+            lastY = y;
+        });
+
+        canvas.addEventListener('mouseup', () => {
+            isDrawing = false;
+        });
+
+        canvas.addEventListener('mouseleave', () => {
+            isDrawing = false;
+        });
+
+        // Touch events for mobile
+        canvas.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            const rect = canvas.getBoundingClientRect();
+            const touch = e.touches[0];
+            isDrawing = true;
+            lastX = touch.clientX - rect.left;
+            lastY = touch.clientY - rect.top;
+            saveHistory();
+        });
+
+        canvas.addEventListener('touchmove', (e) => {
+            e.preventDefault();
+            if (!isDrawing) return;
+            
+            const rect = canvas.getBoundingClientRect();
+            const touch = e.touches[0];
+            const x = touch.clientX - rect.left;
+            const y = touch.clientY - rect.top;
+            
+            draw(lastX, lastY, x, y);
+            lastX = x;
+            lastY = y;
+        });
+
+        canvas.addEventListener('touchend', () => {
+            isDrawing = false;
+        });
+
+        function draw(x0, y0, x1, y1) {
+            ctx.beginPath();
+            ctx.moveTo(x0, y0);
+            ctx.lineTo(x1, y1);
+            ctx.strokeStyle = colorPicker.value;
+            ctx.lineWidth = brushSize.value;
+            ctx.globalAlpha = opacity.value;
+            ctx.lineCap = 'round';
+            ctx.lineJoin = 'round';
+            ctx.stroke();
+            ctx.globalAlpha = 1;
+        }
+
+        function saveHistory() {
+            history.push(canvas.toDataURL());
+        }
+
+        document.getElementById('clearBtn').addEventListener('click', () => {
+            if (confirm('Clear the entire whiteboard?')) {
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                history = [];
+            }
+        });
+
+        document.getElementById('undoBtn').addEventListener('click', () => {
+            if (history.length > 0) {
+                history.pop();
+                if (history.length > 0) {
+                    const img = new Image();
+                    img.src = history[history.length - 1];
+                    img.onload = () => {
+                        ctx.clearRect(0, 0, canvas.width, canvas.height);
+                        ctx.drawImage(img, 0, 0);
+                    };
+                } else {
+                    ctx.clearRect(0, 0, canvas.width, canvas.height);
+                }
+            }
+        });
+
+        document.getElementById('downloadBtn').addEventListener('click', () => {
+            const link = document.createElement('a');
+            link.href = canvas.toDataURL();
+            link.download = 'whiteboard-' + new Date().getTime() + '.png';
+            link.click();
+        });
+
+        // Socket.IO events
+        socket.on('draw_update', (data) => {
+            if (data.user_id !== userId) {
+                draw(data.x0, data.y0, data.x1, data.y1);
+            }
+        });
+
+        socket.on('user_typing', (data) => {
+            const participants = document.getElementById('participants');
+            if (data.is_typing) {
+                participants.innerHTML += `<p><small>${data.user_id} is drawing...</small></p>`;
+            }
+        });
+
+        document.getElementById('logoutBtn').addEventListener('click', (e) => {
+            e.preventDefault();
+            localStorage.removeItem('token');
+            localStorage.removeItem('userId');
+            window.location.href = '/auth';
+        });
+
+        // Join whiteboard room
+        socket.emit('join_room', { room: 'whiteboard', user_id: userId });
+
+        document.addEventListener('DOMContentLoaded', () => {
+            if (!token) window.location.href = '/auth';
+        });
+    </script>
+</body>
+</html>
