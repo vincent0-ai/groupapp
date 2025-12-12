@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#ffffff">
+
+    <title>{% block title %}Discussio{% endblock %}</title>
+
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+
+    {% block head %}{% endblock %}
+</head>
+<body>
+{% set ep = request.endpoint %}
+
+{% block navbar %}
+<nav class="navbar navbar-expand-lg navbar-light sticky-top">
+    <div class="container-fluid">
+        <a class="navbar-brand" href="{{ url_for('dashboard') }}"><i class="fas fa-book-open"></i> Discussio</a>
+        <button class="navbar-toggler" type="button" id="navbarToggler" aria-label="Toggle navigation">
+            <span class="navbar-toggler-icon"></span>
+        </button>
+        <div class="navbar-collapse" id="navbarNav">
+            <button class="mobile-menu-close d-lg-none" id="menuClose" aria-label="Close menu">
+                <i class="fas fa-times"></i>
+            </button>
+            <ul class="navbar-nav ms-auto">
+                <li class="nav-item">
+                    <a class="nav-link {% if ep == 'dashboard' %}active{% endif %}" href="{{ url_for('dashboard') }}"><i class="fas fa-home"></i> Dashboard</a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link {% if ep == 'groups_page' %}active{% endif %}" href="{{ url_for('groups_page') }}"><i class="fas fa-users"></i> Groups</a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link {% if ep == 'messages_page' %}active{% endif %}" href="{{ url_for('messages_page') }}"><i class="fas fa-comments"></i> Messages</a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link {% if ep == 'competitions_page' %}active{% endif %}" href="{{ url_for('competitions_page') }}"><i class="fas fa-trophy"></i> Competitions</a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link {% if ep == 'files_page' %}active{% endif %}" href="{{ url_for('files_page') }}"><i class="fas fa-file"></i> Files</a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link {% if ep == 'leaderboard_page' %}active{% endif %}" href="{{ url_for('leaderboard_page') }}"><i class="fas fa-chart-bar"></i> Leaderboard</a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link {% if ep == 'profile_page' %}active{% endif %}" href="{{ url_for('profile_page') }}"><i class="fas fa-user"></i> Profile</a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link {% if ep == 'whiteboard_page' %}active{% endif %}" href="{{ url_for('whiteboard_page') }}"><i class="fas fa-chalkboard"></i> Whiteboard</a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" id="logoutBtn" href="#"><i class="fas fa-sign-out-alt"></i> Logout</a>
+                </li>
+            </ul>
+        </div>
+    </div>
+</nav>
+<div class="navbar-backdrop" id="navbarBackdrop"></div>
+{% endblock %}
+
+{% block body %}
+<main class="{% block main_class %}container py-4{% endblock %}">
+    {% block main_inner %}
+    <div class="card shadow-lg border-0 rounded-4">
+        <div class="card-body p-4">
+            {% block content %}{% endblock %}
+        </div>
+    </div>
+    {% endblock %}
+</main>
+{% endblock %}
+
+{% block footer %}
+<footer class="py-4">
+    <div class="container text-center">
+        <small class="text-body-secondary">&copy; {{ now().year if now is defined else '' }} Discussio</small>
+    </div>
+</footer>
+{% endblock %}
+
+{% block modals %}{% endblock %}
+
+<!-- Global Confirmation Modal -->
+<div class="modal fade" id="globalConfirmModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="globalConfirmTitle">Confirmation</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body" id="globalConfirmMessage">
+                Are you sure?
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal" id="globalConfirmCancel">Cancel</button>
+                <button type="button" class="btn btn-primary" id="globalConfirmOK">OK</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Global Alert Modal -->
+<div class="modal fade" id="globalAlertModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="globalAlertTitle">Alert</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body" id="globalAlertMessage">
+                Alert message.
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-primary" data-bs-dismiss="modal">OK</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script src="{{ url_for('static', filename='js/pwa.js') }}"></script>
+<script>
+    // Global Custom Alert/Confirm
+    window.showCustomAlert = function(message, title = 'Alert') {
+        return new Promise((resolve) => {
+            document.getElementById('globalAlertTitle').textContent = title;
+            document.getElementById('globalAlertMessage').textContent = message;
+            const modalEl = document.getElementById('globalAlertModal');
+            const modal = new bootstrap.Modal(modalEl);
+            
+            const onHidden = () => {
+                modalEl.removeEventListener('hidden.bs.modal', onHidden);
+                resolve();
+            };
+            modalEl.addEventListener('hidden.bs.modal', onHidden);
+            
+            modal.show();
+        });
+    };
+
+    window.showCustomConfirm = function(message, title = 'Confirmation') {
+        return new Promise((resolve) => {
+            document.getElementById('globalConfirmTitle').textContent = title;
+            document.getElementById('globalConfirmMessage').textContent = message;
+            const modalEl = document.getElementById('globalConfirmModal');
+            const modal = new bootstrap.Modal(modalEl);
+            const okBtn = document.getElementById('globalConfirmOK');
+            
+            let result = false;
+            
+            const onOk = () => {
+                result = true;
+                modal.hide();
+            };
+            
+            const onHidden = () => {
+                okBtn.removeEventListener('click', onOk);
+                modalEl.removeEventListener('hidden.bs.modal', onHidden);
+                resolve(result);
+            };
+            
+            okBtn.addEventListener('click', onOk);
+            modalEl.addEventListener('hidden.bs.modal', onHidden);
+            
+            modal.show();
+        });
+    };
+
+    // Override default alert/confirm (optional, but safer to use explicit calls for async)
+    // We won't override window.confirm because it must be synchronous.
+    // We can override window.alert but it won't block execution.
+    // For this task, we will replace usages with the async versions.
+
+    document.addEventListener('DOMContentLoaded', () => {
+        // Logout
+        const logoutBtn = document.getElementById('logoutBtn');
+        if (logoutBtn) {
+            logoutBtn.addEventListener('click', (e) => {
+                e.preventDefault();
+                localStorage.removeItem('token');
+                localStorage.removeItem('userId');
+                window.location.href = "{{ url_for('auth_page') }}";
+            });
+        }
+
+        // Mobile menu
+        const navbarToggler = document.getElementById('navbarToggler');
+        const navbarCollapse = document.getElementById('navbarNav');
+        const navbarBackdrop = document.getElementById('navbarBackdrop');
+        const menuClose = document.getElementById('menuClose');
+
+        function openMenu() {
+            if (!navbarCollapse || !navbarBackdrop) return;
+            navbarCollapse.classList.add('show');
+            navbarBackdrop.classList.add('show');
+            document.body.style.overflow = 'hidden';
+        }
+
+        function closeMenu() {
+            if (!navbarCollapse || !navbarBackdrop) return;
+            navbarCollapse.classList.remove('show');
+            navbarBackdrop.classList.remove('show');
+            document.body.style.overflow = '';
+        }
+
+        if (navbarToggler) navbarToggler.addEventListener('click', openMenu);
+        if (menuClose) menuClose.addEventListener('click', closeMenu);
+        if (navbarBackdrop) navbarBackdrop.addEventListener('click', closeMenu);
+    });
+</script>
+
+{% block scripts %}{% endblock %}
+</body>
+</html>

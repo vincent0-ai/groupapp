@@ -36,10 +36,7 @@ def create_app(config_name='development'):
     app.register_blueprint(users_bp)
     
     # Page routes (serving templates)
-    @app.route('/')
-    def index():
-        """Serve landing page"""
-        return render_template('landing.html')
+
     
     @app.route('/auth')
     def auth_page():
@@ -47,6 +44,7 @@ def create_app(config_name='development'):
         return render_template('auth.html')
     
     @app.route('/dashboard')
+    @app.route('/')
     def dashboard():
         """Serve dashboard"""
         return render_template('dashboard.html')

@@ -1,57 +1,8 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Groups - GroupApp</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
-</head>
-<body>
-    <!-- Navigation -->
-    <nav class="navbar navbar-expand-lg navbar-dark bg-dark sticky-top">
-        <div class="container-fluid">
-            <a class="navbar-brand" href="/"><i class="fas fa-book-open"></i> GroupApp</a>
-            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
-                <span class="navbar-toggler-icon"></span>
-            </button>
-            <div class="collapse navbar-collapse" id="navbarNav">
-                <ul class="navbar-nav ms-auto">
-                    <li class="nav-item">
-                        <a class="nav-link" href="/dashboard"><i class="fas fa-home"></i> Dashboard</a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link active" href="/groups"><i class="fas fa-users"></i> Groups</a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link" href="/messages"><i class="fas fa-comments"></i> Messages</a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link" href="/competitions"><i class="fas fa-trophy"></i> Competitions</a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link" href="/files"><i class="fas fa-file"></i> Files</a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link" href="/leaderboard"><i class="fas fa-chart-bar"></i> Leaderboard</a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link" href="/profile"><i class="fas fa-user"></i> Profile</a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link" href="/whiteboard"><i class="fas fa-chalkboard"></i> Whiteboard</a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link" id="logoutBtn" href="#"><i class="fas fa-sign-out-alt"></i> Logout</a>
-                    </li>
-                </ul>
-            </div>
-        </div>
-    </nav>
+{% extends "base.html" %}
 
-    <!-- Main Content -->
-    <main class="container-fluid py-4">
+{% block title %}Groups - Discussio{% endblock %}
+
+{% block content %}
         <div class="row mb-4">
             <div class="col-lg-8">
                 <h1><i class="fas fa-users"></i> Groups</h1>
@@ -92,9 +43,6 @@
                     </div>
                 </div>
             </div>
-        </div>
-    </main>
-
     <!-- Create Group Modal -->
     <div class="modal fade" id="createGroupModal" tabindex="-1">
         <div class="modal-dialog">
@@ -127,7 +75,9 @@
         </div>
     </div>
 
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+{% endblock %}
+
+{% block scripts %}
     <script>
         const token = localStorage.getItem('token');
 
@@ -138,7 +88,7 @@
                 });
                 if (res.status === 401) {
                     localStorage.removeItem('token');
-                    window.location.href = '/auth';
+                    window.location.href = "{{ url_for('auth_page') }}";
                     return;
                 }
                 const data = await res.json();
@@ -175,7 +125,7 @@
                 });
                 if (res.status === 401) {
                     localStorage.removeItem('token');
-                    window.location.href = '/auth';
+                    window.location.href = "{{ url_for('auth_page') }}";
                     return;
                 }
                 const data = await res.json();
@@ -214,11 +164,11 @@
                 });
                 if (res.status === 401) {
                     localStorage.removeItem('token');
-                    window.location.href = '/auth';
+                    window.location.href = "{{ url_for('auth_page') }}";
                     return;
                 }
                 if (res.ok) {
-                    alert('Joined group successfully!');
+                    await showCustomAlert('Joined group successfully!', 'Success');
                     loadMyGroups();
                     loadAvailableGroups();
                 }
@@ -230,11 +180,11 @@
         function viewGroup(groupId) {
             // Store group ID and navigate to messages page filtered by group
             localStorage.setItem('selectedGroupId', groupId);
-            window.location.href = '/messages';
+            window.location.href = "{{ url_for('messages_page') }}";
         }
 
         async function leaveGroup(groupId) {
-            if (confirm('Are you sure you want to leave this group?')) {
+            if (await showCustomConfirm('Are you sure you want to leave this group?', 'Leave Group')) {
                 try {
                     const res = await fetch(`/api/groups/${groupId}/leave`, {
                         method: 'POST',
@@ -242,11 +192,11 @@
                     });
                     if (res.status === 401) {
                         localStorage.removeItem('token');
-                        window.location.href = '/auth';
+                        window.location.href = "{{ url_for('auth_page') }}";
                         return;
                     }
                     if (res.ok) {
-                        alert('Left group successfully!');
+                        await showCustomAlert('Left group successfully!', 'Success');
                         loadMyGroups();
                         loadAvailableGroups();
                     }
@@ -273,11 +223,11 @@
                 });
                 if (res.status === 401) {
                     localStorage.removeItem('token');
-                    window.location.href = '/auth';
+                    window.location.href = "{{ url_for('auth_page') }}";
                     return;
                 }
                 if (res.ok) {
-                    alert('Group created successfully!');
+                    await showCustomAlert('Group created successfully!', 'Success');
                     document.getElementById('createGroupForm').reset();
                     const modal = bootstrap.Modal.getInstance(document.getElementById('createGroupModal'));
                     if (modal) {
@@ -291,18 +241,13 @@
             }
         });
 
-        document.getElementById('logoutBtn').addEventListener('click', (e) => {
-            e.preventDefault();
-            localStorage.removeItem('token');
-            localStorage.removeItem('userId');
-            window.location.href = '/auth';
-        });
-
         document.addEventListener('DOMContentLoaded', () => {
-            if (!token) window.location.href = '/auth';
+            if (!token) {
+                window.location.href = "{{ url_for('auth_page') }}";
+                return;
+            }
             loadMyGroups();
             loadAvailableGroups();
         });
     </script>
-</body>
-</html>
+{% endblock %}

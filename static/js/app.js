@@ -1,6 +1,6 @@
-// GroupApp - Main Application JavaScript
+// Discussio - Main Application JavaScript
 
-class GroupApp {
+class Discussio {
     constructor() {
         this.apiBase = '/api';
         this.token = localStorage.getItem('token');
@@ -257,7 +257,7 @@ class GroupApp {
                             <i class="fas fa-hashtag"></i> ${channel.name}
                         </h5>
                         <p class="card-text text-muted">${channel.description}</p>
-                        <button class="btn btn-sm btn-primary" onclick="groupApp.openChannel('${channel._id}')">
+                        <button class="btn btn-sm btn-primary" onclick="Discussio.openChannel('${channel._id}')">
                             <i class="fas fa-comments"></i> Open Chat
                         </button>
                     </div>
@@ -379,7 +379,7 @@ class GroupApp {
             });
         } catch (error) {
             console.error('Error sending message:', error);
-            alert('Failed to send message');
+            await showCustomAlert('Failed to send message', 'Error');
         }
     }
 
@@ -389,7 +389,7 @@ class GroupApp {
         const isPrivate = document.getElementById('isPrivate').checked;
 
         if (!name) {
-            alert('Please enter a group name');
+            await showCustomAlert('Please enter a group name', 'Validation Error');
             return;
         }
 
@@ -417,10 +417,10 @@ class GroupApp {
             // Reload groups
             await this.loadGroups();
 
-            alert('Group created successfully');
+            await showCustomAlert('Group created successfully', 'Success');
         } catch (error) {
             console.error('Error creating group:', error);
-            alert('Failed to create group');
+            await showCustomAlert('Failed to create group', 'Error');
         }
     }
 
@@ -440,5 +440,5 @@ class GroupApp {
 
 // Initialize app when DOM is ready
 document.addEventListener('DOMContentLoaded', () => {
-    window.groupApp = new GroupApp();
+    window.Discussio = new Discussio();
 });

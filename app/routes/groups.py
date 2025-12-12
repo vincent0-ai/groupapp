@@ -236,12 +236,38 @@ def leave_group(group_id):
     if user_id_obj not in group['members']:
         return error_response('Not a member of this group', 400)
     
-    # Cannot leave if owner
-    if str(group['owner_id']) == g.user_id:
-        return error_response('Group owner cannot leave the group', 403)
+    # Check if user is owner
+    is_owner = str(group['owner_id']) == g.user_id
+    members = group.get('members', [])
     
+    if is_owner:
+        if len(members) == 1:
+            # Owner is the only member, delete the group
+            db.delete_many('channels', {'group_id': group_id_obj})
+            db.delete_many('messages', {'group_id': group_id_obj})
+            db.delete_many('whiteboards', {'group_id': group_id_obj})
+            db.delete_many('competitions', {'group_id': group_id_obj})
+            db.delete_many('files', {'group_id': group_id_obj})
+            db.delete_one('groups', {'_id': group_id_obj})
+            db.pull_from_array('users', {'_id': user_id_obj}, 'groups', group_id_obj)
+            return success_response(None, 'Left and deleted group (you were the last member)', 200)
+        else:
+            # Transfer ownership to another member
+            new_owner = None
+            for member in members:
+                if member != user_id_obj:
+                    new_owner = member
+                    break
+            
+            # Update group owner
+            db.update_one('groups', {'_id': group_id_obj}, {'owner_id': new_owner})
+    
+    # Remove user from group members
     db.pull_from_array('groups', {'_id': group_id_obj}, 'members', user_id_obj)
     db.pull_from_array('users', {'_id': user_id_obj}, 'groups', group_id_obj)
+    
+    if is_owner and len(members) > 1:
+        return success_response(None, 'Left group successfully. Ownership transferred to another member.', 200)
     
     return success_response(None, 'Left group successfully', 200)
 

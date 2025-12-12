@@ -31,8 +31,8 @@ class PWAManager {
             const installBanner = document.createElement('div');
             installBanner.className = 'pwa-install-banner';
             installBanner.innerHTML = `
-                <h6 class="mb-2">Install GroupApp</h6>
-                <p class="mb-3">Get quick access to GroupApp on your device.</p>
+                <h6 class="mb-2">Install Discussio</h6>
+                <p class="mb-3">Get quick access to Discussio on your device.</p>
                 <button id="installBtn" class="btn btn-primary btn-sm me-2">Install</button>
                 <button id="dismissBtn" class="btn btn-secondary btn-sm">Dismiss</button>
             `;
@@ -95,7 +95,7 @@ class PWAManager {
 
     openDatabase() {
         return new Promise((resolve, reject) => {
-            const request = indexedDB.open('groupapp', 1);
+            const request = indexedDB.open('Discussio', 1);
             request.onerror = () => reject(request.error);
             request.onsuccess = () => resolve(request.result);
             request.onupgradeneeded = (event) => {

@@ -4,7 +4,7 @@ services:
   # MongoDB Database
   mongodb:
     image: mongo:7.0
-    container_name: groupapp-mongodb
+    container_name: Discussio-mongodb
     ports:
       - "27017:27017"
     environment:
@@ -13,23 +13,23 @@ services:
     volumes:
       - mongodb_data:/data/db
     networks:
-      - groupapp-network
+      - Discussio-network
 
   # Redis Cache
   redis:
     image: redis:7-alpine
-    container_name: groupapp-redis
+    container_name: Discussio-redis
     ports:
       - "6379:6379"
     volumes:
       - redis_data:/data
     networks:
-      - groupapp-network
+      - Discussio-network
 
   # MinIO S3-compatible Storage
   minio:
     image: minio/minio:latest
-    container_name: groupapp-minio
+    container_name: Discussio-minio
     ports:
       - "9000:9000"
       - "9001:9001"
@@ -40,12 +40,12 @@ services:
     volumes:
       - minio_data:/data
     networks:
-      - groupapp-network
+      - Discussio-network
 
   # Meilisearch Search Engine
   meilisearch:
     image: getmeili/meilisearch:v1.7
-    container_name: groupapp-meilisearch
+    container_name: Discussio-meilisearch
     ports:
       - "7700:7700"
     environment:
@@ -53,18 +53,18 @@ services:
     volumes:
       - meilisearch_data:/meili_data
     networks:
-      - groupapp-network
+      - Discussio-network
 
   # Flask Application
   app:
     build: .
-    container_name: groupapp-flask
+    container_name: Discussio-flask
     ports:
       - "5000:5000"
     environment:
       FLASK_ENV: development
       FLASK_DEBUG: 1
-      MONGODB_URI: mongodb://admin:password@mongodb:27017/groupapp?authSource=admin
+      MONGODB_URI: mongodb://admin:password@mongodb:27017/Discussio?authSource=admin
       REDIS_URL: redis://redis:6379/0
       MINIO_ENDPOINT: minio:9000
       MINIO_ROOT_USER: minioadmin
@@ -79,7 +79,7 @@ services:
     volumes:
       - .:/app
     networks:
-      - groupapp-network
+      - Discussio-network
     command: python main.py
 
 volumes:
@@ -89,5 +89,5 @@ volumes:
   meilisearch_data:
 
 networks:
-  groupapp-network:
+  Discussio-network:
     driver: bridge

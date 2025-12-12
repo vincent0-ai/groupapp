@@ -1,57 +1,8 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Messages - GroupApp</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
-</head>
-<body>
-    <!-- Navigation -->
-    <nav class="navbar navbar-expand-lg navbar-dark bg-dark sticky-top">
-        <div class="container-fluid">
-            <a class="navbar-brand" href="/"><i class="fas fa-book-open"></i> GroupApp</a>
-            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
-                <span class="navbar-toggler-icon"></span>
-            </button>
-            <div class="collapse navbar-collapse" id="navbarNav">
-                <ul class="navbar-nav ms-auto">
-                    <li class="nav-item">
-                        <a class="nav-link" href="/dashboard"><i class="fas fa-home"></i> Dashboard</a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link" href="/groups"><i class="fas fa-users"></i> Groups</a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link active" href="/messages"><i class="fas fa-comments"></i> Messages</a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link" href="/competitions"><i class="fas fa-trophy"></i> Competitions</a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link" href="/files"><i class="fas fa-file"></i> Files</a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link" href="/leaderboard"><i class="fas fa-chart-bar"></i> Leaderboard</a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link" href="/profile"><i class="fas fa-user"></i> Profile</a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link" href="/whiteboard"><i class="fas fa-chalkboard"></i> Whiteboard</a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link" id="logoutBtn" href="#"><i class="fas fa-sign-out-alt"></i> Logout</a>
-                    </li>
-                </ul>
-            </div>
-        </div>
-    </nav>
+{% extends "base.html" %}
 
-    <!-- Main Content -->
-    <main class="container-fluid py-4">
+{% block title %}Messages - Discussio{% endblock %}
+
+{% block content %}
         <div class="row g-3" style="height: calc(100vh - 100px);">
             <!-- Channels List -->
             <div class="col-md-3 h-100 d-flex flex-column">
@@ -78,10 +29,9 @@
                     </div>
                 </div>
             </div>
-        </div>
-    </main>
+{% endblock %}
 
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+{% block scripts %}
     <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
     <script>
         const token = localStorage.getItem('token');
@@ -187,17 +137,12 @@
             }
         });
 
-        document.getElementById('logoutBtn').addEventListener('click', (e) => {
-            e.preventDefault();
-            localStorage.removeItem('token');
-            localStorage.removeItem('userId');
-            window.location.href = '/auth';
-        });
-
         document.addEventListener('DOMContentLoaded', () => {
-            if (!token) window.location.href = '/auth';
+            if (!token) {
+                window.location.href = "{{ url_for('auth_page') }}";
+                return;
+            }
             loadChannels();
         });
     </script>
-</body>
-</html>
+{% endblock %}

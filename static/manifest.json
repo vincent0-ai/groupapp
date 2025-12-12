@@ -1,13 +1,13 @@
 {
-  "name": "GroupApp - Collaborative Learning Platform",
-  "short_name": "GroupApp",
+  "name": "Discussio - Collaborative Learning Platform",
+  "short_name": "Discussio",
   "description": "A progressive web app for collaborative learning, interactive whiteboards, and group competitions",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",
   "orientation": "portrait-primary",
-  "background_color": "#ffffff",
-  "theme_color": "#007bff",
+  "background_color": "#faf8f5",
+  "theme_color": "#800020",
   "icons": [
     {
       "src": "/static/images/icon-192x192.png",

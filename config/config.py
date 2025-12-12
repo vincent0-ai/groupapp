@@ -9,8 +9,8 @@ class Config:
     JWT_ACCESS_TOKEN_EXPIRES = timedelta(hours=1)
     
     # MongoDB
-    MONGODB_URI = os.getenv('MONGODB_URI', 'mongodb://localhost:27017/groupapp')
-    MONGODB_DATABASE = os.getenv('MONGODB_DATABASE', 'groupapp')
+    MONGODB_URI = os.getenv('MONGODB_URI', 'mongodb://localhost:27017/Discussio')
+    MONGODB_DATABASE = os.getenv('MONGODB_DATABASE', 'Discussio')
     
     # Redis
     REDIS_URL = os.getenv('REDIS_URL', 'redis://localhost:6379/0')
@@ -19,7 +19,7 @@ class Config:
     MINIO_ENDPOINT = os.getenv('MINIO_ENDPOINT', 'localhost:9000')
     MINIO_ROOT_USER = os.getenv('MINIO_ROOT_USER', 'minioadmin')
     MINIO_ROOT_PASSWORD = os.getenv('MINIO_ROOT_PASSWORD', 'minioadmin')
-    MINIO_BUCKET = os.getenv('MINIO_BUCKET', 'groupapp')
+    MINIO_BUCKET = os.getenv('MINIO_BUCKET', 'Discussio')
     MINIO_USE_SSL = os.getenv('MINIO_USE_SSL', 'False') == 'True'
     
     # Meilisearch
@@ -48,7 +48,7 @@ class TestingConfig(Config):
     """Testing configuration"""
     DEBUG = True
     TESTING = True
-    MONGODB_DATABASE = 'groupapp_test'
+    MONGODB_DATABASE = 'Discussio_test'
 
 config = {
     'development': DevelopmentConfig,

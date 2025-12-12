@@ -1,8 +1,8 @@
 // Service Worker for PWA offline support and push notifications
-const CACHE_NAME = 'groupapp-v1';
+const CACHE_NAME = 'Discussio-v2';
 const urlsToCache = [
   '/',
-  '/index.html',
+  '/dashboard.html',
   '/static/css/style.css',
   '/static/js/app.js',
   '/static/js/socket.io.js',
@@ -39,6 +39,16 @@ self.addEventListener('fetch', event => {
     return;
   }
 
+  // Don't cache HTML navigations (templates change often; caching can break routing/UI)
+  const acceptHeader = event.request.headers.get('accept') || '';
+  const isNavigation = event.request.mode === 'navigate' || acceptHeader.includes('text/html');
+  if (isNavigation) {
+    event.respondWith(
+      fetch(event.request).catch(() => caches.match('/'))
+    );
+    return;
+  }
+
   event.respondWith(
     fetch(event.request)
       .then(response => {
@@ -70,12 +80,12 @@ self.addEventListener('push', event => {
     body: event.data.text(),
     icon: '/static/images/icon-192x192.png',
     badge: '/static/images/badge-72x72.png',
-    tag: 'groupapp-notification',
+    tag: 'Discussio-notification',
     requireInteraction: false
   };
 
   event.waitUntil(
-    self.registration.showNotification('GroupApp', options)
+    self.registration.showNotification('Discussio', options)
   );
 });
 
@@ -128,7 +138,7 @@ async function syncMessages() {
 
 function openIndexedDB() {
   return new Promise((resolve, reject) => {
-    const request = indexedDB.open('groupapp', 1);
+    const request = indexedDB.open('Discussio', 1);
     request.onerror = () => reject(request.error);
     request.onsuccess = () => resolve(request.result);
     request.onupgradeneeded = (event) => {
