@@ -444,9 +444,29 @@
             if (!sessionId) return;
             try {
                 const res = await fetch(`/api/whiteboards/${sessionId}`, { headers: { 'Authorization': `Bearer ${token}` } });
-                if (res.ok) {
-                    const data = await res.json();
-                    const wb = data.data;
+                
+                // Check if session has ended
+                if (res.status === 410) {
+                    await showCustomAlert('This session has ended', 'Session Ended');
+                    window.location.href = '/whiteboard';
+                    return;
+                }
+                
+                if (res.status === 404) {
+                    await showCustomAlert('Session not found', 'Error');
+                    window.location.href = '/whiteboard';
+                    return;
+                }
+                
+                if (!res.ok) {
+                    const errData = await res.json();
+                    await showCustomAlert(errData.message || 'Failed to load session', 'Error');
+                    window.location.href = '/whiteboard';
+                    return;
+                }
+                
+                const data = await res.json();
+                const wb = data.data;
                     
                     // Update page title
                     if (wb.title) {
@@ -531,7 +551,6 @@
                             draw(d.x0, d.y0, d.x1, d.y1, d.color, d.size, d.opacity);
                         });
                     }
-                }
             } catch (e) {
                 console.error('Failed to fetch session info', e);
             }
@@ -542,6 +561,18 @@
                 participantsEl.innerHTML = '<small class="text-body-secondary">Connected</small>';
             }
         });
+        
+        // Handle session ended by creator
+        socket.on('session_ended', async (data) => {
+            console.log('Session ended:', data);
+            // Stop any active calls
+            if (isInCall && typeof stopCall === 'function') {
+                stopCall();
+            }
+            await showCustomAlert('This session has been ended by the host', 'Session Ended');
+            window.location.href = '/whiteboard';
+        });
+        
         // Load session info (permissions)
         loadSessionInfo();
         // Update permission status UI element and overlay

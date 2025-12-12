@@ -579,10 +579,11 @@ def get_group_requests(group_id):
     if not pending_ids:
         return success_response([], 'No pending requests', 200)
         
-    users = db.find('users', {'_id': {'$in': pending_ids}})
+    users = list(db.find('users', {'_id': {'$in': pending_ids}}))
     
-    # Remove sensitive data
+    # Remove sensitive data and add 'id' field
     for user in users:
+        user['id'] = str(user['_id'])
         del user['password_hash']
         
     return success_response([serialize_document(u) for u in users], 'Requests retrieved successfully', 200)

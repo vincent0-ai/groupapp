@@ -286,13 +286,17 @@
                     headers: { 'Authorization': `Bearer ${token}` }
                 });
                 
+                const data = await res.json();
+                
                 if (res.ok) {
+                    await showCustomAlert(`Request ${action}d successfully!`, 'Success');
                     loadRequests(); // Reload list
                 } else {
-                    alert('Failed to process request');
+                    await showCustomAlert(data.message || 'Failed to process request', 'Error');
                 }
             } catch (err) {
-                alert('Error processing request');
+                console.error('Error processing request:', err);
+                await showCustomAlert('Error processing request', 'Error');
             }
         }
 

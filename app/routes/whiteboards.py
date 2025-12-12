@@ -81,7 +81,15 @@ def end_whiteboard(wb_id):
         return error_response('Only the creator can end this session', 403)
         
     # Soft delete by setting is_active to False
-    db.update_one('whiteboards', {'_id': wb_obj_id}, {'is_active': False})
+    db.update_one('whiteboards', {'_id': wb_obj_id}, {'is_active': False, 'ended_at': datetime.utcnow()})
+    
+    # Emit socket event to notify all users in the session
+    try:
+        from app import socketio
+        room = f'whiteboard:{wb_id}'
+        socketio.emit('session_ended', {'session_id': wb_id}, room=room)
+    except Exception as e:
+        print(f"Error emitting session_ended event: {e}")
     
     return success_response(None, 'Session ended successfully', 200)
 
