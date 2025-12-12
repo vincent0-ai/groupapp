@@ -413,11 +413,21 @@
                 const compCard = (comp, isCompletedCard = false) => {
                     const participantCount = Array.isArray(comp.participants) ? comp.participants.length : (comp.participants || 0);
                     const isParticipant = Array.isArray(comp.participants) && comp.participants.some(p => p.user_id === userId);
+                    const isCreator = comp.created_by === userId;
                     const endTime = new Date(comp.end_time);
                     const timeRemaining = endTime - now;
                     
                     let actionBtn = '';
                     let statusBadge = '';
+                    let creatorActions = '';
+                    
+                    // Creator actions (end/delete)
+                    if (isCreator) {
+                        if (!isCompletedCard) {
+                            creatorActions += `<button class="btn btn-sm btn-outline-warning" onclick="endCompetition('${comp.id}')" title="End competition now"><i class="fas fa-stop"></i></button> `;
+                        }
+                        creatorActions += `<button class="btn btn-sm btn-outline-danger" onclick="deleteCompetition('${comp.id}')" title="Delete competition"><i class="fas fa-trash"></i></button>`;
+                    }
                     
                     if (isCompletedCard) {
                         // Completed - show results button
@@ -454,10 +464,14 @@
                                 <p class="card-text">${comp.description || 'No description'}</p>
                                 <div class="mb-2">
                                     <small class="text-muted"><i class="fas fa-users"></i> ${participantCount} participants</small>
+                                    ${isCreator ? '<span class="badge bg-primary ms-2">Creator</span>' : ''}
                                 </div>
-                                <div class="mt-auto pt-3">
-                                    ${actionBtn}
-                                    <button class="btn btn-sm btn-info" onclick="viewCompetition('${comp.id}')">View Details</button>
+                                <div class="mt-auto pt-3 d-flex justify-content-between">
+                                    <div>
+                                        ${actionBtn}
+                                        <button class="btn btn-sm btn-info" onclick="viewCompetition('${comp.id}')">View Details</button>
+                                    </div>
+                                    <div>${creatorActions}</div>
                                 </div>
                             </div>
                         </div>
@@ -514,6 +528,56 @@
                 }
             } catch (error) {
                 console.error('Error joining competition:', error);
+            }
+        }
+
+        async function endCompetition(compId) {
+            if (!confirm('Are you sure you want to end this competition now? Participants will no longer be able to submit answers.')) {
+                return;
+            }
+            
+            try {
+                const res = await fetch(`/api/competitions/${compId}/end`, {
+                    method: 'POST',
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                
+                if (res.ok) {
+                    await showCustomAlert('Competition ended successfully!', 'Success');
+                    loadCompetitions();
+                } else {
+                    const data = await res.json();
+                    await showCustomAlert(data.message || 'Failed to end competition', 'Error');
+                }
+            } catch (error) {
+                console.error('Error ending competition:', error);
+                await showCustomAlert('An error occurred', 'Error');
+            }
+        }
+
+        async function deleteCompetition(compId) {
+            if (!confirm('Are you sure you want to delete this competition? This action cannot be undone.')) {
+                return;
+            }
+            
+            try {
+                const res = await fetch(`/api/competitions/${compId}`, {
+                    method: 'DELETE',
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                
+                if (res.ok) {
+                    await showCustomAlert('Competition deleted successfully!', 'Success');
+                    loadCompetitions();
+                } else {
+                    const data = await res.json();
+                    await showCustomAlert(data.message || 'Failed to delete competition', 'Error');
+                }
+            } catch (error) {
+                console.error('Error deleting competition:', error);
+                await showCustomAlert('An error occurred', 'Error');
+            }
+        }
             }
         }
 

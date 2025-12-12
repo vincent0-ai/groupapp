@@ -348,3 +348,60 @@ def get_leaderboard(comp_id):
     leaderboard.sort(key=lambda x: x['score'], reverse=True)
     
     return success_response(leaderboard, 'Leaderboard retrieved successfully', 200)
+
+@competitions_bp.route('/<comp_id>', methods=['DELETE'])
+@require_auth
+def delete_competition(comp_id):
+    """Delete a competition (creator only)"""
+    try:
+        comp_id_obj = ObjectId(comp_id)
+    except:
+        return error_response('Invalid competition ID', 400)
+    
+    db = Database()
+    competition = db.find_one('competitions', {'_id': comp_id_obj})
+    
+    if not competition:
+        return error_response('Competition not found', 404)
+    
+    # Check if user is the creator or an admin
+    user = db.find_one('users', {'_id': ObjectId(g.user_id)})
+    is_admin = user.get('is_admin', False) if user else False
+    
+    if str(competition.get('created_by')) != g.user_id and not is_admin:
+        return error_response('Only the competition creator can delete this competition', 403)
+    
+    db.delete_one('competitions', {'_id': comp_id_obj})
+    
+    return success_response(None, 'Competition deleted successfully', 200)
+
+@competitions_bp.route('/<comp_id>/end', methods=['POST'])
+@require_auth
+def end_competition(comp_id):
+    """End a competition early (creator only)"""
+    try:
+        comp_id_obj = ObjectId(comp_id)
+    except:
+        return error_response('Invalid competition ID', 400)
+    
+    db = Database()
+    competition = db.find_one('competitions', {'_id': comp_id_obj})
+    
+    if not competition:
+        return error_response('Competition not found', 404)
+    
+    # Check if user is the creator or an admin
+    user = db.find_one('users', {'_id': ObjectId(g.user_id)})
+    is_admin = user.get('is_admin', False) if user else False
+    
+    if str(competition.get('created_by')) != g.user_id and not is_admin:
+        return error_response('Only the competition creator can end this competition', 403)
+    
+    # Set end_time to now and mark as completed
+    db.update_one('competitions', {'_id': comp_id_obj}, {
+        'end_time': datetime.utcnow(),
+        'completed': True,
+        'is_active': False
+    })
+    
+    return success_response(None, 'Competition ended successfully', 200)
