@@ -187,6 +187,28 @@
             });
         }
 
+        // Check if user is admin and add admin link
+        const token = localStorage.getItem('token');
+        if (token) {
+            fetch('/api/users/profile', {
+                headers: { 'Authorization': `Bearer ${token}` }
+            })
+            .then(res => res.json())
+            .then(data => {
+                if (data.data && data.data.is_admin) {
+                    const navbarList = document.getElementById('navbarList');
+                    if (navbarList && !document.getElementById('adminLink')) {
+                        const li = document.createElement('li');
+                        li.className = 'nav-item';
+                        li.innerHTML = `<a class="nav-link" id="adminLink" href="/admin"><i class="fas fa-shield-alt"></i> Admin</a>`;
+                        // Insert before Logout (last item)
+                        navbarList.insertBefore(li, navbarList.lastElementChild);
+                    }
+                }
+            })
+            .catch(err => console.warn('Could not check admin status:', err));
+        }
+
         // Mobile menu
         const navbarToggler = document.getElementById('navbarToggler');
         const navbarCollapse = document.getElementById('navbarNav');
