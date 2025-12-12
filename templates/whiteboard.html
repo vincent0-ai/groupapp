@@ -1034,8 +1034,14 @@
         socket.on('webrtc_user_joined', async (data) => {
             const remoteUserId = data.user_id;
             if (remoteUserId === userId) return;
+            if (!isInCall) return; // Only respond if we're in the call
             
             console.log('User joined call:', remoteUserId);
+            
+            // Close existing peer connection if any
+            if (peers[remoteUserId]) {
+                peers[remoteUserId].close();
+            }
             
             // Create peer connection
             const peer = createPeerConnection(remoteUserId);
@@ -1076,10 +1082,19 @@
 
         // Handle incoming offer
         socket.on('webrtc_offer', async (data) => {
-            const { sender, offer } = data;
+            const { sender, offer, target } = data;
+            
+            // Ignore if not in call, or if we're the sender, or if we're not the target
+            if (!isInCall) return;
             if (sender === userId) return;
+            if (target && target !== userId) return;
             
             console.log('Received offer from:', sender);
+            
+            // Close existing peer connection if any (renegotiation)
+            if (peers[sender]) {
+                peers[sender].close();
+            }
             
             const peer = createPeerConnection(sender);
             peers[sender] = peer;
@@ -1087,7 +1102,7 @@
             try {
                 await peer.setRemoteDescription(new RTCSessionDescription(offer));
                 
-                // Add local tracks if we are in the call
+                // Add local tracks if we are in the call and have a stream
                 if (localStream) {
                     localStream.getTracks().forEach(track => peer.addTrack(track, localStream));
                 }
@@ -1108,12 +1123,20 @@
 
         // Handle incoming answer
         socket.on('webrtc_answer', async (data) => {
-            const { sender, answer } = data;
+            const { sender, answer, target } = data;
+            
+            // Ignore if not in call or not the intended target
+            if (!isInCall) return;
+            if (target && target !== userId) return;
+            
             const peer = peers[sender];
             
             if (peer) {
                 try {
-                    await peer.setRemoteDescription(new RTCSessionDescription(answer));
+                    // Only set remote description if we haven't already
+                    if (peer.signalingState === 'have-local-offer') {
+                        await peer.setRemoteDescription(new RTCSessionDescription(answer));
+                    }
                 } catch (e) {
                     console.error('Error setting remote description:', e);
                 }
@@ -1122,10 +1145,15 @@
 
         // Handle ICE candidate
         socket.on('webrtc_ice', async (data) => {
-            const { sender, candidate } = data;
+            const { sender, candidate, target } = data;
+            
+            // Ignore if not in call or not the intended target
+            if (!isInCall) return;
+            if (target && target !== userId) return;
+            
             const peer = peers[sender];
             
-            if (peer) {
+            if (peer && peer.remoteDescription) {
                 try {
                     await peer.addIceCandidate(new RTCIceCandidate(candidate));
                 } catch (e) {
