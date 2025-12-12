@@ -3,6 +3,7 @@ from minio.error import S3Error
 import os
 from flask import current_app
 from datetime import timedelta
+from urllib.parse import urlparse
 
 class MinioClient:
     """MinIO client for S3-compatible file storage"""
@@ -19,11 +20,23 @@ class MinioClient:
         if self._initialized:
             return
         
+        # Parse endpoint - MinIO client only accepts host:port, not full URLs
+        endpoint = current_app.config['MINIO_ENDPOINT']
+        use_ssl = current_app.config['MINIO_USE_SSL']
+        
+        # If endpoint looks like a URL, parse it
+        if endpoint.startswith('http://') or endpoint.startswith('https://'):
+            parsed = urlparse(endpoint)
+            endpoint = parsed.netloc  # Extract just host:port
+            # If URL uses https, enable SSL
+            if parsed.scheme == 'https':
+                use_ssl = True
+        
         self.client = Minio(
-            current_app.config['MINIO_ENDPOINT'],
+            endpoint,
             access_key=current_app.config['MINIO_ROOT_USER'],
             secret_key=current_app.config['MINIO_ROOT_PASSWORD'],
-            secure=current_app.config['MINIO_USE_SSL']
+            secure=use_ssl
         )
         self.bucket = current_app.config['MINIO_BUCKET']
         self._ensure_bucket_exists()
