@@ -120,6 +120,9 @@ def upload_file():
     
     file.save(temp_path)
     
+    # Get file size before any operations
+    file_size = os.path.getsize(temp_path)
+    
     # Upload to MinIO
     minio_path = f"groups/{group_id}/{filename}"
     minio_client = MinioClient()
@@ -138,7 +141,7 @@ def upload_file():
         filename, file.filename.rsplit('.', 1)[1].lower(), g.user_id,
         group_id, channel_id, minio_path=minio_path
     )
-    file_doc['file_size'] = os.path.getsize(temp_path) if os.path.exists(temp_path) else 0
+    file_doc['file_size'] = file_size
     file_doc['mime_type'] = content_type
     
     file_id = db.insert_one('files', file_doc)

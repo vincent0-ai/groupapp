@@ -60,7 +60,10 @@
                     </div>
                     <div class="modal-footer">
                         <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                        <button type="submit" class="btn btn-primary">Upload</button>
+                        <button type="submit" class="btn btn-primary" id="uploadBtn">
+                            <span class="upload-text">Upload</span>
+                            <span class="uploading-text d-none"><i class="fas fa-spinner fa-spin"></i> Uploading...</span>
+                        </button>
                     </div>
                 </form>
             </div>
@@ -72,6 +75,14 @@
     <script>
         const token = localStorage.getItem('token');
 
+        function formatFileSize(bytes) {
+            if (bytes === 0) return '0 Bytes';
+            const k = 1024;
+            const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+        }
+
         async function loadFiles() {
             try {
                 const res = await fetch('/api/files', {
@@ -80,21 +91,24 @@
                 const data = await res.json();
                 const files = data.data?.files || [];
 
-                const html = files.length ? files.map(f => `
+                const html = files.length ? files.map(f => {
+                    const fileIcon = getFileIcon(f.file_type || f.filename.split('.').pop());
+                    return `
                     <div class="col-md-4 mb-3">
                         <div class="card h-100 shadow-sm border-0">
                             <div class="card-body d-flex flex-column">
-                                <h5 class="card-title"><i class="fas fa-file"></i> ${f.filename}</h5>
-                                <p class="card-text text-body-secondary small">${(f.file_size || f.size || 0)} bytes</p>
-                                <small>${f.uploaded_by}</small>
+                                <h5 class="card-title"><i class="fas ${fileIcon}"></i> ${f.filename}</h5>
+                                <p class="card-text text-body-secondary small">${formatFileSize(f.file_size || 0)}</p>
+                                <small class="text-muted"><i class="fas fa-download"></i> ${f.downloads || 0} downloads</small>
                                 <div class="mt-auto pt-3">
-                                    <a href="#" class="btn btn-sm btn-primary" onclick="downloadFile('${f.id}')">Download</a>
-                                    <button class="btn btn-sm btn-danger" onclick="deleteFile('${f.id}')">Delete</button>
+                                    <button class="btn btn-sm btn-primary" onclick="downloadFile('${f.id}', '${f.filename}')"><i class="fas fa-download"></i> Download</button>
+                                    <button class="btn btn-sm btn-danger" onclick="deleteFile('${f.id}')"><i class="fas fa-trash"></i></button>
                                 </div>
                             </div>
                         </div>
                     </div>
-                `).join('') : '<div class="col-12 text-center text-secondary"><p>No files uploaded yet</p></div>';
+                `;
+                }).join('') : '<div class="col-12 text-center text-secondary"><p>No files uploaded yet</p></div>';
 
                 document.getElementById('filesList').innerHTML = html;
 
@@ -121,7 +135,20 @@
             }
         }
 
-        async function downloadFile(fileId) {
+        function getFileIcon(fileType) {
+            const icons = {
+                'pdf': 'fa-file-pdf',
+                'doc': 'fa-file-word', 'docx': 'fa-file-word',
+                'xls': 'fa-file-excel', 'xlsx': 'fa-file-excel',
+                'ppt': 'fa-file-powerpoint', 'pptx': 'fa-file-powerpoint',
+                'jpg': 'fa-file-image', 'jpeg': 'fa-file-image', 'png': 'fa-file-image', 'gif': 'fa-file-image',
+                'zip': 'fa-file-archive',
+                'txt': 'fa-file-alt'
+            };
+            return icons[fileType?.toLowerCase()] || 'fa-file';
+        }
+
+        async function downloadFile(fileId, filename) {
             try {
                 const res = await fetch(`/api/files/${fileId}`, {
                     headers: { 'Authorization': `Bearer ${token}` }
@@ -129,10 +156,22 @@
                 if (res.ok) {
                     const data = await res.json();
                     const url = data.data?.download_url;
-                    if (url) window.open(url, '_blank');
+                    if (url) {
+                        // Create a temporary link to trigger download with proper filename
+                        const a = document.createElement('a');
+                        a.href = url;
+                        a.download = filename || 'download';
+                        a.target = '_blank';
+                        document.body.appendChild(a);
+                        a.click();
+                        document.body.removeChild(a);
+                    }
+                } else {
+                    await showCustomAlert('Failed to download file', 'Error');
                 }
             } catch (error) {
                 console.error('Error downloading file:', error);
+                await showCustomAlert('Error downloading file', 'Error');
             }
         }
 
@@ -155,6 +194,16 @@
 
         document.getElementById('uploadForm').addEventListener('submit', async (e) => {
             e.preventDefault();
+            
+            const uploadBtn = document.getElementById('uploadBtn');
+            const uploadText = uploadBtn.querySelector('.upload-text');
+            const uploadingText = uploadBtn.querySelector('.uploading-text');
+            
+            // Disable button and show uploading state
+            uploadBtn.disabled = true;
+            uploadText.classList.add('d-none');
+            uploadingText.classList.remove('d-none');
+            
             const formData = new FormData();
             formData.append('file', document.getElementById('fileInput').files[0]);
             formData.append('group_id', document.getElementById('uploadGroup').value);
@@ -174,9 +223,18 @@
                         modal.hide();
                     }
                     loadFiles();
+                } else {
+                    const data = await res.json();
+                    await showCustomAlert(data.message || 'Upload failed', 'Error');
                 }
             } catch (error) {
                 console.error('Error uploading file:', error);
+                await showCustomAlert('Error uploading file', 'Error');
+            } finally {
+                // Re-enable button and restore text
+                uploadBtn.disabled = false;
+                uploadText.classList.remove('d-none');
+                uploadingText.classList.add('d-none');
             }
         });
         document.addEventListener('DOMContentLoaded', () => {
