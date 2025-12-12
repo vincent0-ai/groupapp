@@ -92,8 +92,11 @@ def create_competition():
     
     try:
         group_id_obj = ObjectId(group_id)
-        start_time = datetime.fromisoformat(data.get('start_time'))
-        end_time = datetime.fromisoformat(data.get('end_time'))
+        # Handle ISO strings with 'Z' suffix (JavaScript format)
+        start_time_str = data.get('start_time').replace('Z', '+00:00')
+        end_time_str = data.get('end_time').replace('Z', '+00:00')
+        start_time = datetime.fromisoformat(start_time_str)
+        end_time = datetime.fromisoformat(end_time_str)
     except:
         return error_response('Invalid data format', 400)
     
