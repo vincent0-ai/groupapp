@@ -57,7 +57,7 @@
 {% block modals %}
     <!-- Create Competition Modal -->
     <div class="modal fade" id="createCompModal" tabindex="-1">
-        <div class="modal-dialog">
+        <div class="modal-dialog modal-lg">
             <div class="modal-content">
                 <div class="modal-header">
                     <h5 class="modal-title">Create Competition</h5>
@@ -65,17 +65,34 @@
                 </div>
                 <form id="createCompForm">
                     <div class="modal-body">
-                        <div class="mb-3">
-                            <label for="compName" class="form-label">Competition Name</label>
-                            <input type="text" class="form-control" id="compName" required>
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label for="compName" class="form-label">Competition Name</label>
+                                <input type="text" class="form-control" id="compName" required>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label for="compGroup" class="form-label">Group</label>
+                                <select class="form-control" id="compGroup" required></select>
+                            </div>
                         </div>
                         <div class="mb-3">
-                            <label for="compGroup" class="form-label">Group</label>
-                            <select class="form-control" id="compGroup" required></select>
+                            <label for="compDescription" class="form-label">Description</label>
+                            <textarea class="form-control" id="compDescription" rows="2"></textarea>
                         </div>
                         <div class="mb-3">
                             <label for="compDuration" class="form-label">Duration (minutes)</label>
                             <input type="number" class="form-control" id="compDuration" value="60" required>
+                        </div>
+                        
+                        <hr>
+                        <div class="d-flex justify-content-between align-items-center mb-3">
+                            <h6>Questions</h6>
+                            <button type="button" class="btn btn-sm btn-outline-primary" onclick="addQuestionField()">
+                                <i class="fas fa-plus"></i> Add Question
+                            </button>
+                        </div>
+                        <div id="questionsContainer">
+                            <!-- Questions will be added here -->
                         </div>
                     </div>
                     <div class="modal-footer">
@@ -86,11 +103,233 @@
             </div>
         </div>
     </div>
+
+    <!-- Play Competition Modal -->
+    <div class="modal fade" id="playCompModal" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="playCompTitle">Play Competition</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="alert alert-info">
+                        <i class="fas fa-info-circle"></i> Answer the questions below. You get 10 points for each correct answer.
+                    </div>
+                    <div id="playCompQuestions">
+                        <!-- Questions will be loaded here -->
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- View Competition Modal -->
+    <div class="modal fade" id="viewCompModal" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="viewCompTitle">Competition Details</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <p id="viewCompDescription" class="text-muted"></p>
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <small class="text-muted">Start Time</small>
+                            <p id="viewCompStart"></p>
+                        </div>
+                        <div class="col-md-6">
+                            <small class="text-muted">End Time</small>
+                            <p id="viewCompEnd"></p>
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <small class="text-muted">Participants</small>
+                        <p id="viewCompParticipants">0</p>
+                    </div>
+                    <hr>
+                    <h6>Questions</h6>
+                    <div id="viewCompQuestions" class="list-group list-group-flush"></div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                    <button type="button" class="btn btn-success" id="viewCompJoinBtn">Join Competition</button>
+                </div>
+            </div>
+        </div>
+    </div>
 {% endblock %}
 
 {% block scripts %}
     <script>
         const token = localStorage.getItem('token');
+        const userId = localStorage.getItem('userId');
+        let questionCount = 0;
+
+        function addQuestionField() {
+            questionCount++;
+            const container = document.getElementById('questionsContainer');
+            const div = document.createElement('div');
+            div.className = 'card mb-3 bg-light';
+            div.innerHTML = `
+                <div class="card-body">
+                    <div class="d-flex justify-content-between mb-2">
+                        <h6>Question ${questionCount}</h6>
+                        <button type="button" class="btn btn-sm btn-danger" onclick="this.closest('.card').remove()">
+                            <i class="fas fa-trash"></i>
+                        </button>
+                    </div>
+                    <div class="mb-2">
+                        <input type="text" class="form-control form-control-sm question-text" placeholder="Question Text" required>
+                    </div>
+                    <div class="mb-2">
+                        <input type="text" class="form-control form-control-sm question-options" placeholder="Options (comma separated, e.g. A,B,C,D)" required>
+                    </div>
+                    <div>
+                        <input type="text" class="form-control form-control-sm question-answer" placeholder="Correct Answer" required>
+                    </div>
+                </div>
+            `;
+            container.appendChild(div);
+        }
+
+        async function playCompetition(compId) {
+            try {
+                const res = await fetch(`/api/competitions/${compId}`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                const data = await res.json();
+                const comp = data.data;
+                
+                document.getElementById('playCompTitle').textContent = comp.title;
+                
+                // Find current user's progress
+                const participant = comp.participants.find(p => p.user_id === userId);
+                const answeredIds = participant ? (participant.answers || []).map(a => parseInt(a.question_id)) : [];
+
+                const questionsHtml = (comp.questions || []).map((q, i) => {
+                    const isAnswered = answeredIds.includes(i);
+                    const answerData = participant?.answers?.find(a => parseInt(a.question_id) === i);
+                    
+                    let statusBadge = '';
+                    if (isAnswered) {
+                        statusBadge = answerData.is_correct 
+                            ? '<span class="badge bg-success">Correct (+10)</span>' 
+                            : '<span class="badge bg-danger">Incorrect</span>';
+                    }
+
+                    const optionsHtml = (q.options || []).map(opt => `
+                        <div class="form-check">
+                            <input class="form-check-input" type="radio" name="q${i}" value="${opt}" id="q${i}_${opt}" ${isAnswered ? 'disabled' : ''}>
+                            <label class="form-check-label" for="q${i}_${opt}">
+                                ${opt}
+                            </label>
+                        </div>
+                    `).join('');
+
+                    return `
+                        <div class="card mb-3">
+                            <div class="card-header d-flex justify-content-between align-items-center">
+                                <strong>Question ${i+1}</strong>
+                                ${statusBadge}
+                            </div>
+                            <div class="card-body">
+                                <p>${q.text}</p>
+                                <div class="mb-3">
+                                    ${optionsHtml}
+                                </div>
+                                ${!isAnswered ? `
+                                    <button class="btn btn-primary btn-sm" onclick="submitAnswer('${comp.id}', ${i})">Submit Answer</button>
+                                ` : `
+                                    <div class="alert alert-light border">
+                                        Your answer: <strong>${answerData.answer}</strong>
+                                    </div>
+                                `}
+                            </div>
+                        </div>
+                    `;
+                }).join('');
+                
+                document.getElementById('playCompQuestions').innerHTML = questionsHtml || '<p>No questions found.</p>';
+                new bootstrap.Modal(document.getElementById('playCompModal')).show();
+
+            } catch (error) {
+                console.error('Error playing competition:', error);
+            }
+        }
+
+        async function submitAnswer(compId, questionIndex) {
+            const selectedOption = document.querySelector(`input[name="q${questionIndex}"]:checked`);
+            if (!selectedOption) {
+                alert('Please select an answer');
+                return;
+            }
+            
+            const answer = selectedOption.value;
+            
+            try {
+                const res = await fetch(`/api/competitions/${compId}/submit-answer`, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        question_id: questionIndex,
+                        answer: answer
+                    })
+                });
+                
+                const data = await res.json();
+                if (res.ok) {
+                    // Reload the modal to show result
+                    playCompetition(compId);
+                } else {
+                    alert(data.message || 'Error submitting answer');
+                }
+            } catch (error) {
+                console.error('Error submitting answer:', error);
+            }
+        }
+
+        async function viewCompetition(compId) {
+            try {
+                const res = await fetch(`/api/competitions/${compId}`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                const data = await res.json();
+                const comp = data.data;
+
+                document.getElementById('viewCompTitle').textContent = comp.title;
+                document.getElementById('viewCompDescription').textContent = comp.description || 'No description provided.';
+                document.getElementById('viewCompStart').textContent = new Date(comp.start_time).toLocaleString();
+                document.getElementById('viewCompEnd').textContent = new Date(comp.end_time).toLocaleString();
+                document.getElementById('viewCompParticipants').textContent = (comp.participants?.length || 0) + ' participants';
+                
+                const questionsHtml = (comp.questions || []).map((q, i) => `
+                    <div class="list-group-item">
+                        <strong>Q${i+1}:</strong> ${q.text}
+                        <br>
+                        <small class="text-muted">Options: ${Array.isArray(q.options) ? q.options.join(', ') : q.options}</small>
+                    </div>
+                `).join('');
+                document.getElementById('viewCompQuestions').innerHTML = questionsHtml || '<p class="text-muted">No questions available.</p>';
+
+                const joinBtn = document.getElementById('viewCompJoinBtn');
+                joinBtn.onclick = () => joinCompetition(comp.id);
+                
+                if (new Date(comp.end_time) < new Date()) {
+                     joinBtn.style.display = 'none';
+                } else {
+                     joinBtn.style.display = 'block';
+                }
+
+                new bootstrap.Modal(document.getElementById('viewCompModal')).show();
+            } catch (error) {
+                console.error('Error viewing competition:', error);
+            }
+        }
 
         async function loadCompetitions() {
             try {
@@ -102,6 +341,13 @@
 
                 const compCard = (comp) => {
                     const participantCount = Array.isArray(comp.participants) ? comp.participants.length : (comp.participants || 0);
+                    const isParticipant = Array.isArray(comp.participants) && comp.participants.some(p => p.user_id === userId);
+                    
+                    let actionBtn = `<button class="btn btn-sm btn-success" onclick="joinCompetition('${comp.id}')">Join</button>`;
+                    if (isParticipant) {
+                        actionBtn = `<button class="btn btn-sm btn-warning" onclick="playCompetition('${comp.id}')"><i class="fas fa-play"></i> Play</button>`;
+                    }
+
                     return `
                     <div class="col-md-6 mb-3">
                         <div class="card h-100 shadow-sm border-0">
@@ -112,8 +358,8 @@
                                     <small class="text-muted"><i class="fas fa-users"></i> ${participantCount} participants</small>
                                 </div>
                                 <div class="mt-auto pt-3">
-                                    <button class="btn btn-sm btn-success" onclick="joinCompetition('${comp.id}')">Join</button>
-                                    <a href="#" class="btn btn-sm btn-info">View Details</a>
+                                    ${actionBtn}
+                                    <button class="btn btn-sm btn-info" onclick="viewCompetition('${comp.id}')">View Details</button>
                                 </div>
                             </div>
                         </div>
@@ -167,6 +413,21 @@
                 const duration = parseInt(document.getElementById('compDuration').value);
                 const startTime = new Date();
                 const endTime = new Date(startTime.getTime() + duration * 60000);
+
+                // Gather questions
+                const questions = [];
+                document.querySelectorAll('#questionsContainer .card').forEach(card => {
+                    const text = card.querySelector('.question-text').value;
+                    const optionsStr = card.querySelector('.question-options').value;
+                    const answer = card.querySelector('.question-answer').value;
+                    
+                    questions.push({
+                        text: text,
+                        options: optionsStr.split(',').map(o => o.trim()),
+                        correct_answer: answer
+                    });
+                });
+
                 const res = await fetch('/api/competitions', {
                     method: 'POST',
                     headers: {
@@ -175,9 +436,11 @@
                     },
                     body: JSON.stringify({
                         title: document.getElementById('compName').value,
+                        description: document.getElementById('compDescription').value,
                         group_id: document.getElementById('compGroup').value,
                         start_time: startTime.toISOString(),
-                        end_time: endTime.toISOString()
+                        end_time: endTime.toISOString(),
+                        questions: questions
                     })
                 });
                 if (res.ok) {

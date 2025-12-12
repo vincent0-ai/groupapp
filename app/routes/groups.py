@@ -115,6 +115,13 @@ def create_group():
     if not inserted_id:
         return error_response('Failed to create group', 500)
 
+    # Award points
+    try:
+        points = current_app.config['POINTS_CONFIG']['CREATE_GROUP']
+        db.increment('users', {'_id': ObjectId(g.user_id)}, 'points', points)
+    except Exception as e:
+        print(f"Error awarding points: {e}")
+
     # Fetch the created group to return complete document
     created_group = db.find_one('groups', {'_id': group_doc['_id']})
     created_group['id'] = str(created_group['_id'])

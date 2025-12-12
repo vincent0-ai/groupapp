@@ -190,6 +190,13 @@ def send_message():
     if not message_id:
         return error_response('Failed to send message', 500)
     
+    # Award points
+    try:
+        points = current_app.config['POINTS_CONFIG']['SEND_MESSAGE']
+        db.increment('users', {'_id': ObjectId(g.user_id)}, 'points', points)
+    except Exception as e:
+        print(f"Error awarding points: {e}")
+    
     message_doc['_id'] = message_id
     # Add sender's first name for immediate response and broadcast
     try:

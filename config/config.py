@@ -34,6 +34,14 @@ class Config:
     # Flask-SocketIO
     SOCKETIO_CORS_ALLOWED_ORIGINS = '*'
 
+    # Gamification Points
+    POINTS_CONFIG = {
+        'CREATE_GROUP': 5,
+        'SEND_MESSAGE': 1,
+        'UPLOAD_FILE': 2,
+        'JOIN_COMPETITION': 3
+    }
+
 class DevelopmentConfig(Config):
     """Development configuration"""
     DEBUG = True

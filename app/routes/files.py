@@ -146,6 +146,13 @@ def upload_file():
     if not file_id:
         return error_response('Failed to save file metadata', 500)
     
+    # Award points
+    try:
+        points = current_app.config['POINTS_CONFIG']['UPLOAD_FILE']
+        db.increment('users', {'_id': ObjectId(g.user_id)}, 'points', points)
+    except Exception as e:
+        print(f"Error awarding points: {e}")
+    
     file_doc['_id'] = file_id
     return success_response(serialize_document(file_doc), 'File uploaded successfully', 201)
 

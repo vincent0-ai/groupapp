@@ -198,6 +198,13 @@ def join_competition(comp_id):
     
     db.push_to_array('competitions', {'_id': comp_id_obj}, 'participants', participant_data)
     
+    # Award points
+    try:
+        points = current_app.config['POINTS_CONFIG']['JOIN_COMPETITION']
+        db.increment('users', {'_id': ObjectId(g.user_id)}, 'points', points)
+    except Exception as e:
+        print(f"Error awarding points: {e}")
+    
     return success_response(None, 'Joined competition successfully', 200)
 
 @competitions_bp.route('/<comp_id>/submit-answer', methods=['POST'])
@@ -235,19 +242,44 @@ def submit_answer(comp_id):
     if participant_index is None:
         return error_response('Not participating in this competition', 400)
     
-    # Store answer (in production, validate against correct answers)
+    # Check if already answered
+    participant = competition['participants'][participant_index]
+    existing_answers = [a.get('question_id') for a in participant.get('answers', [])]
+    if question_id in existing_answers:
+        return error_response('Question already answered', 400)
+
+    # Validate answer and calculate score
+    questions = competition.get('questions', [])
+    try:
+        q_idx = int(question_id)
+        if q_idx < 0 or q_idx >= len(questions):
+            return error_response('Invalid question ID', 400)
+        
+        question = questions[q_idx]
+        is_correct = str(answer).strip().lower() == str(question.get('correct_answer')).strip().lower()
+        points_awarded = 10 if is_correct else 0  # 10 points per correct answer
+        
+    except ValueError:
+        return error_response('Invalid question ID format', 400)
+
+    # Store answer
     answer_data = {
         'question_id': question_id,
         'answer': answer,
+        'is_correct': is_correct,
+        'points': points_awarded,
         'submitted_at': datetime.utcnow()
     }
     
-    # This is a simplified version; in production you'd calculate score
+    # Update participant answers and score
     db.update_one('competitions', 
                  {'_id': comp_id_obj, 'participants.user_id': user_id_obj},
-                 {'$push': {'participants.$.answers': answer_data}})
+                 {
+                     '$push': {'participants.$.answers': answer_data},
+                     '$inc': {'participants.$.score': points_awarded}
+                 })
     
-    return success_response(None, 'Answer submitted successfully', 200)
+    return success_response({'is_correct': is_correct, 'points': points_awarded}, 'Answer submitted successfully', 200)
 
 @competitions_bp.route('/<comp_id>/leaderboard', methods=['GET'])
 @require_auth
