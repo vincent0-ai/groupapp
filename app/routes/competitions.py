@@ -273,7 +273,7 @@ def submit_answer(comp_id):
         
         question = questions[q_idx]
         is_correct = str(answer).strip().lower() == str(question.get('correct_answer')).strip().lower()
-        points_awarded = 10 if is_correct else 0  # 10 points per correct answer
+        points_awarded = 1 if is_correct else 0  # 1 point per correct answer
         
     except ValueError:
         return error_response('Invalid question ID format', 400)
@@ -295,7 +295,27 @@ def submit_answer(comp_id):
                      '$inc': {'participants.$.score': points_awarded}
                  })
     
-    return success_response({'is_correct': is_correct, 'points': points_awarded}, 'Answer submitted successfully', 200)
+    # Get updated participant data
+    updated_comp = db.find_one('competitions', {'_id': comp_id_obj})
+    updated_participant = None
+    for p in updated_comp.get('participants', []):
+        if p.get('user_id') == user_id_obj:
+            updated_participant = p
+            break
+    
+    total_questions = len(questions)
+    answered_count = len(updated_participant.get('answers', [])) if updated_participant else 0
+    current_score = updated_participant.get('score', 0) if updated_participant else 0
+    is_complete = answered_count >= total_questions
+    
+    return success_response({
+        'is_correct': is_correct, 
+        'points': points_awarded,
+        'current_score': current_score,
+        'answered_count': answered_count,
+        'total_questions': total_questions,
+        'is_complete': is_complete
+    }, 'Answer submitted successfully', 200)
 
 @competitions_bp.route('/<comp_id>/leaderboard', methods=['GET'])
 @require_auth
