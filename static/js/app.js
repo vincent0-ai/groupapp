@@ -231,61 +231,71 @@ class Discussio {
             user_id: this.userId
         });
 
-        this.loadGroupChannels(group._id);
+        // Open the group chat view (no per-group channels anymore)
+        this.openGroup(group._id);
     }
 
     async loadGroupChannels(groupId) {
         try {
-            const response = await fetch(`${this.apiBase}/groups/${groupId}/channels`, {
+            const response = await fetch(`${this.apiBase}/groups/${groupId}`, {
                 headers: this.getAuthHeaders()
             });
 
-            if (!response.ok) throw new Error('Failed to load channels');
+            if (!response.ok) throw new Error('Failed to load group details');
 
             const data = await response.json();
-            const channels = data.data;
+            const group = data.data;
 
             const mainContent = document.getElementById('mainContent');
             mainContent.innerHTML = '';
 
-            channels.forEach(channel => {
-                const channelCard = document.createElement('div');
-                channelCard.className = 'card mb-3 cursor-pointer';
-                channelCard.innerHTML = `
-                    <div class="card-body">
-                        <h5 class="card-title">
-                            <i class="fas fa-hashtag"></i> ${channel.name}
-                        </h5>
-                        <p class="card-text text-muted">${channel.description}</p>
-                        <button class="btn btn-sm btn-primary" onclick="Discussio.openChannel('${channel._id}')">
-                            <i class="fas fa-comments"></i> Open Chat
-                        </button>
-                    </div>
-                `;
+            const groupCard = document.createElement('div');
+            groupCard.className = 'card mb-3';
+            groupCard.innerHTML = `
+                <div class="card-body">
+                    <h5 class="card-title">
+                        <i class="fas fa-users"></i> ${group.name}
+                    </h5>
+                    <p class="card-text text-muted">${group.description}</p>
+                    <button class="btn btn-sm btn-primary" onclick="Discussio.openGroup('${group._id}')">
+                        <i class="fas fa-comments"></i> Open Chat
+                    </button>
+                </div>
+            `;
 
-                mainContent.appendChild(channelCard);
-            });
+            mainContent.appendChild(groupCard);
         } catch (error) {
-            console.error('Error loading channels:', error);
+            console.error('Error loading group details:', error);
         }
     }
 
     async openChannel(channelId) {
-        const chatModal = new bootstrap.Modal(document.getElementById('chatModal'));
-        chatModal.show();
-
-        this.currentRoom = channelId;
-        this.socket.emit('join_room', {
-            room: channelId,
-            user_id: this.userId
-        });
-
-        await this.loadChannelMessages(channelId);
+        // Deprecated: channels are now global categories; use group chats instead
+        console.warn('openChannel is deprecated; use openGroup instead');
+        return this.openGroup(channelId);
     }
 
     async loadChannelMessages(channelId) {
+        // Keep for backward compatibility, route to openGroup
+        return this.loadGroupMessages(channelId);
+    }
+
+    async openGroup(groupId) {
+        const chatModal = new bootstrap.Modal(document.getElementById('chatModal'));
+        chatModal.show();
+
+        this.currentRoom = groupId;
+        this.socket.emit('join_room', {
+            room: groupId,
+            user_id: this.userId
+        });
+
+        await this.loadGroupMessages(groupId);
+    }
+
+    async loadGroupMessages(groupId) {
         try {
-            const response = await fetch(`${this.apiBase}/messages/channel/${channelId}?page=1&per_page=20`, {
+            const response = await fetch(`${this.apiBase}/messages/group/${groupId}?page=1&per_page=50`, {
                 headers: this.getAuthHeaders()
             });
 
@@ -321,11 +331,26 @@ class Discussio {
     }
 
     handleNewMessage(data) {
-        if (data.user_id !== this.userId) {
+        // Normalize message object
+        let content = '';
+        let user_id = null;
+        let timestamp = new Date().toISOString();
+
+        if (typeof data.message === 'string') {
+            content = data.message;
+            user_id = data.user_id;
+            timestamp = data.timestamp || timestamp;
+        } else if (typeof data.message === 'object' && data.message !== null) {
+            content = data.message.content || data.message.message || '';
+            user_id = data.message.user_id || data.user_id;
+            timestamp = data.message.created_at || data.timestamp || timestamp;
+        }
+
+        if (user_id !== this.userId) {
             this.displayMessage({
-                user_id: data.user_id,
-                content: data.message,
-                created_at: data.timestamp
+                user_id: user_id,
+                content: content,
+                created_at: timestamp
             });
         }
     }
@@ -360,7 +385,6 @@ class Discussio {
                 },
                 body: JSON.stringify({
                     content,
-                    channel_id: this.currentRoom,
                     group_id: this.currentRoom
                 })
             });
@@ -403,6 +427,7 @@ class Discussio {
                 body: JSON.stringify({
                     name,
                     description,
+                    category: document.getElementById('groupCategory') ? document.getElementById('groupCategory').value : '',
                     is_private: isPrivate
                 })
             });

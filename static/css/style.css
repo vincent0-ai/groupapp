@@ -437,6 +437,7 @@ body {
     border-radius: 20px;
     font-size: 0.85rem;
     font-weight: 500;
+    border: 1px solid var(--border-color);
 }
 
 .badge.bg-primary {
@@ -776,6 +777,7 @@ a:hover {
 .bg-dark,
 .bg-secondary {
     background-color: #fff !important;
+    color: var(--text-dark) !important;
 }
 
 .text-white {
@@ -788,8 +790,7 @@ a:hover {
     color: #000 !important;
 }
 
-.btn-primary:hover,
-.btn-primary:focus {
+.btn-primary:hover {
     background-color: #000 !important;
     border-color: #000 !important;
     color: #fff !important;
@@ -800,8 +801,7 @@ a:hover {
     color: #000 !important;
 }
 
-.btn-outline-primary:hover,
-.btn-outline-primary:focus {
+.btn-outline-primary:hover {
     background-color: #000 !important;
     border-color: #000 !important;
     color: #fff !important;

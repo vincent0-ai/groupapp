@@ -38,18 +38,19 @@ class Group:
     
     @staticmethod
     def create_group_doc(name: str, description: str, owner_id: str,
-                        is_private: bool = False, avatar_url: str = '') -> Dict:
-        """Create a new group document"""
+                        channel_id: Optional[str] = None, is_private: bool = False, avatar_url: str = '') -> Dict:
+        """Create a new group document; channel_id is a reference to Channel._id"""
         return {
             '_id': ObjectId(),
             'name': name,
             'description': description,
+            'channel_id': ObjectId(channel_id) if channel_id else None,
             'owner_id': ObjectId(owner_id),
             'avatar_url': avatar_url or f'https://api.dicebear.com/7.x/shapes/svg?seed={name}',
             'is_private': is_private,
             'members': [ObjectId(owner_id)],  # Include owner as member
+            'pending_members': [],  # List of user IDs waiting for approval
             'moderators': [ObjectId(owner_id)],
-            'channels': [],  # List of channel IDs
             'created_at': datetime.utcnow(),
             'updated_at': datetime.utcnow(),
             'settings': {
@@ -60,18 +61,17 @@ class Group:
         }
 
 class Channel:
-    """Channel model for MongoDB"""
+    """Channel (Category) model for MongoDB. Channels are global categories such as 'Science' or 'Games'."""
     
     @staticmethod
-    def create_channel_doc(name: str, group_id: str, description: str = '',
-                          is_private: bool = False) -> Dict:
-        """Create a new channel document"""
+    def create_channel_doc(name: str, description: str = '', is_private: bool = False) -> Dict:
+        """Create a new channel (category) document"""
         return {
             '_id': ObjectId(),
             'name': name,
-            'group_id': ObjectId(group_id),
             'description': description,
             'is_private': is_private,
+            'group_count': 0,
             'created_at': datetime.utcnow(),
             'updated_at': datetime.utcnow()
         }
@@ -80,7 +80,7 @@ class Message:
     """Message model for MongoDB"""
     
     @staticmethod
-    def create_message_doc(content: str, user_id: str, channel_id: str,
+    def create_message_doc(content: str, user_id: str, channel_id: Optional[str],
                           group_id: str, attachments: List = None,
                           reply_to: Optional[str] = None) -> Dict:
         """Create a new message document"""
@@ -88,7 +88,7 @@ class Message:
             '_id': ObjectId(),
             'content': content,
             'user_id': ObjectId(user_id),
-            'channel_id': ObjectId(channel_id),
+            'channel_id': ObjectId(channel_id) if channel_id else None,
             'group_id': ObjectId(group_id),
             'attachments': attachments or [],
             'reply_to': ObjectId(reply_to) if reply_to else None,
@@ -126,13 +126,16 @@ class Competition:
     def create_competition_doc(title: str, description: str, group_id: str,
                               created_by: str, start_time: datetime,
                               end_time: datetime, questions: List = None,
-                              competition_type: str = 'quiz') -> Dict:
-        """Create a new competition"""
+                              competition_type: str = 'quiz',
+                              channel_id: Optional[str] = None, category: str = 'General') -> Dict:
+        """Create a new competition (optionally tied to a channel/category)"""
         return {
             '_id': ObjectId(),
             'title': title,
             'description': description,
             'group_id': ObjectId(group_id),
+            'channel_id': ObjectId(channel_id) if channel_id else None,
+            'category': category,
             'created_by': ObjectId(created_by),
             'competition_type': competition_type,  # 'quiz', 'challenge', 'contest'
             'questions': questions or [],

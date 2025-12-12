@@ -9,6 +9,7 @@ from functools import wraps
 from flask import g
 import jwt
 from flask import current_app
+from datetime import datetime
 
 groups_bp = Blueprint('groups', __name__, url_prefix='/api/groups')
 
@@ -73,6 +74,8 @@ def create_group():
     
     name = data.get('name', '').strip()
     description = data.get('description', '').strip()
+    channel_id = data.get('channel_id')
+    category = data.get('category', '').strip()
     is_private = data.get('is_private', False)
     avatar_url = data.get('avatar_url', '')
     
@@ -80,21 +83,47 @@ def create_group():
         return error_response('Group name must be at least 3 characters', 400)
     
     db = Database()
-    group_doc = Group.create_group_doc(name, description, g.user_id, is_private, avatar_url)
-    
+
+    # Resolve channel: use explicit channel_id if provided, otherwise find/create by category name
+    channel_obj_id = None
+    if channel_id:
+        try:
+            cid = ObjectId(channel_id)
+            ch = db.find_one('channels', {'_id': cid})
+            if not ch:
+                return error_response('Channel not found', 404)
+            channel_obj_id = cid
+        except Exception:
+            return error_response('Invalid channel ID', 400)
+    else:
+        if not category:
+            category = 'General'
+        existing_channel = db.find_one('channels', {'name': category})
+        if not existing_channel:
+            channel_doc = Channel.create_channel_doc(category, '')
+            db.insert_one('channels', channel_doc)
+            existing_channel = db.find_one('channels', {'name': category})
+            if existing_channel:
+                db.update_one('channels', {'_id': existing_channel['_id']}, {'group_count': 1, 'updated_at': datetime.utcnow()})
+                channel_obj_id = existing_channel['_id']
+        else:
+            db.update_one('channels', {'_id': existing_channel['_id']}, {'group_count': (existing_channel.get('group_count', 0) + 1), 'updated_at': datetime.utcnow()})
+            channel_obj_id = existing_channel['_id']
+
+    group_doc = Group.create_group_doc(name, description, g.user_id, str(channel_obj_id) if channel_obj_id else None, is_private, avatar_url)
+
     # Insert returns the string ID, but the doc already has _id as ObjectId
     inserted_id = db.insert_one('groups', group_doc)
     
     if not inserted_id:
         return error_response('Failed to create group', 500)
-    
-    # Create a default "general" channel for the group
-    channel_doc = Channel.create_channel_doc('general', str(group_doc['_id']), 'General discussion channel')
-    db.insert_one('channels', channel_doc)
-    
+
     # Fetch the created group to return complete document
     created_group = db.find_one('groups', {'_id': group_doc['_id']})
     created_group['id'] = str(created_group['_id'])
+    if created_group.get('channel_id'):
+        ch = db.find_one('channels', {'_id': created_group['channel_id']})
+        created_group['channel'] = serialize_document(ch) if ch else None
     return success_response(serialize_document(created_group), 'Group created successfully', 201)
 
 @groups_bp.route('/<group_id>', methods=['GET'])
@@ -116,6 +145,10 @@ def get_group(group_id):
     if group['is_private'] and ObjectId(g.user_id) not in group['members']:
         return error_response('Access denied', 403)
     
+    # Attach channel information if present
+    if group.get('channel_id'):
+        ch = db.find_one('channels', {'_id': group['channel_id']})
+        group['channel'] = serialize_document(ch) if ch else None
     return success_response(serialize_document(group), 'Group retrieved successfully', 200)
 
 @groups_bp.route('/<group_id>', methods=['PUT'])
@@ -176,16 +209,23 @@ def delete_group(group_id):
     if str(group['owner_id']) != g.user_id:
         return error_response('Only group owner can delete group', 403)
     
-    # Delete associated channels and messages
-    db.delete_many('channels', {'group_id': group_id_obj})
+    # Delete associated messages, whiteboards, competitions, and files
     db.delete_many('messages', {'group_id': group_id_obj})
     db.delete_many('whiteboards', {'group_id': group_id_obj})
     db.delete_many('competitions', {'group_id': group_id_obj})
     db.delete_many('files', {'group_id': group_id_obj})
-    
+
+    # Decrement channel group count
+    channel_id = group.get('channel_id')
+    if channel_id:
+        ch = db.find_one('channels', {'_id': channel_id})
+        if ch:
+            new_count = max(0, ch.get('group_count', 1) - 1)
+            db.update_one('channels', {'_id': ch['_id']}, {'group_count': new_count, 'updated_at': datetime.utcnow()})
+
     # Delete group
     db.delete_one('groups', {'_id': group_id_obj})
-    
+
     return success_response(None, 'Group deleted successfully', 200)
 
 @groups_bp.route('/<group_id>/join', methods=['POST'])
@@ -204,7 +244,13 @@ def join_group(group_id):
         return error_response('Group not found', 404)
     
     if group['is_private']:
-        return error_response('Cannot join private group without invitation', 403)
+        # Check if already pending
+        if user_id_obj in group.get('pending_members', []):
+            return error_response('Join request already sent', 400)
+            
+        # Add to pending members
+        db.push_to_array('groups', {'_id': group_id_obj}, 'pending_members', user_id_obj)
+        return success_response(None, 'Join request sent successfully', 200)
     
     user_id_obj = ObjectId(g.user_id)
     
@@ -243,11 +289,19 @@ def leave_group(group_id):
     if is_owner:
         if len(members) == 1:
             # Owner is the only member, delete the group
-            db.delete_many('channels', {'group_id': group_id_obj})
             db.delete_many('messages', {'group_id': group_id_obj})
             db.delete_many('whiteboards', {'group_id': group_id_obj})
             db.delete_many('competitions', {'group_id': group_id_obj})
             db.delete_many('files', {'group_id': group_id_obj})
+
+            # Decrement channel group count
+            channel_id = group.get('channel_id')
+            if channel_id:
+                ch = db.find_one('channels', {'_id': channel_id})
+                if ch:
+                    new_count = max(0, ch.get('group_count', 1) - 1)
+                    db.update_one('channels', {'_id': ch['_id']}, {'group_count': new_count, 'updated_at': datetime.utcnow()})
+
             db.delete_one('groups', {'_id': group_id_obj})
             db.pull_from_array('users', {'_id': user_id_obj}, 'groups', group_id_obj)
             return success_response(None, 'Left and deleted group (you were the last member)', 200)
@@ -298,7 +352,7 @@ def get_group_members(group_id):
 @groups_bp.route('/<group_id>/channels', methods=['GET'])
 @require_auth
 def get_group_channels(group_id):
-    """Get channels in a group"""
+    """(Deprecated) Returns the channel/category info for the group"""
     try:
         group_id_obj = ObjectId(group_id)
     except:
@@ -310,22 +364,82 @@ def get_group_channels(group_id):
     if not group:
         return error_response('Group not found', 404)
     
-    channels = db.find('channels', {'group_id': group_id_obj})
-    return success_response([serialize_document(c) for c in channels], 'Channels retrieved successfully', 200)
+    channel = None
+    if group.get('channel_id'):
+        channel = db.find_one('channels', {'_id': group.get('channel_id')})
+    if not channel:
+        return success_response([], 'No channel found for this group', 200)
+    return success_response(serialize_document(channel), 'Channel retrieved successfully', 200)
 
 @groups_bp.route('/<group_id>/channels', methods=['POST'])
 @require_auth
 def create_channel(group_id):
-    """Create a channel in a group"""
+    """(Deprecated) Per-group channels are no longer supported; use /api/channels to create global categories"""
+    return error_response('Per-group channels are deprecated. Use /api/channels to create a global channel (category).', 410)
+
+
+# New endpoints for global channels (categories)
+@groups_bp.route('/channels', methods=['GET'])
+@require_auth
+def list_channels():
+    """List all channels (categories) and groups under each channel"""
+    db = Database()
+    user_id_obj = ObjectId(g.user_id)
+
+    channels = list(db.find('channels', {}))
+    result = []
+
+    for ch in channels:
+        groups = list(db.find('groups', {'channel_id': ch['_id'], '$or': [{'is_private': False}, {'members': user_id_obj}]}))
+        for group in groups:
+            group['member_count'] = len(group.get('members', []))
+            group['id'] = str(group['_id'])
+            group['is_member'] = user_id_obj in group.get('members', [])
+        ch['group_count'] = len(groups)
+        ch['groups'] = [serialize_document(g) for g in groups]
+        ch['id'] = str(ch['_id'])
+        result.append(serialize_document(ch))
+
+    return success_response({'channels': result}, 'Channels retrieved successfully', 200)
+
+
+@groups_bp.route('/channels', methods=['POST'])
+@require_auth
+def create_channel_api():
+    """Create a new channel (category)"""
+    data = request.get_json()
+    if not data or 'name' not in data:
+        return error_response('Channel name is required', 400)
+
+    name = data.get('name', '').strip()
+    description = data.get('description', '').strip()
+    is_private = data.get('is_private', False)
+
+    if len(name) < 2:
+        return error_response('Channel name must be at least 2 characters', 400)
+
+    db = Database()
+    existing = db.find_one('channels', {'name': name})
+    if existing:
+        return error_response('Channel with this name already exists', 400)
+
+    channel_doc = Channel.create_channel_doc(name, description, is_private)
+    created_id = db.insert_one('channels', channel_doc)
+    if not created_id:
+        return error_response('Failed to create channel', 500)
+
+    channel_doc = db.find_one('channels', {'_id': channel_doc['_id']})
+    channel_doc['id'] = str(channel_doc['_id'])
+    return success_response(serialize_document(channel_doc), 'Channel created successfully', 201)
+
+@groups_bp.route('/<group_id>/requests', methods=['GET'])
+@require_auth
+def get_group_requests(group_id):
+    """Get pending join requests for a group"""
     try:
         group_id_obj = ObjectId(group_id)
     except:
         return error_response('Invalid group ID', 400)
-    
-    data = request.get_json()
-    
-    if not data or 'name' not in data:
-        return error_response('Channel name is required', 400)
     
     db = Database()
     group = db.find_one('groups', {'_id': group_id_obj})
@@ -333,26 +447,79 @@ def create_channel(group_id):
     if not group:
         return error_response('Group not found', 404)
     
-    # Check if user is owner or moderator
+    # Check if user is moderator
     user_id_obj = ObjectId(g.user_id)
-    if user_id_obj not in group['moderators']:
-        return error_response('Only group moderators can create channels', 403)
+    if user_id_obj not in group.get('moderators', []):
+        return error_response('Only moderators can view requests', 403)
+        
+    pending_ids = group.get('pending_members', [])
+    if not pending_ids:
+        return success_response([], 'No pending requests', 200)
+        
+    users = db.find('users', {'_id': {'$in': pending_ids}})
     
-    name = data.get('name', '').strip()
-    description = data.get('description', '').strip()
-    is_private = data.get('is_private', False)
+    # Remove sensitive data
+    for user in users:
+        del user['password_hash']
+        
+    return success_response([serialize_document(u) for u in users], 'Requests retrieved successfully', 200)
+
+@groups_bp.route('/<group_id>/requests/<user_id>/approve', methods=['POST'])
+@require_auth
+def approve_request(group_id, user_id):
+    """Approve a join request"""
+    try:
+        group_id_obj = ObjectId(group_id)
+        target_user_id_obj = ObjectId(user_id)
+    except:
+        return error_response('Invalid ID', 400)
+        
+    db = Database()
+    group = db.find_one('groups', {'_id': group_id_obj})
     
-    if len(name) < 2:
-        return error_response('Channel name must be at least 2 characters', 400)
+    if not group:
+        return error_response('Group not found', 404)
+        
+    # Check if user is moderator
+    user_id_obj = ObjectId(g.user_id)
+    if user_id_obj not in group.get('moderators', []):
+        return error_response('Only moderators can approve requests', 403)
+        
+    if target_user_id_obj not in group.get('pending_members', []):
+        return error_response('Request not found', 404)
+        
+    # Add to members, remove from pending
+    db.push_to_array('groups', {'_id': group_id_obj}, 'members', target_user_id_obj)
+    db.pull_from_array('groups', {'_id': group_id_obj}, 'pending_members', target_user_id_obj)
+    db.push_to_array('users', {'_id': target_user_id_obj}, 'groups', group_id_obj)
     
-    channel_doc = Channel.create_channel_doc(name, group_id, description, is_private)
+    return success_response(None, 'Request approved', 200)
+
+@groups_bp.route('/<group_id>/requests/<user_id>/reject', methods=['POST'])
+@require_auth
+def reject_request(group_id, user_id):
+    """Reject a join request"""
+    try:
+        group_id_obj = ObjectId(group_id)
+        target_user_id_obj = ObjectId(user_id)
+    except:
+        return error_response('Invalid ID', 400)
+        
+    db = Database()
+    group = db.find_one('groups', {'_id': group_id_obj})
     
-    channel_id = db.insert_one('channels', channel_doc)
+    if not group:
+        return error_response('Group not found', 404)
+        
+    # Check if user is moderator
+    user_id_obj = ObjectId(g.user_id)
+    if user_id_obj not in group.get('moderators', []):
+        return error_response('Only moderators can reject requests', 403)
+        
+    if target_user_id_obj not in group.get('pending_members', []):
+        return error_response('Request not found', 404)
+        
+    # Remove from pending
+    db.pull_from_array('groups', {'_id': group_id_obj}, 'pending_members', target_user_id_obj)
     
-    if not channel_id:
-        return error_response('Failed to create channel', 500)
-    
-    db.push_to_array('groups', {'_id': group_id_obj}, 'channels', ObjectId(channel_id))
-    
-    channel_doc['_id'] = channel_id
-    return success_response(serialize_document(channel_doc), 'Channel created successfully', 201)
+    return success_response(None, 'Request rejected', 200)

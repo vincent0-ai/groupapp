@@ -3,32 +3,31 @@
 {% block title %}Messages - Discussio{% endblock %}
 
 {% block content %}
-        <div class="row g-3" style="height: calc(100vh - 100px);">
-            <!-- Channels List -->
-            <div class="col-md-3 h-100 d-flex flex-column">
-                <h4 class="mb-3">Channels</h4>
-                <div id="channelsList" class="list-group overflow-auto flex-grow-1 shadow-sm">
-                    <div class="p-3 text-center text-muted">Loading channels...</div>
+    <div class="row g-3" style="height: calc(100vh - 100px);">
+        <div class="col-12 h-100">
+            <div class="card h-100 d-flex flex-column shadow-sm border-0">
+                <div class="card-header d-flex align-items-center bg-white border-bottom">
+                    <a href="{{ url_for('groups_page') }}" class="btn btn-sm btn-outline-secondary me-3">
+                        <i class="fas fa-arrow-left me-1"></i> Groups
+                    </a>
+                    <h5 id="groupNameTitle" class="mb-0">Loading...</h5>
                 </div>
-            </div>
-
-            <!-- Chat Area -->
-            <div class="col-md-9 h-100">
-                <div class="card h-100 d-flex flex-column shadow-sm border-0">
-                    <div class="card-header">
-                        <h5 id="channelName">Select a channel</h5>
+                <div class="card-body overflow-auto bg-light" id="messagesArea">
+                    <div class="h-100 d-flex align-items-center justify-content-center">
+                        <p class="text-secondary">Loading messages...</p>
                     </div>
-                    <div class="card-body overflow-auto" id="messagesArea">
-                        <p class="text-secondary text-center">Select a channel to view messages</p>
-                    </div>
-                    <div class="card-footer">
-                        <div class="input-group">
-                            <input type="text" class="form-control" id="messageInput" placeholder="Type a message...">
-                            <button class="btn btn-primary" id="sendBtn" type="button">Send</button>
-                        </div>
+                </div>
+                <div class="card-footer bg-white border-top" id="messageInputArea">
+                    <div class="input-group">
+                        <input type="text" class="form-control border-end-0" id="messageInput" placeholder="Type a message...">
+                        <button class="btn btn-primary" id="sendBtn" type="button">
+                            <i class="fas fa-paper-plane"></i>
+                        </button>
                     </div>
                 </div>
             </div>
+        </div>
+    </div>
 {% endblock %}
 
 {% block scripts %}
@@ -36,71 +35,77 @@
     <script>
         const token = localStorage.getItem('token');
         const userId = localStorage.getItem('userId');
-        let currentChannelId = null;
-        let currentGroupId = null;
+        let currentGroupId = localStorage.getItem('selectedGroupId');
         const socket = io();
 
-        async function loadChannels() {
-            try {
-                const res = await fetch('/api/users/groups', {
-                    headers: { 'Authorization': `Bearer ${token}` }
-                });
-                const data = await res.json();
-                const groups = data.data?.groups || [];
-                const selectedGroupId = localStorage.getItem('selectedGroupId');
-                
-                const html = groups.map(g => `
-                    <div class="list-group-item border-0 bg-light fw-bold mt-2 rounded-top ${selectedGroupId === g.id ? 'bg-primary text-white' : ''}">
-                        <strong>${g.name}</strong>
-                    </div>
-                    ${g.channels?.map(c => `
-                        <button class="list-group-item list-group-item-action border-0 ps-4" onclick="selectChannel('${c.id}', '${c.name}', '${g.id}')">
-                            <i class="fas fa-hashtag text-muted small me-1"></i> ${c.name}
-                        </button>
-                    `).join('') || '<div class="list-group-item border-0 ps-4 text-muted small">No channels</div>'}
-                `).join('') || '<div class="p-3 text-center text-muted">No groups found</div>';
-                document.getElementById('channelsList').innerHTML = html;
-                
-                // Clear selected group after loading
-                localStorage.removeItem('selectedGroupId');
-                
-                // Auto-select first channel of selected group
-                if (selectedGroupId) {
-                    const selectedGroup = groups.find(g => g.id === selectedGroupId);
-                    if (selectedGroup && selectedGroup.channels?.length > 0) {
-                        const firstChannel = selectedGroup.channels[0];
-                        selectChannel(firstChannel.id, firstChannel.name, selectedGroupId);
-                    }
-                }
-            } catch (error) {
-                console.error('Error loading channels:', error);
+        async function initPage() {
+            if (!currentGroupId) {
+                window.location.href = "{{ url_for('groups_page') }}";
+                return;
             }
+            
+            await loadGroupDetails();
         }
 
-        async function selectChannel(channelId, channelName, groupId) {
-            currentChannelId = channelId;
-            currentGroupId = groupId;
-            document.getElementById('channelName').textContent = '#' + channelName;
-            await loadMessages();
-            socket.emit('join_room', { room: channelId, user_id: userId });
+        async function loadGroupDetails() {
+            try {
+                // Fetch group info
+                const groupRes = await fetch(`/api/groups/${currentGroupId}`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                
+                if (groupRes.status === 401) {
+                    window.location.href = "{{ url_for('auth_page') }}";
+                    return;
+                }
+                
+                if (!groupRes.ok) {
+                    alert('Group not found or access denied');
+                    window.location.href = "{{ url_for('groups_page') }}";
+                    return;
+                }
+
+                const groupData = await groupRes.json();
+                const group = groupData.data;
+                document.getElementById('groupNameTitle').textContent = group.name;
+
+                // No per-group channels: load messages for the group directly
+                document.getElementById('messageInputArea').style.display = 'block';
+                await loadMessages();
+
+            } catch (error) {
+                console.error('Error loading group details:', error);
+            }
         }
 
         async function loadMessages() {
             try {
-                const res = await fetch(`/api/messages/channel/${currentChannelId}`, {
+                // Join the group room for real-time updates
+                socket.emit('join_room', { room: currentGroupId, user_id: userId });
+
+                const res = await fetch(`/api/messages/group/${currentGroupId}`, {
                     headers: { 'Authorization': `Bearer ${token}` }
                 });
                 const data = await res.json();
                 const messages = data.data?.messages || [];
+                
                 const html = messages.map(m => `
-                    <div class="mb-3 ${m.user_id === userId ? 'text-end' : ''}">
-                        <div class="d-inline-block p-2 rounded" style="background-color: ${m.user_id === userId ? '#007bff' : '#e9ecef'};color: ${m.user_id === userId ? 'white' : '#212529'};max-width: 70%;">
-                            <small style="opacity: 0.8;">${m.user_id === userId ? 'You' : m.user_id}</small>
-                            <p class="mb-0">${m.content}</p>
+                    <div class="mb-3 d-flex ${m.user_id === userId ? 'justify-content-end' : 'justify-content-start'}">
+                        <div class="d-flex flex-column ${m.user_id === userId ? 'align-items-end' : 'align-items-start'}" style="max-width: 75%;">
+                            <div class="p-2 rounded shadow-sm ${m.user_id === userId ? 'bg-primary text-white' : 'bg-white text-dark border'}">
+                                <p class="mb-0">${m.content}</p>
+                            </div>
+                            <small class="text-muted mt-1" style="font-size: 0.7rem;">
+                                ${m.user_id === userId ? 'You' : (m.user_first_name || 'User ' + m.user_id.substr(-4))}
+                            </small>
                         </div>
                     </div>
-                `).join('') || '<p class="text-secondary text-center">No messages yet</p>';
-                document.getElementById('messagesArea').innerHTML = html;
+                `).join('') || '<div class="h-100 d-flex align-items-center justify-content-center"><p class="text-secondary">No messages yet. Start the conversation!</p></div>';
+                
+                const msgArea = document.getElementById('messagesArea');
+                msgArea.innerHTML = html;
+                msgArea.scrollTop = msgArea.scrollHeight;
+                
             } catch (error) {
                 console.error('Error loading messages:', error);
             }
@@ -108,7 +113,7 @@
 
         document.getElementById('sendBtn').addEventListener('click', async () => {
             const content = document.getElementById('messageInput').value;
-            if (!content.trim() || !currentChannelId) return;
+            if (!content.trim() || !currentGroupId) return;
 
             try {
                 const res = await fetch('/api/messages', {
@@ -118,21 +123,30 @@
                         'Content-Type': 'application/json'
                     },
                     body: JSON.stringify({
-                        channel_id: currentChannelId,
+                        group_id: currentGroupId,
                         content: content
                     })
                 });
                 if (res.ok) {
                     document.getElementById('messageInput').value = '';
+                    // Notify other clients via socket
+                    socket.emit('message', { room: currentGroupId, user_id: userId, message: content });
                     loadMessages();
                 }
             } catch (error) {
                 console.error('Error sending message:', error);
             }
         });
+        
+        // Allow sending with Enter key
+        document.getElementById('messageInput').addEventListener('keypress', function (e) {
+            if (e.key === 'Enter') {
+                document.getElementById('sendBtn').click();
+            }
+        });
 
         socket.on('new_message', (data) => {
-            if (data.room === currentChannelId) {
+            if (data.room === currentGroupId) {
                 loadMessages();
             }
         });
@@ -142,7 +156,7 @@
                 window.location.href = "{{ url_for('auth_page') }}";
                 return;
             }
-            loadChannels();
+            initPage();
         });
     </script>
 {% endblock %}

@@ -16,6 +16,8 @@ def create_app(config_name='development'):
     # Initialize extensions
     CORS(app, resources={r"/api/*": {"origins": "*"}})
     socketio = SocketIO(app, cors_allowed_origins="*")
+    # Attach socketio to app for access in routes
+    app.socketio = socketio
     
     # Create upload folder
     os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)

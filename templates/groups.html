@@ -20,7 +20,10 @@
                 <a class="nav-link active" href="#myGroups" data-bs-toggle="tab">My Groups</a>
             </li>
             <li class="nav-item">
-                <a class="nav-link" href="#joinGroups" data-bs-toggle="tab">Available Groups</a>
+                <a class="nav-link" href="#joinGroups" data-bs-toggle="tab">Channels</a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link" href="#pendingRequests" data-bs-toggle="tab" id="pendingRequestsTab" style="display: none;">Requests</a>
             </li>
         </ul>
 
@@ -37,12 +40,25 @@
 
             <!-- Available Groups Tab -->
             <div class="tab-pane fade" id="joinGroups">
-                <div class="row g-4" id="availableGroupsList">
+                <div class="accordion" id="availableGroupsAccordion">
                     <div class="col-12 text-center text-muted py-5">
                         <p><i class="fas fa-spinner fa-spin"></i> Loading groups...</p>
                     </div>
                 </div>
             </div>
+
+            <!-- Pending Requests Tab -->
+            <div class="tab-pane fade" id="pendingRequests">
+                <div class="row g-4" id="pendingRequestsList">
+                    <div class="col-12 text-center text-muted py-5">
+                        <p>No pending requests.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+{% endblock %}
+
+{% block modals %}
     <!-- Create Group Modal -->
     <div class="modal fade" id="createGroupModal" tabindex="-1">
         <div class="modal-dialog">
@@ -56,6 +72,18 @@
                         <div class="mb-3">
                             <label for="groupName" class="form-label">Group Name</label>
                             <input type="text" class="form-control" id="groupName" required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="groupCategory" class="form-label">Channel Category</label>
+                            <input type="text" class="form-control" id="groupCategory" placeholder="e.g. Science, Games, School" list="categoryList">
+                            <datalist id="categoryList">
+                                <option value="Science">
+                                <option value="Games">
+                                <option value="School">
+                                <option value="Technology">
+                                <option value="Art">
+                            </datalist>
+                            <div class="form-text">Create a new channel or select an existing one.</div>
                         </div>
                         <div class="mb-3">
                             <label for="groupDesc" class="form-label">Description</label>
@@ -74,7 +102,6 @@
             </div>
         </div>
     </div>
-
 {% endblock %}
 
 {% block scripts %}
@@ -102,6 +129,7 @@
                                 <p class="card-text text-body-secondary">${g.description || 'No description'}</p>
                                 <small class="text-body-secondary">
                                     <i class="fas fa-users"></i> ${g.member_count || 0} members
+                                    ${g.channel && g.channel.name ? `<span class="badge bg-light text-muted ms-2">${g.channel.name}</span>` : ''}
                                 </small>
                                 <div class="mt-auto pt-3">
                                     <button class="btn btn-sm btn-primary" onclick="viewGroup('${g.id || g._id}')">View</button>
@@ -120,7 +148,7 @@
 
         async function loadAvailableGroups() {
             try {
-                const res = await fetch('/api/groups', {
+                const res = await fetch('/api/groups/channels', {
                     headers: { 'Authorization': `Bearer ${token}` }
                 });
                 if (res.status === 401) {
@@ -129,34 +157,62 @@
                     return;
                 }
                 const data = await res.json();
-                const allGroups = data.data?.groups || [];
-                // Filter out groups user is already a member of
-                const groups = allGroups.filter(g => !g.is_member);
+                const channels = data.data?.channels || [];
 
-                const html = groups.length ? groups.map(g => `
-                    <div class="col-md-4 mb-3">
-                        <div class="card h-100 shadow-sm border-0">
-                            <div class="card-body d-flex flex-column">
-                                <h5 class="card-title">${g.name}</h5>
-                                <p class="card-text text-body-secondary">${g.description || 'No description'}</p>
-                                <small class="text-body-secondary">
-                                    <i class="fas fa-users"></i> ${g.member_count || 0} members
-                                </small>
-                                <div class="mt-auto pt-3">
-                                    <button class="btn btn-sm btn-success" onclick="joinGroup('${g.id || g._id}')">Join</button>
+                if (channels.length === 0) {
+                    document.getElementById('availableGroupsAccordion').innerHTML = '<div class="col-12 text-center text-secondary"><p>No channels available</p></div>';
+                    return;
+                }
+
+                let html = '';
+                let index = 0;
+                for (const channel of channels) {
+                    const category = channel.name || 'General';
+                    const categoryGroups = channel.groups || [];
+                    html += `
+                        <div class="accordion-item">
+                            <h2 class="accordion-header" id="heading${index}">
+                                <button class="accordion-button ${index === 0 ? '' : 'collapsed'}" type="button" data-bs-toggle="collapse" data-bs-target="#collapse${index}">
+                                    ${category} <span class="badge bg-light text-muted ms-2">${categoryGroups.length}</span>
+                                </button>
+                            </h2>
+                            <div id="collapse${index}" class="accordion-collapse collapse ${index === 0 ? 'show' : ''}" data-bs-parent="#availableGroupsAccordion">
+                                <div class="accordion-body">
+                                    <div class="row g-4">
+                                        ${categoryGroups.map(g => `
+                                            <div class="col-md-4 mb-3">
+                                                <div class="card h-100 shadow-sm border-0">
+                                                    <div class="card-body d-flex flex-column">
+                                                        <h5 class="card-title">${g.name}</h5>
+                                                        <p class="card-text text-body-secondary">${g.description || 'No description'}</p>
+                                                        <small class="text-body-secondary">
+                                                            <i class="fas fa-users"></i> ${g.member_count || 0} members
+                                                            ${g.is_private ? '<i class="fas fa-lock ms-2" title="Private"></i>' : ''}
+                                                        </small>
+                                                        <div class="mt-auto pt-3">
+                                                            <button class="btn btn-sm btn-success" onclick="joinGroup('${g.id || g._id}', ${g.is_private})">
+                                                                ${g.is_private ? 'Request to Join' : 'Join'}
+                                                            </button>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        `).join('')}
+                                    </div>
                                 </div>
                             </div>
                         </div>
-                    </div>
-                `).join('') : '<div class="col-12 text-center text-secondary"><p>No groups available</p></div>';
+                    `;
+                    index++;
+                }
 
-                document.getElementById('availableGroupsList').innerHTML = html;
+                document.getElementById('availableGroupsAccordion').innerHTML = html;
             } catch (error) {
-                console.error('Error loading available groups:', error);
+                console.error('Error loading channels:', error);
             }
         }
 
-        async function joinGroup(groupId) {
+        async function joinGroup(groupId, isPrivate) {
             try {
                 const res = await fetch(`/api/groups/${groupId}/join`, {
                     method: 'POST',
@@ -167,10 +223,18 @@
                     window.location.href = "{{ url_for('auth_page') }}";
                     return;
                 }
+                
                 if (res.ok) {
-                    await showCustomAlert('Joined group successfully!', 'Success');
-                    loadMyGroups();
-                    loadAvailableGroups();
+                    if (isPrivate) {
+                        await showCustomAlert('Join request sent successfully!', 'Request Sent');
+                    } else {
+                        await showCustomAlert('Joined group successfully!', 'Success');
+                        loadMyGroups();
+                        loadAvailableGroups();
+                    }
+                } else {
+                    const data = await res.json();
+                    await showCustomAlert(data.message || 'Failed to join group', 'Error');
                 }
             } catch (error) {
                 console.error('Error joining group:', error);
@@ -218,6 +282,7 @@
                     body: JSON.stringify({
                         name: document.getElementById('groupName').value,
                         description: document.getElementById('groupDesc').value,
+                        category: document.getElementById('groupCategory').value,
                         is_private: document.getElementById('isPrivate').checked
                     })
                 });
@@ -241,6 +306,92 @@
             }
         });
 
+        async function loadPendingRequests() {
+            try {
+                const res = await fetch('/api/users/groups', {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                const data = await res.json();
+                const myGroups = data.data?.groups || [];
+                
+                let allRequests = [];
+                
+                for (const group of myGroups) {
+                    try {
+                        const reqRes = await fetch(`/api/groups/${group.id || group._id}/requests`, {
+                            headers: { 'Authorization': `Bearer ${token}` }
+                        });
+                        if (reqRes.ok) {
+                            const reqData = await reqRes.json();
+                            const requests = reqData.data || [];
+                            requests.forEach(r => {
+                                r.groupName = group.name;
+                                r.groupId = group.id || group._id;
+                                allRequests.push(r);
+                            });
+                        }
+                    } catch (e) {
+                        // Ignore errors (e.g. not moderator)
+                    }
+                }
+                
+                if (allRequests.length > 0) {
+                    document.getElementById('pendingRequestsTab').style.display = 'block';
+                    const html = allRequests.map(u => `
+                        <div class="col-md-4 mb-3">
+                            <div class="card h-100 shadow-sm border-0">
+                                <div class="card-body">
+                                    <h5 class="card-title">${u.username}</h5>
+                                    <p class="card-text text-body-secondary">Wants to join <strong>${u.groupName}</strong></p>
+                                    <div class="mt-3">
+                                        <button class="btn btn-sm btn-success" onclick="approveRequest('${u.groupId}', '${u.id || u._id}')">Approve</button>
+                                        <button class="btn btn-sm btn-danger" onclick="rejectRequest('${u.groupId}', '${u.id || u._id}')">Reject</button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    `).join('');
+                    document.getElementById('pendingRequestsList').innerHTML = html;
+                } else {
+                     document.getElementById('pendingRequestsList').innerHTML = '<div class="col-12 text-center text-muted py-5"><p>No pending requests.</p></div>';
+                }
+                
+            } catch (error) {
+                console.error('Error loading requests:', error);
+            }
+        }
+
+        async function approveRequest(groupId, userId) {
+            try {
+                const res = await fetch(`/api/groups/${groupId}/requests/${userId}/approve`, {
+                    method: 'POST',
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                if (res.ok) {
+                    await showCustomAlert('Request approved!', 'Success');
+                    loadPendingRequests();
+                    loadMyGroups(); // Update member count
+                }
+            } catch (error) {
+                console.error('Error approving request:', error);
+            }
+        }
+
+        async function rejectRequest(groupId, userId) {
+             try {
+                const res = await fetch(`/api/groups/${groupId}/requests/${userId}/reject`, {
+                    method: 'POST',
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                if (res.ok) {
+                    await showCustomAlert('Request rejected!', 'Success');
+                    loadPendingRequests();
+                }
+            } catch (error) {
+                console.error('Error rejecting request:', error);
+            }
+        }
+
         document.addEventListener('DOMContentLoaded', () => {
             if (!token) {
                 window.location.href = "{{ url_for('auth_page') }}";
@@ -248,6 +399,7 @@
             }
             loadMyGroups();
             loadAvailableGroups();
+            loadPendingRequests();
         });
     </script>
 {% endblock %}

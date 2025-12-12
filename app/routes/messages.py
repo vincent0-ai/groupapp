@@ -10,6 +10,25 @@ from datetime import datetime
 
 messages_bp = Blueprint('messages', __name__, url_prefix='/api/messages')
 
+def _attach_user_first_name(db: Database, msg: dict):
+    """Attach a `user_first_name` field to a message dict (best-effort)."""
+    try:
+        uid = msg.get('user_id')
+        if not uid:
+            msg['user_first_name'] = 'Unknown'
+            return
+        user = db.find_one('users', {'_id': uid})
+        if not user:
+            msg['user_first_name'] = f'User {str(uid)[-4:]}'
+            return
+        full_name = (user.get('full_name') or '').strip()
+        if full_name:
+            msg['user_first_name'] = full_name.split()[0]
+        else:
+            msg['user_first_name'] = user.get('username') or f'User {str(uid)[-4:]}'
+    except Exception:
+        msg['user_first_name'] = f'User {str(msg.get("user_id"))[-4:]}'
+
 def require_auth(f):
     """Decorator to require authentication"""
     @wraps(f)
@@ -37,30 +56,35 @@ def require_auth(f):
     
     return decorated
 
-@messages_bp.route('/channel/<channel_id>', methods=['GET'])
+@messages_bp.route('/group/<group_id>', methods=['GET'])
 @require_auth
-def get_channel_messages(channel_id):
-    """Get messages from a channel"""
+def get_group_messages(group_id):
+    """Get messages from a group (single chat stream)"""
     try:
-        channel_id_obj = ObjectId(channel_id)
+        group_id_obj = ObjectId(group_id)
     except:
-        return error_response('Invalid channel ID', 400)
+        return error_response('Invalid group ID', 400)
     
     page = request.args.get('page', 1, type=int)
-    per_page = request.args.get('per_page', 20, type=int)
+    per_page = request.args.get('per_page', 50, type=int)
     
     db = Database()
     
-    # Get channel
-    channel = db.find_one('channels', {'_id': channel_id_obj})
-    if not channel:
-        return error_response('Channel not found', 404)
+    # Get group
+    group = db.find_one('groups', {'_id': group_id_obj})
+    if not group:
+        return error_response('Group not found', 404)
+    
+    # Verify membership (public groups may be readable by everyone)
+    user_id_obj = ObjectId(g.user_id)
+    if group.get('is_private') and user_id_obj not in group.get('members', []):
+        return error_response('Access denied', 403)
     
     # Get messages with pagination
     skip = (page - 1) * per_page
     messages = db.find(
         'messages',
-        {'channel_id': channel_id_obj},
+        {'group_id': group_id_obj},
         skip=skip,
         limit=per_page,
         sort=('created_at', -1)
@@ -68,8 +92,30 @@ def get_channel_messages(channel_id):
     
     # Reverse to get chronological order
     messages = list(reversed(messages))
+    # Attach the sender's first name (from user's full_name) to each message
+    try:
+        user_ids = list({m.get('user_id') for m in messages if m.get('user_id')})
+        users = db.find('users', {'_id': {'$in': user_ids}}) if user_ids else []
+        user_map = {u['_id']: u for u in users}
+
+        for m in messages:
+            uid = m.get('user_id')
+            u = user_map.get(uid)
+            if u:
+                full_name = (u.get('full_name') or '').strip()
+                if full_name:
+                    first_name = full_name.split()[0]
+                else:
+                    first_name = u.get('username') or f'User {str(uid)[-4:]}'
+            else:
+                first_name = f'User {str(uid)[-4:]}' if uid else 'Unknown'
+
+            m['user_first_name'] = first_name
+    except Exception:
+        # Best-effort: if anything goes wrong, continue without failing
+        pass
     
-    total = db.count('messages', {'channel_id': channel_id_obj})
+    total = db.count('messages', {'group_id': group_id_obj})
     
     return success_response({
         'messages': [serialize_document(m) for m in messages],
@@ -81,14 +127,13 @@ def get_channel_messages(channel_id):
 @messages_bp.route('', methods=['POST'])
 @require_auth
 def send_message():
-    """Send a message to a channel"""
+    """Send a message to a group"""
     data = request.get_json()
     
-    if not data or 'content' not in data or 'channel_id' not in data:
+    if not data or 'content' not in data or 'group_id' not in data:
         return error_response('Missing required fields', 400)
     
     content = data.get('content', '').strip()
-    channel_id = data.get('channel_id')
     group_id = data.get('group_id')
     attachments = data.get('attachments', [])
     reply_to = data.get('reply_to')
@@ -97,10 +142,9 @@ def send_message():
         return error_response('Message content cannot be empty', 400)
     
     try:
-        channel_id_obj = ObjectId(channel_id)
         group_id_obj = ObjectId(group_id)
     except:
-        return error_response('Invalid channel or group ID', 400)
+        return error_response('Invalid group ID', 400)
     
     db = Database()
     
@@ -113,8 +157,9 @@ def send_message():
     if user_id_obj not in group['members']:
         return error_response('You are not a member of this group', 403)
     
+    # Create a message without channel_id
     message_doc = Message.create_message_doc(
-        content, g.user_id, channel_id, group_id, attachments, reply_to
+        content, g.user_id, None, group_id, attachments, reply_to
     )
     
     message_id = db.insert_one('messages', message_doc)
@@ -123,6 +168,27 @@ def send_message():
         return error_response('Failed to send message', 500)
     
     message_doc['_id'] = message_id
+    # Add sender's first name for immediate response and broadcast
+    try:
+        user = db.find_one('users', {'_id': ObjectId(g.user_id)})
+        full_name = (user.get('full_name') or '').strip() if user else ''
+        if full_name:
+            message_doc['user_first_name'] = full_name.split()[0]
+        else:
+            message_doc['user_first_name'] = (user.get('username') if user else f'User {str(g.user_id)[-4:]}')
+    except Exception:
+        message_doc['user_first_name'] = f'User {str(g.user_id)[-4:]}'
+
+    # Broadcast to room so connected clients receive the update in real-time
+    try:
+        current_app.socketio.emit('new_message', {
+            'room': str(group_id),
+            'message': serialize_document(message_doc)
+        }, room=str(group_id))
+    except Exception:
+        # If socketio not available for any reason, we continue without failing
+        pass
+
     return success_response(serialize_document(message_doc), 'Message sent successfully', 201)
 
 @messages_bp.route('/<message_id>', methods=['PUT'])
@@ -161,6 +227,8 @@ def edit_message(message_id):
     })
     
     updated_message = db.find_one('messages', {'_id': message_id_obj})
+    # Attach display name
+    _attach_user_first_name(db, updated_message)
     return success_response(serialize_document(updated_message), 'Message updated successfully', 200)
 
 @messages_bp.route('/<message_id>', methods=['DELETE'])
@@ -222,6 +290,8 @@ def react_to_message(message_id):
     db.update_one('messages', {'_id': message_id_obj}, {'reactions': reactions})
     
     updated_message = db.find_one('messages', {'_id': message_id_obj})
+    # Attach display name
+    _attach_user_first_name(db, updated_message)
     return success_response(serialize_document(updated_message), 'Reaction added successfully', 200)
 
 @messages_bp.route('/<message_id>/pin', methods=['POST'])
@@ -249,6 +319,8 @@ def pin_message(message_id):
     db.update_one('messages', {'_id': message_id_obj}, {'is_pinned': True})
     
     updated_message = db.find_one('messages', {'_id': message_id_obj})
+    # Attach display name
+    _attach_user_first_name(db, updated_message)
     return success_response(serialize_document(updated_message), 'Message pinned successfully', 200)
 
 @messages_bp.route('/<message_id>/unpin', methods=['POST'])
@@ -276,4 +348,6 @@ def unpin_message(message_id):
     db.update_one('messages', {'_id': message_id_obj}, {'is_pinned': False})
     
     updated_message = db.find_one('messages', {'_id': message_id_obj})
+    # Attach display name
+    _attach_user_first_name(db, updated_message)
     return success_response(serialize_document(updated_message), 'Message unpinned successfully', 200)

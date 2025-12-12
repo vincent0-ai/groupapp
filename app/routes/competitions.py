@@ -43,8 +43,10 @@ def get_competitions():
     """Get all competitions"""
     db = Database()
     
-    # Get all competitions, optionally filtered by group
+    # Get all competitions, optionally filtered by group or category
     group_id = request.args.get('group_id')
+    category = request.args.get('category')
+    channel_id = request.args.get('channel_id')
     query = {}
     
     if group_id:
@@ -52,6 +54,14 @@ def get_competitions():
             query['group_id'] = ObjectId(group_id)
         except:
             return error_response('Invalid group ID', 400)
+            
+    if channel_id:
+        try:
+            query['channel_id'] = ObjectId(channel_id)
+        except:
+            return error_response('Invalid channel ID', 400)
+    elif category:
+        query['category'] = category
     
     competitions = list(db.find('competitions', query))
     
@@ -97,10 +107,17 @@ def create_competition():
     user_id_obj = ObjectId(g.user_id)
     if user_id_obj not in group['moderators']:
         return error_response('Only group moderators can create competitions', 403)
+        
+    channel_id = group.get('channel_id')
+    channel_name = None
+    if channel_id:
+        ch = db.find_one('channels', {'_id': channel_id})
+        if ch:
+            channel_name = ch.get('name')
     
     competition_doc = Competition.create_competition_doc(
         title, description, group_id, g.user_id, start_time, end_time, 
-        questions, competition_type
+        questions, competition_type, str(channel_id) if channel_id else None, channel_name or 'General'
     )
     
     comp_id = db.insert_one('competitions', competition_doc)

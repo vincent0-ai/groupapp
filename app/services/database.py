@@ -39,6 +39,34 @@ class Database:
         self.db.messages.create_index('group_id')
         self.db.messages.create_index([('created_at', DESCENDING)])
         
+        # Channel (categories) indexes
+        # Deduplicate existing channels by name to allow creating a unique index
+        try:
+            dup_pipeline = [
+                {'$group': {'_id': '$name', 'ids': {'$push': '$_id'}, 'count': {'$sum': 1}, 'total_group_count': {'$sum': {'$ifNull': ['$group_count', 0]}}}},
+                {'$match': {'count': {'$gt': 1}}}
+            ]
+            duplicates = list(self.db.channels.aggregate(dup_pipeline))
+            for d in duplicates:
+                ids = d.get('ids', [])
+                if not ids:
+                    continue
+                keep_id = ids[0]
+                other_ids = ids[1:]
+                # Sum group_count from all documents and set on the kept doc
+                total_count = int(d.get('total_group_count', 0))
+                try:
+                    self.db.channels.update_one({'_id': keep_id}, {'$set': {'group_count': total_count}})
+                    self.db.channels.delete_many({'_id': {'$in': other_ids}})
+                except Exception:
+                    # best-effort, continue
+                    pass
+        except Exception:
+            # If aggregation fails for any reason, continue and let index creation handle issues
+            pass
+
+        self.db.channels.create_index('name', unique=True)
+
         # Competitions indexes
         self.db.competitions.create_index('group_id')
         self.db.competitions.create_index('created_by')

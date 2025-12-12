@@ -144,11 +144,14 @@ def get_current_user_groups():
     # Add member count and id field to each group
     for group in groups:
         group['member_count'] = len(group.get('members', []))
-        channels = list(db.find('channels', {'group_id': group['_id']}))
-        # Add id field to each channel
-        for channel in channels:
-            channel['id'] = str(channel['_id'])
-        group['channels'] = channels
+        channel_doc = None
+        if group.get('channel_id'):
+            channel_doc = db.find_one('channels', {'_id': group.get('channel_id')})
+        if channel_doc:
+            channel_doc['id'] = str(channel_doc['_id'])
+            group['channel'] = serialize_document(channel_doc)
+        else:
+            group['channel'] = None
         group['id'] = str(group['_id'])  # Add 'id' field for frontend
     
     return success_response({'groups': [serialize_document(grp) for grp in groups]}, 'User groups retrieved successfully', 200)
