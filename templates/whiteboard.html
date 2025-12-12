@@ -248,11 +248,14 @@
         const brushSize = document.getElementById('brushSize');
         const opacity = document.getElementById('opacity');
 
-        brushSize.addEventListener('input', (e) => {
-            document.getElementById('sizeValue').textContent = e.target.value;
-        });
+        if (brushSize) {
+            brushSize.addEventListener('input', (e) => {
+                document.getElementById('sizeValue').textContent = e.target.value;
+            });
+        }
 
         function getPos(clientX, clientY) {
+            if (!canvas) return { x: 0, y: 0 };
             const rect = canvas.getBoundingClientRect();
             return {
                 x: clientX - rect.left,
@@ -299,6 +302,7 @@
 
         // Resize canvas to container size and handle high DPI screens
         function resizeCanvas() {
+            if (!canvas || !ctx) return;
             const rect = canvas.getBoundingClientRect();
             const ratio = window.devicePixelRatio || 1;
             canvas.width = Math.max(300, Math.floor(rect.width * ratio));
@@ -307,104 +311,122 @@
             ctx.setTransform(ratio, 0, 0, ratio, 0, 0);
         }
         window.addEventListener('resize', () => {
-            try { history.push(canvas.toDataURL()); } catch{}
-            resizeCanvas();
+            if (canvas) {
+                try { history.push(canvas.toDataURL()); } catch{}
+                resizeCanvas();
+            }
         });
-        resizeCanvas();
+        if (canvas) resizeCanvas();
 
         // Mouse events
-        canvas.addEventListener('mousedown', (e) => {
-            if (!canDraw) return;
-            isDrawing = true;
-            const p = getPos(e.clientX, e.clientY);
-            lastX = p.x;
-            lastY = p.y;
-            saveHistory();
-        });
+        if (canvas) {
+            canvas.addEventListener('mousedown', (e) => {
+                if (!canDraw) return;
+                isDrawing = true;
+                const p = getPos(e.clientX, e.clientY);
+                lastX = p.x;
+                lastY = p.y;
+                saveHistory();
+            });
 
-        canvas.addEventListener('mousemove', (e) => {
-            if (!isDrawing) return;
-            const p = getPos(e.clientX, e.clientY);
-            draw(lastX, lastY, p.x, p.y);
-            emitDraw(lastX, lastY, p.x, p.y);
-            lastX = p.x;
-            lastY = p.y;
-        });
+            canvas.addEventListener('mousemove', (e) => {
+                if (!isDrawing) return;
+                const p = getPos(e.clientX, e.clientY);
+                draw(lastX, lastY, p.x, p.y);
+                emitDraw(lastX, lastY, p.x, p.y);
+                lastX = p.x;
+                lastY = p.y;
+            });
+        }
 
         function stopDrawing() {
             isDrawing = false;
         }
 
-        canvas.addEventListener('mouseup', stopDrawing);
-        canvas.addEventListener('mouseleave', stopDrawing);
+        if (canvas) {
+            canvas.addEventListener('mouseup', stopDrawing);
+            canvas.addEventListener('mouseleave', stopDrawing);
 
-        // Touch events
-        canvas.addEventListener('touchstart', (e) => {
-            e.preventDefault();
-            if (!canDraw) return;
-            const t = e.touches[0];
-            isDrawing = true;
-            const p = getPos(t.clientX, t.clientY);
-            lastX = p.x;
-            lastY = p.y;
-            saveHistory();
-        }, { passive: false });
+            // Touch events
+            canvas.addEventListener('touchstart', (e) => {
+                e.preventDefault();
+                if (!canDraw) return;
+                const t = e.touches[0];
+                isDrawing = true;
+                const p = getPos(t.clientX, t.clientY);
+                lastX = p.x;
+                lastY = p.y;
+                saveHistory();
+            }, { passive: false });
 
-        canvas.addEventListener('touchmove', (e) => {
-            e.preventDefault();
-            if (!isDrawing) return;
-            const t = e.touches[0];
-            const p = getPos(t.clientX, t.clientY);
-            draw(lastX, lastY, p.x, p.y);
-            emitDraw(lastX, lastY, p.x, p.y);
-            lastX = p.x;
-            lastY = p.y;
-        }, { passive: false });
+            canvas.addEventListener('touchmove', (e) => {
+                e.preventDefault();
+                if (!isDrawing) return;
+                const t = e.touches[0];
+                const p = getPos(t.clientX, t.clientY);
+                draw(lastX, lastY, p.x, p.y);
+                emitDraw(lastX, lastY, p.x, p.y);
+                lastX = p.x;
+                lastY = p.y;
+            }, { passive: false });
 
-        canvas.addEventListener('touchend', stopDrawing);
-        canvas.addEventListener('touchcancel', stopDrawing);
+            canvas.addEventListener('touchend', stopDrawing);
+            canvas.addEventListener('touchcancel', stopDrawing);
+        }
 
         // Controls
-        document.getElementById('clearBtn').addEventListener('click', async () => {
-            if (await showCustomConfirm('Clear the entire whiteboard?', 'Confirm Clear')) {
-                // Local clear
-                ctx.clearRect(0, 0, canvas.width, canvas.height);
-                history = [];
-                // Emit clear event
-                socket.emit('clear_board', { 
-                    room: sessionId ? `whiteboard:${sessionId}` : 'whiteboard', 
-                    user_id: userId 
-                });
-            }
-        });
+        const clearBtn = document.getElementById('clearBtn');
+        if (clearBtn) {
+            clearBtn.addEventListener('click', async () => {
+                if (await showCustomConfirm('Clear the entire whiteboard?', 'Confirm Clear')) {
+                    // Local clear
+                    if (ctx && canvas) ctx.clearRect(0, 0, canvas.width, canvas.height);
+                    history = [];
+                    // Emit clear event
+                    socket.emit('clear_board', { 
+                        room: sessionId ? `whiteboard:${sessionId}` : 'whiteboard', 
+                        user_id: userId 
+                    });
+                }
+            });
+        }
 
         socket.on('board_cleared', () => {
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            if (ctx && canvas) ctx.clearRect(0, 0, canvas.width, canvas.height);
             history = [];
         });
 
-        document.getElementById('undoBtn').addEventListener('click', () => {
-            if (history.length === 0) return;
-            history.pop();
-            if (history.length === 0) {
-                ctx.clearRect(0, 0, canvas.width, canvas.height);
-                return;
-            }
+        const undoBtn = document.getElementById('undoBtn');
+        if (undoBtn) {
+            undoBtn.addEventListener('click', () => {
+                if (history.length === 0) return;
+                history.pop();
+                if (history.length === 0) {
+                    if (ctx && canvas) ctx.clearRect(0, 0, canvas.width, canvas.height);
+                    return;
+                }
 
-            const img = new Image();
-            img.src = history[history.length - 1];
-            img.onload = () => {
-                ctx.clearRect(0, 0, canvas.width, canvas.height);
-                ctx.drawImage(img, 0, 0);
-            };
-        });
+                const img = new Image();
+                img.src = history[history.length - 1];
+                img.onload = () => {
+                    if (ctx && canvas) {
+                        ctx.clearRect(0, 0, canvas.width, canvas.height);
+                        ctx.drawImage(img, 0, 0);
+                    }
+                };
+            });
+        }
 
-        document.getElementById('downloadBtn').addEventListener('click', () => {
-            const link = document.createElement('a');
-            link.href = canvas.toDataURL();
-            link.download = 'whiteboard-' + new Date().getTime() + '.png';
-            link.click();
-        });
+        const downloadBtn = document.getElementById('downloadBtn');
+        if (downloadBtn) {
+            downloadBtn.addEventListener('click', () => {
+                if (!canvas) return;
+                const link = document.createElement('a');
+                link.href = canvas.toDataURL();
+                link.download = 'whiteboard-' + new Date().getTime() + '.png';
+                link.click();
+            });
+        }
 
         // Socket events
         let canDraw = true;
@@ -433,11 +455,14 @@
                             leaveBtnContainer.innerHTML = `
                                 <button id="endSessionBtn" class="btn btn-sm btn-danger w-100">End Session</button>
                             `;
-                            document.getElementById('endSessionBtn').addEventListener('click', async () => {
-                                if (confirm('Are you sure you want to end this session? It will be closed for everyone.')) {
-                                    await endSession(sessionId);
-                                }
-                            });
+                            const endSessionBtn = document.getElementById('endSessionBtn');
+                            if (endSessionBtn) {
+                                endSessionBtn.addEventListener('click', async () => {
+                                    if (confirm('Are you sure you want to end this session? It will be closed for everyone.')) {
+                                        await endSession(sessionId);
+                                    }
+                                });
+                            }
                         }
                     }
 
@@ -626,12 +651,23 @@
         speakBtn.innerHTML = '<i class="fas fa-microphone"></i> Push to Talk';
         if (controlsContainer) controlsContainer.appendChild(speakBtn);
         
-        // Removed broken "Start Live" WebRTC button for now
+        // Live audio call button
+        const liveBtn = document.createElement('button');
+        liveBtn.className = 'btn btn-sm btn-outline-success';
+        liveBtn.innerHTML = '<i class="fas fa-phone"></i> Join Call';
+        if (controlsContainer) controlsContainer.appendChild(liveBtn);
         
         const raiseBtn = document.createElement('button');
         raiseBtn.className = 'btn btn-sm btn-outline-secondary';
         raiseBtn.innerHTML = '<i class="fas fa-hand-paper"></i> Raise Hand';
         if (controlsContainer) controlsContainer.appendChild(raiseBtn);
+
+        raiseBtn.addEventListener('click', async () => {
+            socket.emit('raise_hand', { room: sessionId ? `whiteboard:${sessionId}` : 'whiteboard', user_id: userId });
+            participants[userId] = participants[userId] || { name: 'You', avatar_url: '', can_draw: false, can_speak: false };
+            participants[userId].raised = true;
+            renderParticipants();
+        });
 
         speakBtn.addEventListener('mousedown', async () => {
             if (!canSpeak) {
@@ -885,26 +921,36 @@
             const createSessionBtnDesktop = document.getElementById('createSessionBtnDesktop');
             const joinSessionBtnDesktop = document.getElementById('joinSessionBtnDesktop');
             
-            // Initialize modals
             const createModalEl = document.getElementById('createSessionModal');
             const joinModalEl = document.getElementById('joinSessionModal');
-            const sessionCreatedModalEl = document.getElementById('sessionCreatedModal');
             
-            const createModal = new bootstrap.Modal(createModalEl);
-            const joinModal = new bootstrap.Modal(joinModalEl);
-            const sessionCreatedModal = new bootstrap.Modal(sessionCreatedModalEl);
-
+            console.log('Modal elements exist:', !!createModalEl, !!joinModalEl);
+            
+            let createModal = null;
+            let joinModal = null;
+            
+            if (createModalEl) {
+                createModal = new bootstrap.Modal(createModalEl);
+            }
+            if (joinModalEl) {
+                joinModal = new bootstrap.Modal(joinModalEl);
+            }
+            
             const toggleDrawingToolsBtn = document.getElementById('toggleDrawingTools');
             const drawingToolsCollapseEl = document.getElementById('drawingToolsCollapse');
-            
+            console.log('toggleDrawingToolsBtn:', !!toggleDrawingToolsBtn, 'drawingToolsCollapseEl:', !!drawingToolsCollapseEl);
             if (toggleDrawingToolsBtn && drawingToolsCollapseEl) {
                 drawingToolsCollapseEl.addEventListener('shown.bs.collapse', () => { toggleDrawingToolsBtn.textContent = 'Hide Tools'; });
                 drawingToolsCollapseEl.addEventListener('hidden.bs.collapse', () => { toggleDrawingToolsBtn.textContent = 'Show Tools'; });
             }
-            
+            console.log('createSessionBtnDesktop exists?', !!createSessionBtnDesktop, 'joinSessionBtnDesktop exists?', !!joinSessionBtnDesktop);
             const openCreateModal = async (e) => { 
                 if (e) e.preventDefault();
                 console.log('openCreateModal called');
+                if (!createModal) {
+                    console.error('Create modal not initialized');
+                    return;
+                }
                 try {
                     const grpRes = await fetch('/api/users/groups', { headers: { 'Authorization': `Bearer ${token}` } });
                     if (grpRes.ok) {
@@ -946,9 +992,8 @@
                         
                         document.getElementById('createdSessionLink').value = fullUrl;
                         document.getElementById('goToSessionBtn').onclick = () => window.location.href = invite;
-                        
+                        new bootstrap.Modal(document.getElementById('sessionCreatedModal')).show();
                         createModal.hide();
-                        sessionCreatedModal.show();
                     } else {
                         const data = await res.json();
                         alert(data.message || 'Failed to create session');
@@ -958,12 +1003,14 @@
                     alert('Error creating session');
                 }
             }
-            
-            if (createSessionBtnMobile) createSessionBtnMobile.addEventListener('click', openCreateModal);
-            
+            createSessionBtnMobile && createSessionBtnMobile.addEventListener('click', openCreateModal);
+            // createSessionBtnDesktop removed from DOM, using landing button
             const createSessionBtnLanding = document.getElementById('createSessionBtnLanding');
             if (createSessionBtnLanding) {
                 createSessionBtnLanding.addEventListener('click', openCreateModal);
+                console.log('Create session button listener attached');
+            } else {
+                console.log('createSessionBtnLanding not found');
             }
 
             // Preload user's groups into the create modal select (don't auto-open modal)
@@ -982,23 +1029,26 @@
                     console.error('Failed to preload groups', e);
                 }
             })();
-            
             const openJoinModal = (e) => { 
                 if (e) e.preventDefault();
-                console.log('openJoinModal called'); 
+                console.log('openJoinModal called');
+                if (!joinModal) {
+                    console.error('Join modal not initialized');
+                    return;
+                }
                 joinModal.show(); 
             };
-            
-            if (joinSessionBtnMobile) joinSessionBtnMobile.addEventListener('click', openJoinModal);
-            
+            joinSessionBtnMobile && joinSessionBtnMobile.addEventListener('click', openJoinModal);
+            // joinSessionBtnDesktop removed from DOM, using landing button
             const joinSessionBtnLanding = document.getElementById('joinSessionBtnLanding');
             if (joinSessionBtnLanding) {
                 joinSessionBtnLanding.addEventListener('click', openJoinModal);
+                console.log('Join session button listener attached');
             }
 
-            const createSessionSubmitBtn = document.getElementById('createSessionSubmit');
-            if (createSessionSubmitBtn) {
-                createSessionSubmitBtn.addEventListener('click', async () => {
+            const createSubmitBtn = document.getElementById('createSessionSubmit');
+            if (createSubmitBtn) {
+                createSubmitBtn.addEventListener('click', async () => {
                     const gid = document.getElementById('sessionGroupSelect').value;
                     const title = document.getElementById('sessionNameInput').value.trim();
                     if (!gid) {
@@ -1009,9 +1059,9 @@
                 });
             }
 
-            const joinSessionSubmitBtn = document.getElementById('joinSessionSubmit');
-            if (joinSessionSubmitBtn) {
-                joinSessionSubmitBtn.addEventListener('click', () => {
+            const joinSubmitBtn = document.getElementById('joinSessionSubmit');
+            if (joinSubmitBtn) {
+                joinSubmitBtn.addEventListener('click', () => {
                     const raw = document.getElementById('joinSessionId').value.trim();
                     if (!raw) return;
                     // Support full URL or plain session id
