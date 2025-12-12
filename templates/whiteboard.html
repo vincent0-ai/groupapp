@@ -684,75 +684,197 @@
         speakBtn.addEventListener('mouseleave', stopSpeaking);
         speakBtn.addEventListener('touchend', stopSpeaking);
 
-        // WebRTC live audio (low-latency) - DISABLED for now as it's unstable for groups
-        /*
+        // WebRTC live audio (low-latency)
         let pc = null;
         let localStream = null;
-        liveBtn.addEventListener('click', async () => {
-            // ... existing code ...
-        });
-        */
+        const peers = {}; // Map of userId -> RTCPeerConnection
 
-        raiseBtn.addEventListener('click', async () => {
-            socket.emit('raise_hand', { room: sessionId ? `whiteboard:${sessionId}` : 'whiteboard', user_id: userId });
-            participants[userId] = participants[userId] || { name: 'You', avatar_url: '', can_draw: false, can_speak: false };
-            participants[userId].raised = true;
-            renderParticipants();
-        });
-
-        // Playback incoming audio clips
-        socket.on('audio_clip', (data) => {
-            const b64 = data?.audio_b64;
-            if (!b64) return;
-            const binary = atob(b64);
-            const len = binary.length;
-            const buffer = new Uint8Array(len);
-            for (let i = 0; i < len; i++) buffer[i] = binary.charCodeAt(i);
-            const blob = new Blob([buffer], { type: 'audio/webm' });
-            const url = URL.createObjectURL(blob);
-            const audioEl = document.createElement('audio');
-            audioEl.src = url;
-            audioEl.autoplay = true;
-            participantsEl.appendChild(audioEl);
-            audioEl.onended = () => { URL.revokeObjectURL(url); audioEl.remove(); };
-        });
-
-        // WebRTC signaling handlers
-        socket.on('webrtc_offer', async (data) => {
-            const offer = data.offer;
-            const from = data.user_id;
-            if (!offer) return;
+        // Function to start WebRTC call
+        async function startCall() {
             try {
-                const pc2 = new RTCPeerConnection({ iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] });
-                pc2.onicecandidate = (e) => { if (e.candidate) socket.emit('webrtc_ice', { room: sessionId ? `whiteboard:${sessionId}` : 'whiteboard', user_id: userId, candidate: e.candidate }); };
-                pc2.ontrack = (e) => { const audioEl = document.createElement('audio'); audioEl.srcObject = e.streams[0]; audioEl.autoplay = true; participantsEl.appendChild(audioEl); };
-                // Optionally add local audio if user wants to send audio back
-                try {
-                    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-                    stream.getTracks().forEach(t => pc2.addTrack(t, stream));
-                } catch (e) { /* ignore */ }
-                await pc2.setRemoteDescription(new RTCSessionDescription(offer));
-                const answer = await pc2.createAnswer();
-                await pc2.setLocalDescription(answer);
-                socket.emit('webrtc_answer', { room: sessionId ? `whiteboard:${sessionId}` : 'whiteboard', user_id: userId, answer: answer });
-            } catch (e) {
-                console.error('Error handling offer', e);
+                localStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                
+                // Mute local audio playback to prevent echo
+                const localAudio = document.createElement('audio');
+                localAudio.srcObject = localStream;
+                localAudio.muted = true;
+                
+                // Notify others that we are joining the call
+                socket.emit('webrtc_join', { room: sessionId ? `whiteboard:${sessionId}` : 'whiteboard', user_id: userId });
+                
+                liveBtn.classList.remove('btn-outline-success');
+                liveBtn.classList.add('btn-success');
+                liveBtn.innerHTML = '<i class="fas fa-phone-slash"></i> End Call';
+            } catch (err) {
+                console.error('Error accessing microphone', err);
+                alert('Could not access microphone');
+            }
+        }
+
+        // Function to stop WebRTC call
+        function stopCall() {
+            if (localStream) {
+                localStream.getTracks().forEach(track => track.stop());
+                localStream = null;
+            }
+            
+            // Close all peer connections
+            Object.values(peers).forEach(peer => peer.close());
+            for (const key in peers) delete peers[key];
+            
+            // Notify others
+            socket.emit('webrtc_leave', { room: sessionId ? `whiteboard:${sessionId}` : 'whiteboard', user_id: userId });
+            
+            liveBtn.classList.remove('btn-success');
+            liveBtn.classList.add('btn-outline-success');
+            liveBtn.innerHTML = '<i class="fas fa-phone"></i> Join Call';
+        }
+
+        liveBtn.addEventListener('click', () => {
+            if (localStream) {
+                stopCall();
+            } else {
+                startCall();
             }
         });
 
-        socket.on('webrtc_answer', async (data) => {
-            const answer = data.answer;
+        // Handle new user joining the call
+        socket.on('webrtc_user_joined', async (data) => {
+            const remoteUserId = data.user_id;
+            if (remoteUserId === userId) return;
+            
+            console.log('User joined call:', remoteUserId);
+            
+            // Create peer connection
+            const peer = createPeerConnection(remoteUserId);
+            peers[remoteUserId] = peer;
+            
+            // Add local tracks
+            if (localStream) {
+                localStream.getTracks().forEach(track => peer.addTrack(track, localStream));
+            }
+            
+            // Create offer
             try {
-                if (pc && answer) { await pc.setRemoteDescription(new RTCSessionDescription(answer)); }
-            } catch (e) { console.error('Error setting remote answer', e); }
+                const offer = await peer.createOffer();
+                await peer.setLocalDescription(offer);
+                socket.emit('webrtc_offer', {
+                    room: sessionId ? `whiteboard:${sessionId}` : 'whiteboard',
+                    target: remoteUserId,
+                    sender: userId,
+                    offer: offer
+                });
+            } catch (e) {
+                console.error('Error creating offer:', e);
+            }
         });
 
-        socket.on('webrtc_ice', async (data) => {
-            const candidate = data.candidate;
-            try {
-                if (pc && candidate) { await pc.addIceCandidate(candidate); }
-            } catch (e) { console.error('Error adding ice candidate', e); }
+        // Handle user leaving the call
+        socket.on('webrtc_user_left', (data) => {
+            const remoteUserId = data.user_id;
+            if (peers[remoteUserId]) {
+                peers[remoteUserId].close();
+                delete peers[remoteUserId];
+                
+                // Remove audio element
+                const audioEl = document.getElementById(`audio-${remoteUserId}`);
+                if (audioEl) audioEl.remove();
+            }
         });
+
+        // Handle incoming offer
+        socket.on('webrtc_offer', async (data) => {
+            const { sender, offer } = data;
+            if (sender === userId) return;
+            
+            console.log('Received offer from:', sender);
+            
+            const peer = createPeerConnection(sender);
+            peers[sender] = peer;
+            
+            try {
+                await peer.setRemoteDescription(new RTCSessionDescription(offer));
+                
+                // Add local tracks if we are in the call
+                if (localStream) {
+                    localStream.getTracks().forEach(track => peer.addTrack(track, localStream));
+                }
+                
+                const answer = await peer.createAnswer();
+                await peer.setLocalDescription(answer);
+                
+                socket.emit('webrtc_answer', {
+                    room: sessionId ? `whiteboard:${sessionId}` : 'whiteboard',
+                    target: sender,
+                    sender: userId,
+                    answer: answer
+                });
+            } catch (e) {
+                console.error('Error handling offer:', e);
+            }
+        });
+
+        // Handle incoming answer
+        socket.on('webrtc_answer', async (data) => {
+            const { sender, answer } = data;
+            const peer = peers[sender];
+            
+            if (peer) {
+                try {
+                    await peer.setRemoteDescription(new RTCSessionDescription(answer));
+                } catch (e) {
+                    console.error('Error setting remote description:', e);
+                }
+            }
+        });
+
+        // Handle ICE candidate
+        socket.on('webrtc_ice', async (data) => {
+            const { sender, candidate } = data;
+            const peer = peers[sender];
+            
+            if (peer) {
+                try {
+                    await peer.addIceCandidate(new RTCIceCandidate(candidate));
+                } catch (e) {
+                    console.error('Error adding ICE candidate:', e);
+                }
+            }
+        });
+
+        function createPeerConnection(remoteUserId) {
+            const peer = new RTCPeerConnection({
+                iceServers: [
+                    { urls: 'stun:stun.l.google.com:19302' },
+                    { urls: 'stun:stun1.l.google.com:19302' }
+                ]
+            });
+            
+            peer.onicecandidate = (event) => {
+                if (event.candidate) {
+                    socket.emit('webrtc_ice', {
+                        room: sessionId ? `whiteboard:${sessionId}` : 'whiteboard',
+                        target: remoteUserId,
+                        sender: userId,
+                        candidate: event.candidate
+                    });
+                }
+            };
+            
+            peer.ontrack = (event) => {
+                console.log('Received track from:', remoteUserId);
+                let audioEl = document.getElementById(`audio-${remoteUserId}`);
+                if (!audioEl) {
+                    audioEl = document.createElement('audio');
+                    audioEl.id = `audio-${remoteUserId}`;
+                    audioEl.autoplay = true;
+                    participantsEl.appendChild(audioEl);
+                }
+                audioEl.srcObject = event.streams[0];
+            };
+            
+            return peer;
+        }
 
         // Join room
         socket.emit('join_room', { room: sessionId ? `whiteboard:${sessionId}` : 'whiteboard', user_id: userId });

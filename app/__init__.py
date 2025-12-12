@@ -308,36 +308,71 @@ def create_app(config_name='development'):
             pass
 
     # WebRTC signaling
+    @socketio.on('webrtc_join')
+    def handle_webrtc_join(data):
+        room = data.get('room')
+        user_id = data.get('user_id')
+        if room:
+            emit('webrtc_user_joined', {'user_id': user_id}, room=room, skip_sid=request.sid)
+
+    @socketio.on('webrtc_leave')
+    def handle_webrtc_leave(data):
+        room = data.get('room')
+        user_id = data.get('user_id')
+        if room:
+            emit('webrtc_user_left', {'user_id': user_id}, room=room, skip_sid=request.sid)
+
     @socketio.on('webrtc_offer')
     def handle_webrtc_offer(data):
         room = data.get('room')
         offer = data.get('offer')
-        user_id = data.get('user_id')
+        sender = data.get('sender')
         target = data.get('target')
-        if not room or not offer:
+        
+        if not room or not offer or not target:
             return
-        if target:
-            emit('webrtc_offer', {'offer': offer, 'user_id': user_id}, room=room, include_self=False)
-        else:
-            emit('webrtc_offer', {'offer': offer, 'user_id': user_id}, room=room, skip_sid=request.sid)
+            
+        # Send only to the specific target user
+        # We need to find the socket ID for the target user
+        # For now, we'll broadcast to the room but clients will filter by target ID
+        # In a production app, you'd map user_ids to socket_ids
+        emit('webrtc_offer', {
+            'offer': offer, 
+            'sender': sender,
+            'target': target
+        }, room=room, skip_sid=request.sid)
 
     @socketio.on('webrtc_answer')
     def handle_webrtc_answer(data):
         room = data.get('room')
         answer = data.get('answer')
-        user_id = data.get('user_id')
-        if not room or not answer:
+        sender = data.get('sender')
+        target = data.get('target')
+        
+        if not room or not answer or not target:
             return
-        emit('webrtc_answer', {'answer': answer, 'user_id': user_id}, room=room, skip_sid=request.sid)
+            
+        emit('webrtc_answer', {
+            'answer': answer, 
+            'sender': sender,
+            'target': target
+        }, room=room, skip_sid=request.sid)
 
     @socketio.on('webrtc_ice')
     def handle_webrtc_ice(data):
         room = data.get('room')
         candidate = data.get('candidate')
-        user_id = data.get('user_id')
-        if not room or not candidate:
+        sender = data.get('sender')
+        target = data.get('target')
+        
+        if not room or not candidate or not target:
             return
-        emit('webrtc_ice', {'candidate': candidate, 'user_id': user_id}, room=room, skip_sid=request.sid)
+            
+        emit('webrtc_ice', {
+            'candidate': candidate, 
+            'sender': sender,
+            'target': target
+        }, room=room, skip_sid=request.sid)
 
 
     @socketio.on('grant_draw')
