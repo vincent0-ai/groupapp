@@ -241,6 +241,11 @@ def submit_answer(comp_id):
     if not competition:
         return error_response('Competition not found', 404)
     
+    # Check if competition has ended
+    end_time = competition.get('end_time')
+    if end_time and end_time < datetime.utcnow():
+        return error_response('This competition has ended', 400)
+    
     user_id_obj = ObjectId(g.user_id)
     
     # Find user in participants

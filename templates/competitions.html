@@ -202,7 +202,12 @@
                 const data = await res.json();
                 const comp = data.data;
                 
-                document.getElementById('playCompTitle').textContent = comp.title;
+                // Check if competition has ended
+                const endTime = new Date(comp.end_time);
+                const now = new Date();
+                const isEnded = endTime <= now;
+                
+                document.getElementById('playCompTitle').textContent = comp.title + (isEnded ? ' (Ended)' : '');
                 
                 // Find current user's progress
                 const participant = comp.participants.find(p => p.user_id === userId);
@@ -221,12 +226,18 @@
 
                     const optionsHtml = (q.options || []).map(opt => `
                         <div class="form-check">
-                            <input class="form-check-input" type="radio" name="q${i}" value="${opt}" id="q${i}_${opt}" ${isAnswered ? 'disabled' : ''}>
+                            <input class="form-check-input" type="radio" name="q${i}" value="${opt}" id="q${i}_${opt}" ${isAnswered || isEnded ? 'disabled' : ''}>
                             <label class="form-check-label" for="q${i}_${opt}">
                                 ${opt}
                             </label>
                         </div>
                     `).join('');
+                    
+                    // Show correct answer if competition ended
+                    let correctAnswerHtml = '';
+                    if (isEnded && !isAnswered) {
+                        correctAnswerHtml = `<div class="alert alert-info mt-2"><i class="fas fa-info-circle"></i> Correct answer: <strong>${q.correct_answer}</strong></div>`;
+                    }
 
                     return `
                         <div class="card mb-3">
@@ -239,19 +250,26 @@
                                 <div class="mb-3">
                                     ${optionsHtml}
                                 </div>
-                                ${!isAnswered ? `
+                                ${!isAnswered && !isEnded ? `
                                     <button class="btn btn-primary btn-sm" onclick="submitAnswer('${comp.id}', ${i})">Submit Answer</button>
-                                ` : `
+                                ` : isAnswered ? `
                                     <div class="alert alert-light border">
                                         Your answer: <strong>${answerData.answer}</strong>
+                                        ${isEnded ? ` | Correct: <strong>${q.correct_answer}</strong>` : ''}
                                     </div>
-                                `}
+                                ` : ''}
+                                ${correctAnswerHtml}
                             </div>
                         </div>
                     `;
                 }).join('');
                 
-                document.getElementById('playCompQuestions').innerHTML = questionsHtml || '<p>No questions found.</p>';
+                let headerHtml = '';
+                if (isEnded) {
+                    headerHtml = '<div class="alert alert-warning mb-3"><i class="fas fa-clock"></i> This competition has ended. You can view the questions and correct answers below.</div>';
+                }
+                
+                document.getElementById('playCompQuestions').innerHTML = headerHtml + (questionsHtml || '<p>No questions found.</p>');
                 new bootstrap.Modal(document.getElementById('playCompModal')).show();
 
             } catch (error) {
@@ -338,21 +356,64 @@
                 });
                 const data = await res.json();
                 const competitions = data.data?.competitions || [];
+                
+                const now = new Date();
+                
+                // Determine if competition is active or completed based on end_time
+                const isActive = (comp) => new Date(comp.end_time) > now && !comp.completed;
+                const isCompleted = (comp) => new Date(comp.end_time) <= now || comp.completed;
+                
+                // Active competitions sorted by end_time (soonest first)
+                const activeComps = competitions.filter(isActive).sort((a, b) => 
+                    new Date(a.end_time) - new Date(b.end_time)
+                );
+                
+                // Completed competitions sorted by end_time (most recent first)
+                const completedComps = competitions.filter(isCompleted).sort((a, b) => 
+                    new Date(b.end_time) - new Date(a.end_time)
+                );
 
-                const compCard = (comp) => {
+                const compCard = (comp, isCompletedCard = false) => {
                     const participantCount = Array.isArray(comp.participants) ? comp.participants.length : (comp.participants || 0);
                     const isParticipant = Array.isArray(comp.participants) && comp.participants.some(p => p.user_id === userId);
+                    const endTime = new Date(comp.end_time);
+                    const timeRemaining = endTime - now;
                     
-                    let actionBtn = `<button class="btn btn-sm btn-success" onclick="joinCompetition('${comp.id}')">Join</button>`;
-                    if (isParticipant) {
-                        actionBtn = `<button class="btn btn-sm btn-warning" onclick="playCompetition('${comp.id}')"><i class="fas fa-play"></i> Play</button>`;
+                    let actionBtn = '';
+                    let statusBadge = '';
+                    
+                    if (isCompletedCard) {
+                        // Completed - show results button
+                        statusBadge = '<span class="badge bg-secondary">Ended</span>';
+                        actionBtn = `<button class="btn btn-sm btn-outline-secondary" onclick="viewCompetition('${comp.id}')"><i class="fas fa-chart-bar"></i> Results</button>`;
+                    } else {
+                        // Active competition
+                        if (timeRemaining < 3600000) { // Less than 1 hour
+                            const mins = Math.floor(timeRemaining / 60000);
+                            statusBadge = `<span class="badge bg-danger"><i class="fas fa-clock"></i> ${mins}m left</span>`;
+                        } else if (timeRemaining < 86400000) { // Less than 24 hours
+                            const hours = Math.floor(timeRemaining / 3600000);
+                            statusBadge = `<span class="badge bg-warning text-dark"><i class="fas fa-clock"></i> ${hours}h left</span>`;
+                        } else {
+                            const days = Math.floor(timeRemaining / 86400000);
+                            statusBadge = `<span class="badge bg-info"><i class="fas fa-clock"></i> ${days}d left</span>`;
+                        }
+                        
+                        if (isParticipant) {
+                            actionBtn = `<button class="btn btn-sm btn-warning" onclick="playCompetition('${comp.id}')"><i class="fas fa-play"></i> Play</button>`;
+                        } else {
+                            actionBtn = `<button class="btn btn-sm btn-success" onclick="joinCompetition('${comp.id}')">Join</button>`;
+                        }
                     }
 
                     return `
                     <div class="col-md-6 mb-3">
                         <div class="card h-100 shadow-sm border-0">
                             <div class="card-body d-flex flex-column">
-                                <h5 class="card-title">${comp.title}</h5>
+                                <div class="d-flex justify-content-between align-items-start mb-2">
+                                    <h5 class="card-title mb-0">${comp.title}</h5>
+                                    ${statusBadge}
+                                </div>
                                 <p class="card-text">${comp.description || 'No description'}</p>
                                 <div class="mb-2">
                                     <small class="text-muted"><i class="fas fa-users"></i> ${participantCount} participants</small>
@@ -367,10 +428,10 @@
                 `;
                 };
 
-                const activeHtml = competitions.length ? competitions.filter(c => !c.completed).map(compCard).join('') : '<div class="col-12 text-center text-secondary"><p>No active competitions</p></div>';
+                const activeHtml = activeComps.length ? activeComps.map(c => compCard(c, false)).join('') : '<div class="col-12 text-center text-secondary"><p>No active competitions</p></div>';
                 document.getElementById('activeCompsList').innerHTML = activeHtml;
 
-                const completedHtml = competitions.length ? competitions.filter(c => c.completed).map(compCard).join('') : '<div class="col-12 text-center text-secondary"><p>No completed competitions</p></div>';
+                const completedHtml = completedComps.length ? completedComps.map(c => compCard(c, true)).join('') : '<div class="col-12 text-center text-secondary"><p>No completed competitions</p></div>';
                 document.getElementById('completedCompsList').innerHTML = completedHtml;
 
                 // Populate group dropdown with only groups where user is moderator/owner
@@ -397,7 +458,7 @@
                 
                 // Load "My Competitions" - those created by the user
                 const myComps = competitions.filter(c => c.created_by === userId);
-                const myHtml = myComps.length ? myComps.map(compCard).join('') : '<div class="col-12 text-center text-secondary"><p>No competitions created by you</p></div>';
+                const myHtml = myComps.length ? myComps.map(c => compCard(c, isCompleted(c))).join('') : '<div class="col-12 text-center text-secondary"><p>No competitions created by you</p></div>';
                 document.getElementById('myCompsList').innerHTML = myHtml;
             } catch (error) {
                 console.error('Error loading competitions:', error);
