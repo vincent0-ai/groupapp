@@ -164,7 +164,23 @@
 {% block scripts %}
     <script>
         const token = localStorage.getItem('token');
-        const userId = localStorage.getItem('userId');
+
+        // Some sessions may have a token but no cached userId.
+        // Derive it from the JWT payload to keep UI state (answer marking, creator actions) consistent.
+        let userId = localStorage.getItem('userId');
+        if (!userId && token) {
+            try {
+                const payloadPart = token.split('.')[1];
+                const payloadJson = atob(payloadPart.replace(/-/g, '+').replace(/_/g, '/'));
+                const payload = JSON.parse(payloadJson);
+                if (payload && payload.user_id) {
+                    userId = String(payload.user_id);
+                    localStorage.setItem('userId', userId);
+                }
+            } catch (e) {
+                // Ignore parse errors; API calls will still work via token.
+            }
+        }
         let questionCount = 0;
 
         function addQuestionField() {
@@ -210,7 +226,8 @@
                 document.getElementById('playCompTitle').textContent = comp.title + (isEnded ? ' (Ended)' : '');
                 
                 // Find current user's progress
-                const participant = comp.participants.find(p => p.user_id === userId);
+                const participants = Array.isArray(comp.participants) ? comp.participants : [];
+                const participant = userId ? participants.find(p => p.user_id === userId) : null;
                 const answeredIds = participant ? (participant.answers || []).map(a => parseInt(a.question_id)) : [];
                 const totalQuestions = (comp.questions || []).length;
                 const currentScore = participant?.score || 0;
@@ -221,10 +238,12 @@
                     const answerData = participant?.answers?.find(a => parseInt(a.question_id) === i);
                     
                     let statusBadge = '';
-                    if (isAnswered) {
+                    if (isAnswered && answerData) {
                         statusBadge = answerData.is_correct 
                             ? '<span class="badge bg-success">Correct (+1)</span>' 
                             : '<span class="badge bg-danger">Incorrect</span>';
+                    } else if (isAnswered) {
+                        statusBadge = '<span class="badge bg-secondary">Answered</span>';
                     }
 
                     const optionsHtml = (q.options || []).map(opt => `
