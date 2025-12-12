@@ -1,5 +1,5 @@
 from flask import jsonify
-from datetime import datetime
+from datetime import datetime, timezone
 
 def success_response(data: any = None, message: str = 'Success', 
                     status_code: int = 200):
@@ -39,7 +39,13 @@ def serialize_document(doc):
         return str(doc)
     
     if isinstance(doc, datetime):
-        return doc.isoformat()
+        # MongoDB datetimes are typically returned as naive UTC datetimes.
+        # Emit an explicit UTC ISO-8601 string so browsers parse it correctly.
+        if doc.tzinfo is None:
+            doc = doc.replace(tzinfo=timezone.utc)
+        else:
+            doc = doc.astimezone(timezone.utc)
+        return doc.isoformat().replace('+00:00', 'Z')
     
     if isinstance(doc, list):
         return [serialize_document(item) for item in doc]

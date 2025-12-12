@@ -395,10 +395,22 @@
                 const competitions = data.data?.competitions || [];
                 
                 const now = new Date();
+                const nowMs = now.getTime();
                 
-                // Determine if competition is active or completed based on end_time
-                const isActive = (comp) => new Date(comp.end_time) > now && !comp.completed;
-                const isCompleted = (comp) => new Date(comp.end_time) <= now || comp.completed;
+                // Determine if competition is active or completed.
+                // Prefer time-based classification, but also respect server flags.
+                const isActive = (comp) => {
+                    const endMs = Date.parse(comp.end_time);
+                    const timeSaysActive = Number.isFinite(endMs) ? (endMs > nowMs) : true;
+                    const serverSaysActive = comp.is_active !== false;
+                    return timeSaysActive && serverSaysActive && !comp.completed;
+                };
+                const isCompleted = (comp) => {
+                    const endMs = Date.parse(comp.end_time);
+                    const timeSaysCompleted = Number.isFinite(endMs) ? (endMs <= nowMs) : false;
+                    const serverSaysCompleted = comp.is_active === false;
+                    return timeSaysCompleted || serverSaysCompleted || comp.completed;
+                };
                 
                 // Active competitions sorted by end_time (soonest first)
                 const activeComps = competitions.filter(isActive).sort((a, b) => 
