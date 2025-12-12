@@ -115,6 +115,7 @@
                 });
                 if (res.status === 401) {
                     localStorage.removeItem('token');
+                    sessionStorage.setItem('redirectAfterLogin', window.location.href);
                     window.location.href = "{{ url_for('auth_page') }}";
                     return;
                 }
@@ -153,6 +154,7 @@
                 });
                 if (res.status === 401) {
                     localStorage.removeItem('token');
+                    sessionStorage.setItem('redirectAfterLogin', window.location.href);
                     window.location.href = "{{ url_for('auth_page') }}";
                     return;
                 }
@@ -226,6 +228,7 @@
                 });
                 if (res.status === 401) {
                     localStorage.removeItem('token');
+                    sessionStorage.setItem('redirectAfterLogin', window.location.href);
                     window.location.href = "{{ url_for('auth_page') }}";
                     return;
                 }
@@ -262,6 +265,7 @@
                     });
                     if (res.status === 401) {
                         localStorage.removeItem('token');
+                        sessionStorage.setItem('redirectAfterLogin', window.location.href);
                         window.location.href = "{{ url_for('auth_page') }}";
                         return;
                     }
@@ -294,6 +298,7 @@
                 });
                 if (res.status === 401) {
                     localStorage.removeItem('token');
+                    sessionStorage.setItem('redirectAfterLogin', window.location.href);
                     window.location.href = "{{ url_for('auth_page') }}";
                     return;
                 }

@@ -211,6 +211,8 @@
         const userId = localStorage.getItem('userId');
 
         if (!token || !userId) {
+            // Save current URL to redirect back after login
+            sessionStorage.setItem('redirectAfterLogin', window.location.href);
             window.location.href = "{{ url_for('auth_page') }}";
             return;
         }
@@ -431,6 +433,12 @@
         // Socket events
         let canDraw = true;
         let canSpeak = true;
+        
+        // WebRTC state (declared early for access in socket handlers)
+        let isInCall = false;
+        let localStream = null;
+        const peers = {}; // Map of userId -> RTCPeerConnection
+        let liveBtn = null; // Will be created later
 
         async function loadSessionInfo() {
             if (!sessionId) return;
@@ -618,8 +626,29 @@
                 participants[uid].can_speak = can_speak.includes(uid);
             }
             // Update local flags too
+            const hadSpeakPermission = canSpeak;
             canDraw = can_draw.includes(userId);
             canSpeak = can_speak.includes(userId);
+            
+            // If user just got speak permission and is in a call, enable their microphone
+            if (!hadSpeakPermission && canSpeak && isInCall && typeof enableMicrophone === 'function') {
+                enableMicrophone();
+            }
+            
+            // If user lost speak permission while in call, disable their microphone
+            if (hadSpeakPermission && !canSpeak && isInCall && localStream) {
+                disableMicrophone();
+            }
+            
+            // Update button text if in call (liveBtn may not exist yet)
+            if (isInCall && typeof liveBtn !== 'undefined' && liveBtn) {
+                if (canSpeak && localStream) {
+                    liveBtn.innerHTML = '<i class="fas fa-phone-slash"></i> Leave Call';
+                } else if (!canSpeak || !localStream) {
+                    liveBtn.innerHTML = '<i class="fas fa-phone-slash"></i> Leave (Listen Only)';
+                }
+            }
+            
             renderParticipants();
         });
 
@@ -652,7 +681,7 @@
         if (controlsContainer) controlsContainer.appendChild(speakBtn);
         
         // Live audio call button
-        const liveBtn = document.createElement('button');
+        liveBtn = document.createElement('button');
         liveBtn.className = 'btn btn-sm btn-outline-success';
         liveBtn.innerHTML = '<i class="fas fa-phone"></i> Join Call';
         if (controlsContainer) controlsContainer.appendChild(liveBtn);
@@ -722,29 +751,97 @@
 
         // WebRTC live audio (low-latency)
         let pc = null;
-        let localStream = null;
-        const peers = {}; // Map of userId -> RTCPeerConnection
 
         // Function to start WebRTC call
         async function startCall() {
             try {
-                localStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                // Only get microphone if user has speak permission
+                if (canSpeak) {
+                    localStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                    
+                    // Mute local audio playback to prevent echo
+                    const localAudio = document.createElement('audio');
+                    localAudio.srcObject = localStream;
+                    localAudio.muted = true;
+                    
+                    liveBtn.innerHTML = '<i class="fas fa-phone-slash"></i> Leave Call';
+                } else {
+                    // Join as listen-only
+                    localStream = null;
+                    liveBtn.innerHTML = '<i class="fas fa-phone-slash"></i> Leave (Listen Only)';
+                }
                 
-                // Mute local audio playback to prevent echo
-                const localAudio = document.createElement('audio');
-                localAudio.srcObject = localStream;
-                localAudio.muted = true;
+                isInCall = true;
                 
                 // Notify others that we are joining the call
                 socket.emit('webrtc_join', { room: sessionId ? `whiteboard:${sessionId}` : 'whiteboard', user_id: userId });
                 
                 liveBtn.classList.remove('btn-outline-success');
                 liveBtn.classList.add('btn-success');
-                liveBtn.innerHTML = '<i class="fas fa-phone-slash"></i> End Call';
             } catch (err) {
                 console.error('Error accessing microphone', err);
-                alert('Could not access microphone');
+                // Still allow joining as listen-only if mic access fails
+                localStream = null;
+                isInCall = true;
+                socket.emit('webrtc_join', { room: sessionId ? `whiteboard:${sessionId}` : 'whiteboard', user_id: userId });
+                liveBtn.classList.remove('btn-outline-success');
+                liveBtn.classList.add('btn-success');
+                liveBtn.innerHTML = '<i class="fas fa-phone-slash"></i> Leave (Listen Only)';
             }
+        }
+
+        // Function to enable microphone after permission is granted
+        async function enableMicrophone() {
+            if (!isInCall || localStream) return; // Already have mic or not in call
+            
+            try {
+                localStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                
+                // Add tracks to all existing peer connections
+                Object.entries(peers).forEach(([peerId, peer]) => {
+                    localStream.getTracks().forEach(track => {
+                        peer.addTrack(track, localStream);
+                    });
+                });
+                
+                // Renegotiate with all peers
+                for (const [peerId, peer] of Object.entries(peers)) {
+                    try {
+                        const offer = await peer.createOffer();
+                        await peer.setLocalDescription(offer);
+                        socket.emit('webrtc_offer', {
+                            room: sessionId ? `whiteboard:${sessionId}` : 'whiteboard',
+                            target: peerId,
+                            sender: userId,
+                            offer: offer
+                        });
+                    } catch (e) {
+                        console.error('Error renegotiating with peer:', peerId, e);
+                    }
+                }
+                
+                liveBtn.innerHTML = '<i class="fas fa-phone-slash"></i> Leave Call';
+                console.log('Microphone enabled after permission grant');
+            } catch (err) {
+                console.error('Error enabling microphone:', err);
+            }
+        }
+
+        // Function to disable microphone when permission is revoked
+        function disableMicrophone() {
+            if (!localStream) return;
+            
+            // Stop all tracks
+            localStream.getTracks().forEach(track => track.stop());
+            localStream = null;
+            
+            // Note: We don't remove tracks from peer connections, they will just stop sending
+            // The connection stays open so user can still listen
+            
+            if (liveBtn) {
+                liveBtn.innerHTML = '<i class="fas fa-phone-slash"></i> Leave (Listen Only)';
+            }
+            console.log('Microphone disabled due to permission revocation');
         }
 
         // Function to stop WebRTC call
@@ -753,6 +850,8 @@
                 localStream.getTracks().forEach(track => track.stop());
                 localStream = null;
             }
+            
+            isInCall = false;
             
             // Close all peer connections
             Object.values(peers).forEach(peer => peer.close());
@@ -767,7 +866,7 @@
         }
 
         liveBtn.addEventListener('click', () => {
-            if (localStream) {
+            if (isInCall) {
                 stopCall();
             } else {
                 startCall();

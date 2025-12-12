@@ -58,7 +58,10 @@ class AuthManager {
             this.showSuccess('Login successful! Redirecting...');
 
             setTimeout(() => {
-                window.location.href = '/';
+                // Check for redirect URL (saved when user was redirected to login)
+                const redirectUrl = sessionStorage.getItem('redirectAfterLogin');
+                sessionStorage.removeItem('redirectAfterLogin');
+                window.location.href = redirectUrl || '/';
             }, 1500);
         } catch (error) {
             console.error('Login error:', error);
@@ -116,7 +119,10 @@ class AuthManager {
             this.showSuccess('Account created! Redirecting...');
 
             setTimeout(() => {
-                window.location.href = '/';
+                // Check for redirect URL (saved when user was redirected to login)
+                const redirectUrl = sessionStorage.getItem('redirectAfterLogin');
+                sessionStorage.removeItem('redirectAfterLogin');
+                window.location.href = redirectUrl || '/';
             }, 1500);
         } catch (error) {
             console.error('Signup error:', error);

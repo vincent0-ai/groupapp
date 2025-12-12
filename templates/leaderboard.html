@@ -200,6 +200,7 @@
         });
         document.addEventListener('DOMContentLoaded', () => {
             if (!token) {
+                sessionStorage.setItem('redirectAfterLogin', window.location.href);
                 window.location.href = "{{ url_for('auth_page') }}";
                 return;
             }
