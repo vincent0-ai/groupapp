@@ -26,6 +26,7 @@ class User:
             'last_login': None,
             'is_active': True,
             'is_verified': False,
+            'is_admin': False,
             'preferences': {
                 'notifications_enabled': True,
                 'dark_mode': False,

@@ -174,6 +174,18 @@ class Discussio {
 
             const data = await response.json();
             console.log('User Profile:', data);
+            
+            // Add Admin link if user is admin
+            if (data.data && data.data.is_admin) {
+                const navbarList = document.getElementById('navbarList');
+                if (navbarList && !document.getElementById('adminLink')) {
+                    const li = document.createElement('li');
+                    li.className = 'nav-item';
+                    li.innerHTML = `<a class="nav-link" id="adminLink" href="/admin"><i class="fas fa-shield-alt"></i> Admin</a>`;
+                    // Insert before Logout (last item)
+                    navbarList.insertBefore(li, navbarList.lastElementChild);
+                }
+            }
         } catch (error) {
             console.error('Error loading profile:', error);
         }

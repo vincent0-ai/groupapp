@@ -32,6 +32,7 @@ def create_app(config_name='development'):
     from app.routes.files import files_bp
     from app.routes.users import users_bp
     from app.routes.whiteboards import whiteboards_bp
+    from app.routes.admin import admin_bp
     
     app.register_blueprint(auth_bp)
     app.register_blueprint(groups_bp)
@@ -40,6 +41,7 @@ def create_app(config_name='development'):
     app.register_blueprint(files_bp)
     app.register_blueprint(users_bp)
     app.register_blueprint(whiteboards_bp)
+    app.register_blueprint(admin_bp)
     
     # Page routes (serving templates)
 
@@ -48,6 +50,11 @@ def create_app(config_name='development'):
     def auth_page():
         """Serve auth page"""
         return render_template('auth.html')
+    
+    @app.route('/admin')
+    def admin_page():
+        """Serve admin page"""
+        return render_template('admin.html')
     
     @app.route('/dashboard')
     @app.route('/')

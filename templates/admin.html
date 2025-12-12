@@ -1,0 +1,380 @@
+{% extends "base.html" %}
+
+{% block title %}Admin Dashboard - Discussio{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2><i class="fas fa-shield-alt me-2"></i>Admin Dashboard</h2>
+    <div id="adminStats" class="d-flex gap-3 text-muted small">
+        <!-- Stats will be loaded here -->
+    </div>
+</div>
+
+<ul class="nav nav-tabs mb-4" id="adminTabs" role="tablist">
+    <li class="nav-item" role="presentation">
+        <button class="nav-link active" id="users-tab" data-bs-toggle="tab" data-bs-target="#users" type="button" role="tab">Users</button>
+    </li>
+    <li class="nav-item" role="presentation">
+        <button class="nav-link" id="groups-tab" data-bs-toggle="tab" data-bs-target="#groups" type="button" role="tab">Groups</button>
+    </li>
+    <li class="nav-item" role="presentation">
+        <button class="nav-link" id="channels-tab" data-bs-toggle="tab" data-bs-target="#channels" type="button" role="tab">Channels</button>
+    </li>
+</ul>
+
+<div class="tab-content" id="adminTabContent">
+    <!-- Users Tab -->
+    <div class="tab-pane fade show active" id="users" role="tabpanel">
+        <div class="d-flex justify-content-between mb-3">
+            <input type="text" class="form-control w-auto" id="userSearch" placeholder="Search users...">
+        </div>
+        <div class="table-responsive">
+            <table class="table table-hover">
+                <thead>
+                    <tr>
+                        <th>User</th>
+                        <th>Email</th>
+                        <th>Status</th>
+                        <th>Joined</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="usersTableBody">
+                    <!-- Users will be loaded here -->
+                </tbody>
+            </table>
+        </div>
+        <nav aria-label="User pagination">
+            <ul class="pagination justify-content-center" id="userPagination"></ul>
+        </nav>
+    </div>
+
+    <!-- Groups Tab -->
+    <div class="tab-pane fade" id="groups" role="tabpanel">
+        <div class="d-flex justify-content-between mb-3">
+            <input type="text" class="form-control w-auto" id="groupSearch" placeholder="Search groups...">
+        </div>
+        <div class="table-responsive">
+            <table class="table table-hover">
+                <thead>
+                    <tr>
+                        <th>Name</th>
+                        <th>Owner</th>
+                        <th>Members</th>
+                        <th>Created</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="groupsTableBody">
+                    <!-- Groups will be loaded here -->
+                </tbody>
+            </table>
+        </div>
+        <nav aria-label="Group pagination">
+            <ul class="pagination justify-content-center" id="groupPagination"></ul>
+        </nav>
+    </div>
+
+    <!-- Channels Tab -->
+    <div class="tab-pane fade" id="channels" role="tabpanel">
+        <div class="table-responsive">
+            <table class="table table-hover">
+                <thead>
+                    <tr>
+                        <th>Name</th>
+                        <th>Description</th>
+                        <th>Groups</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="channelsTableBody">
+                    <!-- Channels will be loaded here -->
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', async () => {
+    const token = localStorage.getItem('token');
+    if (!token) {
+        window.location.href = '/auth';
+        return;
+    }
+
+    // Check admin status
+    try {
+        const payload = JSON.parse(atob(token.split('.')[1]));
+        // We might need to fetch user profile to confirm admin status if not in token
+        // But for now let's try to load stats, if it fails (403), redirect
+        await loadStats();
+    } catch (e) {
+        console.error(e);
+        alert('Access denied');
+        window.location.href = '/';
+    }
+
+    // Load initial data
+    loadUsers();
+    loadGroups();
+    loadChannels();
+
+    // Search listeners
+    let userSearchTimeout;
+    document.getElementById('userSearch').addEventListener('input', (e) => {
+        clearTimeout(userSearchTimeout);
+        userSearchTimeout = setTimeout(() => loadUsers(1, e.target.value), 500);
+    });
+
+    let groupSearchTimeout;
+    document.getElementById('groupSearch').addEventListener('input', (e) => {
+        clearTimeout(groupSearchTimeout);
+        groupSearchTimeout = setTimeout(() => loadGroups(1, e.target.value), 500);
+    });
+});
+
+async function apiCall(endpoint, method = 'GET', body = null) {
+    const token = localStorage.getItem('token');
+    const headers = {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
+    };
+    
+    const options = { method, headers };
+    if (body) options.body = JSON.stringify(body);
+
+    const response = await fetch(`/api/admin${endpoint}`, options);
+    if (response.status === 401) {
+        window.location.href = '/auth';
+        return;
+    }
+    if (response.status === 403) {
+        alert('Admin privileges required');
+        window.location.href = '/';
+        return;
+    }
+    return response.json();
+}
+
+async function loadStats() {
+    const res = await apiCall('/stats');
+    if (res.status === 'success') {
+        const stats = res.data;
+        document.getElementById('adminStats').innerHTML = `
+            <span><i class="fas fa-users"></i> ${stats.total_users} Users</span>
+            <span><i class="fas fa-layer-group"></i> ${stats.total_groups} Groups</span>
+            <span><i class="fas fa-hashtag"></i> ${stats.total_channels} Channels</span>
+        `;
+    }
+}
+
+async function loadUsers(page = 1, search = '') {
+    const res = await apiCall(`/users?page=${page}&search=${search}`);
+    if (res.status === 'success') {
+        const tbody = document.getElementById('usersTableBody');
+        tbody.innerHTML = res.data.users.map(user => `
+            <tr>
+                <td>
+                    <div class="d-flex align-items-center">
+                        <img src="${user.avatar_url}" class="rounded-circle me-2" width="32" height="32">
+                        <div>
+                            <div class="fw-bold">${user.username}</div>
+                            <div class="small text-muted">${user.full_name}</div>
+                        </div>
+                    </div>
+                </td>
+                <td>${user.email}</td>
+                <td>
+                    <span class="badge bg-${user.is_active ? 'success' : 'danger'}">
+                        ${user.is_active ? 'Active' : 'Banned'}
+                    </span>
+                    ${user.is_admin ? '<span class="badge bg-primary">Admin</span>' : ''}
+                </td>
+                <td>${new Date(user.created_at).toLocaleDateString()}</td>
+                <td>
+                    ${!user.is_admin ? `
+                        <button class="btn btn-sm btn-${user.is_active ? 'danger' : 'success'}" 
+                                onclick="toggleBan('${user._id}', ${user.is_active})">
+                            ${user.is_active ? 'Ban' : 'Unban'}
+                        </button>
+                    ` : ''}
+                </td>
+            </tr>
+        `).join('');
+        
+        renderPagination('userPagination', res.data.page, res.data.pages, (p) => loadUsers(p, search));
+    }
+}
+
+async function toggleBan(userId, isActive) {
+    if (!confirm(`Are you sure you want to ${isActive ? 'ban' : 'unban'} this user?`)) return;
+    
+    const endpoint = `/users/${userId}/${isActive ? 'ban' : 'unban'}`;
+    const res = await apiCall(endpoint, 'POST');
+    
+    if (res.status === 'success') {
+        loadUsers(1, document.getElementById('userSearch').value);
+    } else {
+        alert(res.message);
+    }
+}
+
+async function loadGroups(page = 1, search = '') {
+    const res = await apiCall(`/groups?page=${page}&search=${search}`);
+    if (res.status === 'success') {
+        const tbody = document.getElementById('groupsTableBody');
+        tbody.innerHTML = res.data.groups.map(group => `
+            <tr>
+                <td>
+                    <div class="d-flex align-items-center">
+                        <img src="${group.avatar_url}" class="rounded-circle me-2" width="32" height="32">
+                        ${group.name}
+                    </div>
+                </td>
+                <td>${group.owner_id}</td> <!-- Ideally fetch owner name -->
+                <td>${group.members.length}</td>
+                <td>${new Date(group.created_at).toLocaleDateString()}</td>
+                <td>
+                    <button class="btn btn-sm btn-danger" onclick="deleteGroup('${group._id}')">
+                        Delete
+                    </button>
+                </td>
+            </tr>
+        `).join('');
+        
+        renderPagination('groupPagination', res.data.page, res.data.pages, (p) => loadGroups(p, search));
+    }
+}
+
+async function deleteGroup(groupId) {
+    if (!confirm('Are you sure you want to delete this group? This cannot be undone.')) return;
+    
+    const res = await apiCall(`/groups/${groupId}`, 'DELETE');
+    if (res.status === 'success') {
+        loadGroups(1, document.getElementById('groupSearch').value);
+        loadStats();
+    } else {
+        alert(res.message);
+    }
+}
+
+async function loadChannels() {
+    const res = await apiCall('/channels');
+    if (res.status === 'success') {
+        const tbody = document.getElementById('channelsTableBody');
+        tbody.innerHTML = res.data.map(channel => `
+            <tr>
+                <td>${channel.name}</td>
+                <td>${channel.description}</td>
+                <td>${channel.group_count || 0}</td>
+                <td>
+                    <button class="btn btn-sm btn-danger" onclick="deleteChannel('${channel._id}')">
+                        Delete
+                    </button>
+                </td>
+            </tr>
+        `).join('');
+    }
+}
+
+async function deleteChannel(channelId) {
+    if (!confirm('Are you sure you want to delete this channel?')) return;
+    
+    const res = await apiCall(`/channels/${channelId}`, 'DELETE');
+    if (res.status === 'success') {
+        loadChannels();
+        loadStats();
+    } else {
+        alert(res.message);
+    }
+}
+
+function renderPagination(elementId, currentPage, totalPages, callback) {
+    const container = document.getElementById(elementId);
+    let html = '';
+    
+    if (totalPages > 1) {
+        html += `
+            <li class="page-item ${currentPage === 1 ? 'disabled' : ''}">
+                <a class="page-link" href="#" onclick="event.preventDefault(); ${currentPage > 1 ? 'callback(' + (currentPage - 1) + ')' : ''}">Previous</a>
+            </li>
+        `;
+        
+        for (let i = 1; i <= totalPages; i++) {
+            if (i === 1 || i === totalPages || (i >= currentPage - 2 && i <= currentPage + 2)) {
+                html += `
+                    <li class="page-item ${i === currentPage ? 'active' : ''}">
+                        <a class="page-link" href="#" onclick="event.preventDefault(); callback(${i})">${i}</a>
+                    </li>
+                `;
+            } else if (i === currentPage - 3 || i === currentPage + 3) {
+                html += `<li class="page-item disabled"><span class="page-link">...</span></li>`;
+            }
+        }
+        
+        html += `
+            <li class="page-item ${currentPage === totalPages ? 'disabled' : ''}">
+                <a class="page-link" href="#" onclick="event.preventDefault(); ${currentPage < totalPages ? 'callback(' + (currentPage + 1) + ')' : ''}">Next</a>
+            </li>
+        `;
+    }
+    
+    container.innerHTML = html;
+    
+    // Attach callback to window so onclick works (hacky but simple)
+    // Better to add event listeners but this is quick
+    window.callback = callback; 
+    // Wait, window.callback will be overwritten. 
+    // We need to bind the callback properly.
+    // The onclick in HTML string refers to global scope.
+    // Let's fix this by not using inline onclick for the callback logic if possible, 
+    // or by assigning unique global functions.
+    // Actually, since I'm generating HTML string, I can't easily pass the closure 'callback'.
+    // I'll just assign it to a property on the element and use event delegation or just use a global helper.
+}
+
+// Fix for pagination callback
+window.loadUsersPage = (p) => loadUsers(p, document.getElementById('userSearch').value);
+window.loadGroupsPage = (p) => loadGroups(p, document.getElementById('groupSearch').value);
+
+// Re-implement renderPagination to use specific global functions
+function renderPagination(elementId, currentPage, totalPages, callback) {
+    const container = document.getElementById(elementId);
+    const callbackName = elementId === 'userPagination' ? 'loadUsersPage' : 'loadGroupsPage';
+    
+    let html = '';
+    
+    if (totalPages > 1) {
+        html += `
+            <li class="page-item ${currentPage === 1 ? 'disabled' : ''}">
+                <a class="page-link" href="#" onclick="event.preventDefault(); ${callbackName}(${currentPage - 1})">Previous</a>
+            </li>
+        `;
+        
+        for (let i = 1; i <= totalPages; i++) {
+            if (i === 1 || i === totalPages || (i >= currentPage - 2 && i <= currentPage + 2)) {
+                html += `
+                    <li class="page-item ${i === currentPage ? 'active' : ''}">
+                        <a class="page-link" href="#" onclick="event.preventDefault(); ${callbackName}(${i})">${i}</a>
+                    </li>
+                `;
+            } else if (i === currentPage - 3 || i === currentPage + 3) {
+                html += `<li class="page-item disabled"><span class="page-link">...</span></li>`;
+            }
+        }
+        
+        html += `
+            <li class="page-item ${currentPage === totalPages ? 'disabled' : ''}">
+                <a class="page-link" href="#" onclick="event.preventDefault(); ${callbackName}(${currentPage + 1})">Next</a>
+            </li>
+        `;
+    }
+    
+    container.innerHTML = html;
+}
+</script>
+{% endblock %}
