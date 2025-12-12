@@ -95,14 +95,18 @@ class Database:
             return None
     
     def find(self, collection_name: str, query: Dict, skip: int = 0, 
-            limit: int = 0, sort: tuple = None) -> List[Dict]:
+            limit: int = 0, sort: object = None) -> List[Dict]:
         """Find multiple documents"""
         try:
             cursor = self.db[collection_name].find(query).skip(skip)
             if limit:
                 cursor = cursor.limit(limit)
             if sort:
-                cursor = cursor.sort(sort[0], sort[1])
+                # Handle both list of tuples (pymongo style) and single tuple
+                if isinstance(sort, list):
+                    cursor = cursor.sort(sort)
+                elif isinstance(sort, tuple):
+                    cursor = cursor.sort(sort[0], sort[1])
             return list(cursor)
         except Exception as e:
             print(f"Error finding documents: {e}")

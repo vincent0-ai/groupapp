@@ -787,15 +787,15 @@
                             return;
                         }
                         
+                        // Always show modal to allow naming the session
+                        const select = document.getElementById('sessionGroupSelect');
+                        select.innerHTML = '<option value="">Select a group</option>' + (groups.map(g => `<option value="${g.id}">${g.name}</option>`).join(''));
+                        
                         if (groups.length === 1) {
-                            // Only one group, create immediately
-                            createSession(groups[0].id);
-                        } else {
-                            // Multiple groups, show selection
-                            const select = document.getElementById('sessionGroupSelect');
-                            select.innerHTML = '<option value="">Select a group</option>' + (groups.map(g => `<option value="${g.id}">${g.name}</option>`).join(''));
-                            createModal.show();
+                            // Pre-select the single group
+                            select.value = groups[0].id;
                         }
+                        createModal.show();
                     }
                 } catch (e) {
                     console.error('Failed to load groups', e);
