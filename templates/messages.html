@@ -124,6 +124,77 @@
             height: 28px;
             border-radius: 50%;
         }
+        
+        /* Message content text handling */
+        .message-content {
+            word-wrap: break-word;
+            word-break: break-word;
+            overflow-wrap: break-word;
+            hyphens: auto;
+            white-space: pre-wrap;
+        }
+        
+        /* Handle long links */
+        .message-content a {
+            word-break: break-all;
+            overflow-wrap: anywhere;
+        }
+        
+        /* Mobile-optimized message styles */
+        @media (max-width: 768px) {
+            .message-bubble {
+                max-width: 100% !important;
+                padding: 8px 10px !important;
+                font-size: 0.9rem;
+            }
+            
+            .message-bubble p.message-content {
+                font-size: 0.875rem;
+                line-height: 1.4;
+            }
+            
+            .message-bubble .reply-preview {
+                font-size: 0.7rem;
+                padding: 3px 6px;
+            }
+            
+            /* Reduce max-width of message container on mobile */
+            #messagesArea .d-flex > .d-flex.flex-column {
+                max-width: 85% !important;
+            }
+            
+            /* Smaller timestamps */
+            #messagesArea small.text-muted {
+                font-size: 0.65rem !important;
+            }
+            
+            /* Compact message actions */
+            .message-actions button {
+                padding: 1px 4px;
+                font-size: 0.65rem;
+            }
+            
+            /* Smaller input on mobile */
+            #messageInput {
+                font-size: 0.9rem;
+            }
+        }
+        
+        /* Extra small screens */
+        @media (max-width: 400px) {
+            .message-bubble {
+                padding: 6px 8px !important;
+                font-size: 0.85rem;
+            }
+            
+            .message-bubble p.message-content {
+                font-size: 0.825rem;
+            }
+            
+            #messagesArea .d-flex > .d-flex.flex-column {
+                max-width: 90% !important;
+            }
+        }
     </style>
     <div class="row g-3" style="height: calc(100vh - 100px);">
         <div class="col-12 h-100">
@@ -522,8 +593,8 @@
                     const displayTime = isToday ? timeStr : `${dateStr} ${timeStr}`;
                     
                     return `
-                        <div class="mb-3 d-flex ${isMine ? 'justify-content-end' : 'justify-content-start'}" id="msg-${m._id}">
-                            <div class="d-flex flex-column ${isMine ? 'align-items-end' : 'align-items-start'}" style="max-width: 75%;">
+                        <div class="mb-2 d-flex ${isMine ? 'justify-content-end' : 'justify-content-start'}" id="msg-${m._id}">
+                            <div class="d-flex flex-column ${isMine ? 'align-items-end' : 'align-items-start'}" style="max-width: 70%;">
                                 <div class="message-bubble p-2 rounded shadow-sm ${isMine ? 'bg-primary text-white' : 'bg-white text-dark border'}">
                                     ${replyHtml}
                                     <div class="message-actions ${isMine ? '' : 'message-actions-left'}">

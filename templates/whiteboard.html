@@ -15,6 +15,64 @@
     .controls {
         margin-bottom: 15px;
     }
+
+    /* Fullscreen mode styles */
+    .whiteboard-fullscreen {
+        position: fixed !important;
+        top: 0 !important;
+        left: 0 !important;
+        width: 100vw !important;
+        height: 100vh !important;
+        z-index: 9999 !important;
+        background: #fff !important;
+        border-radius: 0 !important;
+        border: none !important;
+    }
+
+    .fullscreen-controls {
+        position: fixed;
+        bottom: 20px;
+        left: 50%;
+        transform: translateX(-50%);
+        z-index: 10000;
+        display: flex;
+        gap: 10px;
+        background: rgba(255,255,255,0.95);
+        padding: 10px 15px;
+        border-radius: 30px;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+    }
+
+    .fullscreen-controls button {
+        border-radius: 50%;
+        width: 45px;
+        height: 45px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .fullscreen-exit-btn {
+        position: fixed;
+        top: 15px;
+        right: 15px;
+        z-index: 10000;
+        border-radius: 50%;
+        width: 45px;
+        height: 45px;
+    }
+
+    @media (max-width: 768px) {
+        .fullscreen-toggle-btn {
+            display: inline-flex !important;
+        }
+    }
+
+    @media (min-width: 769px) {
+        .fullscreen-toggle-btn {
+            display: none !important;
+        }
+    }
 </style>
 {% endblock %}
 
@@ -115,7 +173,13 @@
 
     <div class="col-lg-10">
         <div class="card shadow-sm border-0">
-            <div class="card-body overflow-auto text-center bg-light">
+            <div class="card-header d-flex justify-content-between align-items-center d-lg-none">
+                <span class="fw-semibold">Whiteboard</span>
+                <button id="fullscreenToggleBtn" class="btn btn-sm btn-outline-secondary fullscreen-toggle-btn">
+                    <i class="fas fa-expand"></i> Fullscreen
+                </button>
+            </div>
+            <div class="card-body overflow-auto text-center bg-light" id="canvasContainer">
                 <div style="position:relative;">
                     <canvas id="whiteboard" style="width:100%;height:50vh;display:block;" width="1200" height="600"></canvas>
                     <div id="canvasOverlay" style="position:absolute;inset:0;display:none;align-items:center;justify-content:center;background:rgba(255,255,255,0.6);">
@@ -302,23 +366,83 @@
             });
         }
 
-        // Resize canvas to container size and handle high DPI screens
-        function resizeCanvas() {
+        // Store canvas image data to preserve across resize/visibility changes
+        let savedCanvasData = null;
+        
+        function saveCanvasState() {
             if (!canvas || !ctx) return;
+            try {
+                savedCanvasData = canvas.toDataURL();
+            } catch (e) {
+                console.error('Could not save canvas state:', e);
+            }
+        }
+        
+        function restoreCanvasState() {
+            if (!canvas || !ctx || !savedCanvasData) return;
+            const img = new Image();
+            img.onload = () => {
+                // Clear and redraw
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                ctx.drawImage(img, 0, 0, canvas.width / (window.devicePixelRatio || 1), canvas.height / (window.devicePixelRatio || 1));
+            };
+            img.src = savedCanvasData;
+        }
+
+        // Resize canvas to container size and handle high DPI screens
+        function resizeCanvas(preserveContent = true) {
+            if (!canvas || !ctx) return;
+            
+            // Save current canvas content before resize
+            if (preserveContent) {
+                saveCanvasState();
+            }
+            
             const rect = canvas.getBoundingClientRect();
             const ratio = window.devicePixelRatio || 1;
             canvas.width = Math.max(300, Math.floor(rect.width * ratio));
             canvas.height = Math.max(200, Math.floor(rect.height * ratio));
             // Reset scaling for drawing operations
             ctx.setTransform(ratio, 0, 0, ratio, 0, 0);
+            
+            // Restore canvas content after resize
+            if (preserveContent) {
+                restoreCanvasState();
+            }
         }
+        
+        // Handle visibility change (user switches tabs/apps on mobile)
+        document.addEventListener('visibilitychange', () => {
+            if (document.hidden) {
+                // Page is being hidden - save canvas state
+                saveCanvasState();
+            } else {
+                // Page is visible again - restore canvas state
+                // Small delay to ensure canvas is ready
+                setTimeout(() => {
+                    restoreCanvasState();
+                }, 100);
+            }
+        });
+        
+        // Handle page focus/blur for additional mobile browser support
+        window.addEventListener('blur', () => {
+            saveCanvasState();
+        });
+        
+        window.addEventListener('focus', () => {
+            setTimeout(() => {
+                restoreCanvasState();
+            }, 100);
+        });
+        
         window.addEventListener('resize', () => {
             if (canvas) {
                 try { history.push(canvas.toDataURL()); } catch{}
-                resizeCanvas();
+                resizeCanvas(true);
             }
         });
-        if (canvas) resizeCanvas();
+        if (canvas) resizeCanvas(false);
 
         // Mouse events
         if (canvas) {
@@ -384,6 +508,7 @@
                     // Local clear
                     if (ctx && canvas) ctx.clearRect(0, 0, canvas.width, canvas.height);
                     history = [];
+                    savedCanvasData = null; // Clear saved state too
                     // Emit clear event
                     socket.emit('clear_board', { 
                         room: sessionId ? `whiteboard:${sessionId}` : 'whiteboard', 
@@ -396,6 +521,7 @@
         socket.on('board_cleared', () => {
             if (ctx && canvas) ctx.clearRect(0, 0, canvas.width, canvas.height);
             history = [];
+            savedCanvasData = null; // Clear saved state when board is cleared
         });
 
         const undoBtn = document.getElementById('undoBtn');
@@ -1044,6 +1170,133 @@
 
         // Join room
         socket.emit('join_room', { room: sessionId ? `whiteboard:${sessionId}` : 'whiteboard', user_id: userId });
+
+        // Fullscreen functionality for mobile
+        let isFullscreen = false;
+        let fullscreenControls = null;
+        let fullscreenExitBtn = null;
+        
+        const fullscreenToggleBtn = document.getElementById('fullscreenToggleBtn');
+        
+        function enterFullscreen() {
+            if (!canvas) return;
+            
+            // Save canvas state before fullscreen transition
+            saveCanvasState();
+            
+            isFullscreen = true;
+            canvas.classList.add('whiteboard-fullscreen');
+            
+            // Create floating controls for fullscreen mode
+            fullscreenControls = document.createElement('div');
+            fullscreenControls.className = 'fullscreen-controls';
+            fullscreenControls.innerHTML = `
+                <button class="btn btn-outline-dark fs-color-btn" title="Color">
+                    <input type="color" id="fsColorPicker" value="${colorPicker.value}" style="opacity:0;position:absolute;width:100%;height:100%;cursor:pointer;">
+                    <i class="fas fa-palette"></i>
+                </button>
+                <button class="btn btn-outline-dark fs-brush-small" title="Small brush">
+                    <i class="fas fa-circle" style="font-size:8px;"></i>
+                </button>
+                <button class="btn btn-outline-dark fs-brush-medium" title="Medium brush">
+                    <i class="fas fa-circle" style="font-size:12px;"></i>
+                </button>
+                <button class="btn btn-outline-dark fs-brush-large" title="Large brush">
+                    <i class="fas fa-circle" style="font-size:16px;"></i>
+                </button>
+                <button class="btn btn-outline-warning fs-undo-btn" title="Undo">
+                    <i class="fas fa-undo"></i>
+                </button>
+            `;
+            document.body.appendChild(fullscreenControls);
+            
+            // Create exit button
+            fullscreenExitBtn = document.createElement('button');
+            fullscreenExitBtn.className = 'btn btn-secondary fullscreen-exit-btn';
+            fullscreenExitBtn.innerHTML = '<i class="fas fa-compress"></i>';
+            fullscreenExitBtn.title = 'Exit fullscreen';
+            document.body.appendChild(fullscreenExitBtn);
+            
+            // Event listeners for fullscreen controls
+            const fsColorInput = fullscreenControls.querySelector('#fsColorPicker');
+            fsColorInput.addEventListener('input', (e) => {
+                colorPicker.value = e.target.value;
+            });
+            
+            fullscreenControls.querySelector('.fs-brush-small').addEventListener('click', () => {
+                brushSize.value = 2;
+                document.getElementById('sizeValue').textContent = '2';
+            });
+            
+            fullscreenControls.querySelector('.fs-brush-medium').addEventListener('click', () => {
+                brushSize.value = 6;
+                document.getElementById('sizeValue').textContent = '6';
+            });
+            
+            fullscreenControls.querySelector('.fs-brush-large').addEventListener('click', () => {
+                brushSize.value = 12;
+                document.getElementById('sizeValue').textContent = '12';
+            });
+            
+            fullscreenControls.querySelector('.fs-undo-btn').addEventListener('click', () => {
+                if (undoBtn) undoBtn.click();
+            });
+            
+            fullscreenExitBtn.addEventListener('click', exitFullscreen);
+            
+            // Resize canvas to fill screen after transition
+            setTimeout(() => {
+                resizeCanvas(true);
+            }, 50);
+            
+            // Hide body scroll
+            document.body.style.overflow = 'hidden';
+        }
+        
+        function exitFullscreen() {
+            if (!canvas) return;
+            
+            // Save canvas state before exiting fullscreen
+            saveCanvasState();
+            
+            isFullscreen = false;
+            canvas.classList.remove('whiteboard-fullscreen');
+            
+            // Remove floating controls
+            if (fullscreenControls) {
+                fullscreenControls.remove();
+                fullscreenControls = null;
+            }
+            if (fullscreenExitBtn) {
+                fullscreenExitBtn.remove();
+                fullscreenExitBtn = null;
+            }
+            
+            // Restore body scroll
+            document.body.style.overflow = '';
+            
+            // Resize canvas back to container size after transition
+            setTimeout(() => {
+                resizeCanvas(true);
+            }, 50);
+        }
+        
+        if (fullscreenToggleBtn) {
+            fullscreenToggleBtn.addEventListener('click', () => {
+                if (isFullscreen) {
+                    exitFullscreen();
+                } else {
+                    enterFullscreen();
+                }
+            });
+        }
+        
+        // Exit fullscreen on escape key
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape' && isFullscreen) {
+                exitFullscreen();
+            }
+        });
 
             // Create/Join session UI handlers
             const createSessionBtnMobile = document.getElementById('createSessionBtn');
