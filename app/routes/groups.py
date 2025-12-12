@@ -399,11 +399,15 @@ def get_group_members(group_id):
         return error_response('Group not found', 404)
     
     # Get member details
-    members = db.find('users', {'_id': {'$in': group['members']}})
+    members = list(db.find('users', {'_id': {'$in': group['members']}}))
     
-    # Remove sensitive data
+    # Remove sensitive data and add id field
     for member in members:
+        member['id'] = str(member['_id'])
         del member['password_hash']
+        # Ensure avatar_url exists
+        if not member.get('avatar_url'):
+            member['avatar_url'] = f"https://api.dicebear.com/7.x/avataaars/svg?seed={member.get('username', member['id'])}"
     
     return success_response([serialize_document(m) for m in members], 'Members retrieved successfully', 200)
 

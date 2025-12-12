@@ -81,7 +81,7 @@ def update_profile():
 
 @users_bp.route('/<user_id>', methods=['GET'])
 def get_user(user_id):
-    """Get user public profile"""
+    """Get user public profile (restricted data)"""
     try:
         user_id_obj = ObjectId(user_id)
     except:
@@ -93,11 +93,25 @@ def get_user(user_id):
     if not user:
         return error_response('User not found', 404)
     
-    # Remove sensitive data
-    del user['password_hash']
-    del user['preferences']
+    # Count groups user is a member of
+    groups_count = db.count('groups', {'members': user_id_obj})
     
-    return success_response(serialize_document(user), 'User profile retrieved successfully', 200)
+    # Return only public fields - exclude email and other sensitive data
+    public_profile = {
+        'id': str(user['_id']),
+        'username': user.get('username', ''),
+        'full_name': user.get('full_name', ''),
+        'avatar_url': user.get('avatar_url') or f"https://api.dicebear.com/7.x/avataaars/svg?seed={user.get('username', '')}",
+        'bio': user.get('bio', ''),
+        'points': user.get('points', 0),
+        'badges': user.get('badges', []),
+        'groups_count': groups_count,
+        'created_at': user.get('created_at').isoformat() if user.get('created_at') else None,
+        'is_admin': user.get('is_admin', False),
+        'role': user.get('role', 'user')
+    }
+    
+    return success_response(public_profile, 'User profile retrieved successfully', 200)
 
 @users_bp.route('/leaderboard', methods=['GET'])
 def get_leaderboard():
@@ -186,17 +200,27 @@ def search_users():
     
     db = Database()
     
-    # Simple regex search (in production, use Meilisearch)
+    # Simple regex search on username and full_name only (not email for privacy)
     users = db.find('users', {
         '$or': [
             {'username': {'$regex': query, '$options': 'i'}},
-            {'full_name': {'$regex': query, '$options': 'i'}},
-            {'email': {'$regex': query, '$options': 'i'}}
+            {'full_name': {'$regex': query, '$options': 'i'}}
         ]
     }, limit=20)
     
+    # Return only public fields
+    public_users = []
     for user in users:
-        del user['password_hash']
-        del user['preferences']
+        user_id_obj = user['_id']
+        groups_count = db.count('groups', {'members': user_id_obj})
+        public_users.append({
+            'id': str(user['_id']),
+            'username': user.get('username', ''),
+            'full_name': user.get('full_name', ''),
+            'avatar_url': user.get('avatar_url') or f"https://api.dicebear.com/7.x/avataaars/svg?seed={user.get('username', '')}",
+            'points': user.get('points', 0),
+            'badges': user.get('badges', []),
+            'groups_count': groups_count
+        })
     
-    return success_response([serialize_document(u) for u in users], 'Users found successfully', 200)
+    return success_response(public_users, 'Users found successfully', 200)

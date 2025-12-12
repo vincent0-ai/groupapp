@@ -3,6 +3,128 @@
 {% block title %}Messages - Discussio{% endblock %}
 
 {% block content %}
+    <style>
+        /* Message enhancements */
+        .message-content a {
+            color: inherit;
+            text-decoration: underline;
+        }
+        .message-content a:hover {
+            opacity: 0.8;
+        }
+        .mention {
+            background: rgba(67, 97, 238, 0.2);
+            color: #4361ee;
+            padding: 1px 4px;
+            border-radius: 3px;
+            font-weight: 500;
+            cursor: pointer;
+        }
+        .mention:hover {
+            background: rgba(67, 97, 238, 0.3);
+        }
+        .bg-primary .mention {
+            background: rgba(255, 255, 255, 0.3);
+            color: white;
+        }
+        .hashtag {
+            color: #2d6a4f;
+            font-weight: 500;
+            cursor: pointer;
+        }
+        .hashtag:hover {
+            text-decoration: underline;
+        }
+        .bg-primary .hashtag {
+            color: #a8e6cf;
+        }
+        .message-bubble {
+            position: relative;
+            transition: all 0.2s;
+        }
+        .message-bubble:hover .message-actions {
+            opacity: 1;
+        }
+        @keyframes pulse-highlight {
+            0% { box-shadow: 0 0 0 0 rgba(67, 97, 238, 0.4); }
+            70% { box-shadow: 0 0 0 10px rgba(67, 97, 238, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(67, 97, 238, 0); }
+        }
+        .message-bubble.highlight {
+            animation: pulse-highlight 0.6s ease-out;
+        }
+        .message-actions {
+            position: absolute;
+            top: -10px;
+            right: 5px;
+            opacity: 0;
+            transition: opacity 0.2s;
+        }
+        .message-actions-left {
+            right: auto;
+            left: 5px;
+        }
+        .message-actions button {
+            padding: 2px 6px;
+            font-size: 0.7rem;
+        }
+        .reply-preview {
+            font-size: 0.75rem;
+            padding: 4px 8px;
+            border-left: 3px solid rgba(67, 97, 238, 0.5);
+            margin-bottom: 4px;
+            background: rgba(0,0,0,0.05);
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        .bg-primary .reply-preview {
+            background: rgba(255,255,255,0.15);
+            border-left-color: rgba(255,255,255,0.5);
+        }
+        .reply-bar {
+            display: none;
+            padding: 8px 12px;
+            background: #e9ecef;
+            border-radius: 8px 8px 0 0;
+            margin-bottom: -1px;
+        }
+        .reply-bar.active {
+            display: flex;
+        }
+        /* Mention autocomplete */
+        .mention-dropdown {
+            position: absolute;
+            bottom: 100%;
+            left: 0;
+            right: 0;
+            background: white;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            max-height: 200px;
+            overflow-y: auto;
+            display: none;
+            z-index: 1000;
+            box-shadow: 0 -4px 12px rgba(0,0,0,0.1);
+        }
+        .mention-dropdown.show {
+            display: block;
+        }
+        .mention-item {
+            padding: 8px 12px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .mention-item:hover, .mention-item.active {
+            background: #f0f0f0;
+        }
+        .mention-item img {
+            width: 28px;
+            height: 28px;
+            border-radius: 50%;
+        }
+    </style>
     <div class="row g-3" style="height: calc(100vh - 100px);">
         <div class="col-12 h-100">
             <div class="card h-100 d-flex flex-column shadow-sm border-0">
@@ -29,12 +151,22 @@
                         <p class="text-secondary">Loading messages...</p>
                     </div>
                 </div>
-                <div class="card-footer bg-white border-top" id="messageInputArea">
-                    <div class="input-group">
-                        <input type="text" class="form-control border-end-0" id="messageInput" placeholder="Type a message...">
-                        <button class="btn btn-primary" id="sendBtn" type="button">
-                            <i class="fas fa-paper-plane"></i>
-                        </button>
+                <div class="card-footer bg-white border-top p-0" id="messageInputArea">
+                    <div class="reply-bar align-items-center justify-content-between" id="replyBar">
+                        <div class="d-flex align-items-center">
+                            <i class="fas fa-reply text-muted me-2"></i>
+                            <span id="replyPreviewText" class="text-truncate" style="max-width: 300px;"></span>
+                        </div>
+                        <button class="btn btn-sm btn-link text-muted" id="cancelReplyBtn"><i class="fas fa-times"></i></button>
+                    </div>
+                    <div class="p-2 position-relative">
+                        <div class="mention-dropdown" id="mentionDropdown"></div>
+                        <div class="input-group">
+                            <input type="text" class="form-control border-end-0" id="messageInput" placeholder="Type a message... (@ to mention)">
+                            <button class="btn btn-primary" id="sendBtn" type="button">
+                                <i class="fas fa-paper-plane"></i>
+                            </button>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -85,6 +217,15 @@
         const userId = localStorage.getItem('userId');
         let currentGroupId = localStorage.getItem('selectedGroupId');
         const socket = io();
+        
+        // Enhanced chat state
+        let groupMembers = [];
+        let replyToMessageId = null;
+        let replyToContent = '';
+        let isOwner = false;
+        let isMod = false;
+        let mentionIndex = -1;
+        let filteredMembers = [];
 
         async function initPage() {
             if (!currentGroupId) {
@@ -93,6 +234,37 @@
             }
             
             await loadGroupDetails();
+            setupMentionAutocomplete();
+            setupReplyUI();
+        }
+        
+        // Format message content with links, mentions, and hashtags
+        function formatMessageContent(content) {
+            // Escape HTML first
+            let formatted = content
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;');
+            
+            // Convert URLs to clickable links
+            const urlRegex = /(https?:\/\/[^\s<]+[^<.,:;"')\]\s])/g;
+            formatted = formatted.replace(urlRegex, '<a href="$1" target="_blank" rel="noopener noreferrer">$1</a>');
+            
+            // Convert @mentions to styled spans
+            const mentionRegex = /@(\w+)/g;
+            formatted = formatted.replace(mentionRegex, '<span class="mention" data-username="$1">@$1</span>');
+            
+            // Convert #hashtags to styled spans
+            const hashtagRegex = /#(\w+)/g;
+            formatted = formatted.replace(hashtagRegex, '<span class="hashtag" data-tag="$1">#$1</span>');
+            
+            return formatted;
+        }
+        
+        // Truncate text for preview
+        function truncate(str, len = 50) {
+            if (!str) return '';
+            return str.length > len ? str.substring(0, len) + '...' : str;
         }
 
         async function loadGroupDetails() {
@@ -119,8 +291,11 @@
                 document.getElementById('groupNameTitle').textContent = group.name;
 
                 // Check permissions
-                const isOwner = group.owner_id === userId;
-                const isMod = (group.moderators || []).includes(userId);
+                isOwner = group.owner_id === userId;
+                isMod = (group.moderators || []).includes(userId);
+                
+                // Load group members for mentions
+                await loadGroupMembersForMentions();
                 
                 if (isOwner || isMod) {
                     document.getElementById('groupAdminControls').style.display = 'block';
@@ -311,18 +486,59 @@
                 const data = await res.json();
                 const messages = data.data?.messages || [];
                 
-                const html = messages.map(m => `
-                    <div class="mb-3 d-flex ${m.user_id === userId ? 'justify-content-end' : 'justify-content-start'}">
-                        <div class="d-flex flex-column ${m.user_id === userId ? 'align-items-end' : 'align-items-start'}" style="max-width: 75%;">
-                            <div class="p-2 rounded shadow-sm ${m.user_id === userId ? 'bg-primary text-white' : 'bg-white text-dark border'}">
-                                <p class="mb-0">${m.content}</p>
+                // Create message map for reply lookups
+                const messageMap = {};
+                messages.forEach(m => { messageMap[m._id] = m; });
+                
+                const html = messages.map(m => {
+                    const isMine = m.user_id === userId;
+                    const canDelete = isMine || isOwner || isMod;
+                    const formattedContent = formatMessageContent(m.content);
+                    
+                    // Build reply preview if this is a reply
+                    let replyHtml = '';
+                    if (m.reply_to) {
+                        const replyMsg = messageMap[m.reply_to];
+                        if (replyMsg) {
+                            replyHtml = `
+                                <div class="reply-preview" onclick="scrollToMessage('${m.reply_to}')">
+                                    <strong>${replyMsg.user_first_name || 'User'}</strong>: ${truncate(replyMsg.content, 40)}
+                                </div>
+                            `;
+                        }
+                    }
+                    
+                    // Time formatting
+                    const msgDate = new Date(m.created_at);
+                    const timeStr = msgDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                    const dateStr = msgDate.toLocaleDateString();
+                    const isToday = new Date().toLocaleDateString() === dateStr;
+                    const displayTime = isToday ? timeStr : `${dateStr} ${timeStr}`;
+                    
+                    return `
+                        <div class="mb-3 d-flex ${isMine ? 'justify-content-end' : 'justify-content-start'}" id="msg-${m._id}">
+                            <div class="d-flex flex-column ${isMine ? 'align-items-end' : 'align-items-start'}" style="max-width: 75%;">
+                                <div class="message-bubble p-2 rounded shadow-sm ${isMine ? 'bg-primary text-white' : 'bg-white text-dark border'}">
+                                    ${replyHtml}
+                                    <div class="message-actions ${isMine ? '' : 'message-actions-left'}">
+                                        <button class="btn btn-sm btn-light" onclick="replyToMessage('${m._id}', '${m.user_first_name || 'User'}', \`${m.content.replace(/`/g, "'").replace(/\\/g, "\\\\")}\`)" title="Reply">
+                                            <i class="fas fa-reply"></i>
+                                        </button>
+                                        ${canDelete ? `
+                                            <button class="btn btn-sm btn-light text-danger" onclick="deleteMessage('${m._id}')" title="Delete">
+                                                <i class="fas fa-trash"></i>
+                                            </button>
+                                        ` : ''}
+                                    </div>
+                                    <p class="mb-0 message-content">${formattedContent}</p>
+                                </div>
+                                <small class="text-muted mt-1" style="font-size: 0.7rem;">
+                                    ${isMine ? 'You' : (m.user_first_name || 'User ' + m.user_id.substr(-4))} • ${displayTime}
+                                </small>
                             </div>
-                            <small class="text-muted mt-1" style="font-size: 0.7rem;">
-                                ${m.user_id === userId ? 'You' : (m.user_first_name || 'User ' + m.user_id.substr(-4))}
-                            </small>
                         </div>
-                    </div>
-                `).join('') || '<div class="h-100 d-flex align-items-center justify-content-center"><p class="text-secondary">No messages yet. Start the conversation!</p></div>';
+                    `;
+                }).join('') || '<div class="h-100 d-flex align-items-center justify-content-center"><p class="text-secondary">No messages yet. Start the conversation!</p></div>';
                 
                 const msgArea = document.getElementById('messagesArea');
                 msgArea.innerHTML = html;
@@ -332,25 +548,199 @@
                 console.error('Error loading messages:', error);
             }
         }
+        
+        // Scroll to a specific message (for reply clicks)
+        function scrollToMessage(msgId) {
+            const el = document.getElementById(`msg-${msgId}`);
+            if (el) {
+                el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                const bubble = el.querySelector('.message-bubble');
+                bubble.classList.add('highlight');
+                setTimeout(() => {
+                    bubble.classList.remove('highlight');
+                }, 600);
+            }
+        }
+        
+        // Reply to a message
+        function replyToMessage(msgId, userName, content) {
+            replyToMessageId = msgId;
+            replyToContent = content;
+            document.getElementById('replyPreviewText').textContent = `${userName}: ${truncate(content, 60)}`;
+            document.getElementById('replyBar').classList.add('active');
+            document.getElementById('messageInput').focus();
+        }
+        
+        // Setup reply UI
+        function setupReplyUI() {
+            document.getElementById('cancelReplyBtn').addEventListener('click', () => {
+                replyToMessageId = null;
+                replyToContent = '';
+                document.getElementById('replyBar').classList.remove('active');
+            });
+        }
+        
+        // Delete a message
+        async function deleteMessage(msgId) {
+            if (!confirm('Delete this message?')) return;
+            
+            try {
+                const res = await fetch(`/api/messages/${msgId}`, {
+                    method: 'DELETE',
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                
+                if (res.ok) {
+                    loadMessages();
+                } else {
+                    const data = await res.json();
+                    await showCustomAlert(data.message || 'Failed to delete message', 'Error');
+                }
+            } catch (err) {
+                console.error('Error deleting message:', err);
+            }
+        }
+        
+        // Load group members for @mentions
+        async function loadGroupMembersForMentions() {
+            try {
+                const res = await fetch(`/api/groups/${currentGroupId}/members`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                if (res.ok) {
+                    const data = await res.json();
+                    groupMembers = data.data || [];
+                }
+            } catch (err) {
+                console.error('Error loading members for mentions:', err);
+            }
+        }
+        
+        // Setup mention autocomplete
+        function setupMentionAutocomplete() {
+            const input = document.getElementById('messageInput');
+            const dropdown = document.getElementById('mentionDropdown');
+            
+            input.addEventListener('input', (e) => {
+                const value = e.target.value;
+                const cursorPos = e.target.selectionStart;
+                
+                // Find if we're in a mention context
+                const textBeforeCursor = value.substring(0, cursorPos);
+                const mentionMatch = textBeforeCursor.match(/@(\w*)$/);
+                
+                if (mentionMatch) {
+                    const query = mentionMatch[1].toLowerCase();
+                    filteredMembers = groupMembers.filter(m => 
+                        (m.username && m.username.toLowerCase().includes(query)) ||
+                        (m.full_name && m.full_name.toLowerCase().includes(query))
+                    ).slice(0, 5);
+                    
+                    if (filteredMembers.length > 0) {
+                        mentionIndex = 0;
+                        renderMentionDropdown();
+                        dropdown.classList.add('show');
+                    } else {
+                        dropdown.classList.remove('show');
+                    }
+                } else {
+                    dropdown.classList.remove('show');
+                }
+            });
+            
+            input.addEventListener('keydown', (e) => {
+                if (!dropdown.classList.contains('show')) return;
+                
+                if (e.key === 'ArrowDown') {
+                    e.preventDefault();
+                    mentionIndex = Math.min(mentionIndex + 1, filteredMembers.length - 1);
+                    renderMentionDropdown();
+                } else if (e.key === 'ArrowUp') {
+                    e.preventDefault();
+                    mentionIndex = Math.max(mentionIndex - 1, 0);
+                    renderMentionDropdown();
+                } else if (e.key === 'Enter' && filteredMembers.length > 0) {
+                    e.preventDefault();
+                    selectMention(filteredMembers[mentionIndex]);
+                } else if (e.key === 'Escape') {
+                    dropdown.classList.remove('show');
+                }
+            });
+            
+            // Close dropdown when clicking outside
+            document.addEventListener('click', (e) => {
+                if (!e.target.closest('#messageInputArea')) {
+                    dropdown.classList.remove('show');
+                }
+            });
+        }
+        
+        function renderMentionDropdown() {
+            const dropdown = document.getElementById('mentionDropdown');
+            dropdown.innerHTML = filteredMembers.map((m, i) => `
+                <div class="mention-item ${i === mentionIndex ? 'active' : ''}" onclick="selectMention(groupMembers.find(gm => gm.id === '${m.id}'))">
+                    <img src="${m.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${m.username}`}" alt="">
+                    <div>
+                        <strong>${m.full_name || m.username}</strong>
+                        <small class="text-muted d-block">@${m.username}</small>
+                    </div>
+                </div>
+            `).join('');
+        }
+        
+        function selectMention(member) {
+            if (!member) return;
+            
+            const input = document.getElementById('messageInput');
+            const value = input.value;
+            const cursorPos = input.selectionStart;
+            
+            // Find the @ position
+            const textBeforeCursor = value.substring(0, cursorPos);
+            const mentionStart = textBeforeCursor.lastIndexOf('@');
+            
+            // Replace the partial mention with the full username
+            const before = value.substring(0, mentionStart);
+            const after = value.substring(cursorPos);
+            input.value = before + '@' + member.username + ' ' + after;
+            
+            // Move cursor after the mention
+            const newPos = mentionStart + member.username.length + 2;
+            input.setSelectionRange(newPos, newPos);
+            input.focus();
+            
+            document.getElementById('mentionDropdown').classList.remove('show');
+        }
 
         document.getElementById('sendBtn').addEventListener('click', async () => {
             const content = document.getElementById('messageInput').value;
             if (!content.trim() || !currentGroupId) return;
 
             try {
+                const payload = {
+                    group_id: currentGroupId,
+                    content: content
+                };
+                
+                // Include reply_to if replying
+                if (replyToMessageId) {
+                    payload.reply_to = replyToMessageId;
+                }
+                
                 const res = await fetch('/api/messages', {
                     method: 'POST',
                     headers: {
                         'Authorization': `Bearer ${token}`,
                         'Content-Type': 'application/json'
                     },
-                    body: JSON.stringify({
-                        group_id: currentGroupId,
-                        content: content
-                    })
+                    body: JSON.stringify(payload)
                 });
                 if (res.ok) {
                     document.getElementById('messageInput').value = '';
+                    // Clear reply state
+                    replyToMessageId = null;
+                    replyToContent = '';
+                    document.getElementById('replyBar').classList.remove('active');
                     // Notify other clients via socket
                     socket.emit('message', { room: currentGroupId, user_id: userId, message: content });
                     loadMessages();

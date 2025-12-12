@@ -85,10 +85,141 @@
             </div>
 {% endblock %}
 
+{% block modals %}
+    <!-- View User Profile Modal -->
+    <div class="modal fade" id="viewUserModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title"><i class="fas fa-user"></i> User Profile</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="text-center mb-4">
+                        <img id="viewUserAvatar" src="" alt="Avatar" class="rounded-circle mb-3" width="100" height="100">
+                        <h4 id="viewUserFullName">-</h4>
+                        <p class="text-muted" id="viewUserUsername">@username</p>
+                    </div>
+                    
+                    <div class="row text-center mb-4">
+                        <div class="col-4">
+                            <div class="p-2 bg-light rounded">
+                                <h5 class="mb-0 text-primary" id="viewUserPoints">0</h5>
+                                <small class="text-muted">Points</small>
+                            </div>
+                        </div>
+                        <div class="col-4">
+                            <div class="p-2 bg-light rounded">
+                                <h5 class="mb-0 text-success" id="viewUserGroups">0</h5>
+                                <small class="text-muted">Groups</small>
+                            </div>
+                        </div>
+                        <div class="col-4">
+                            <div class="p-2 bg-light rounded">
+                                <h5 class="mb-0 text-warning" id="viewUserBadges">0</h5>
+                                <small class="text-muted">Badges</small>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="mb-3" id="viewUserBio" style="display: none;">
+                        <h6><i class="fas fa-info-circle me-2"></i>About</h6>
+                        <p class="text-muted" id="viewUserBioText"></p>
+                    </div>
+                    
+                    <div class="mb-3" id="viewUserBadgesSection" style="display: none;">
+                        <h6><i class="fas fa-award me-2"></i>Badges</h6>
+                        <div id="viewUserBadgesList" class="d-flex flex-wrap gap-2"></div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <h6><i class="fas fa-calendar me-2"></i>Member Since</h6>
+                        <p class="text-muted mb-0" id="viewUserJoined">-</p>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+{% endblock %}
+
 {% block scripts %}
     <script>
         const token = localStorage.getItem('token');
         const userId = localStorage.getItem('userId');
+        let viewUserModal = null;
+
+        async function viewUserProfile(targetUserId) {
+            try {
+                const res = await fetch(`/api/users/${targetUserId}`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                
+                if (!res.ok) {
+                    const errData = await res.json();
+                    await showCustomAlert(errData.message || 'Failed to load profile', 'Error');
+                    return;
+                }
+                
+                const data = await res.json();
+                const user = data.data;
+                
+                // Populate modal
+                document.getElementById('viewUserAvatar').src = user.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${user.username}`;
+                document.getElementById('viewUserFullName').textContent = user.full_name || user.username;
+                document.getElementById('viewUserUsername').textContent = `@${user.username}`;
+                document.getElementById('viewUserPoints').textContent = user.points || 0;
+                document.getElementById('viewUserGroups').textContent = user.groups_count || 0;
+                document.getElementById('viewUserBadges').textContent = (user.badges || []).length;
+                
+                // Bio section
+                const bioSection = document.getElementById('viewUserBio');
+                if (user.bio) {
+                    bioSection.style.display = 'block';
+                    document.getElementById('viewUserBioText').textContent = user.bio;
+                } else {
+                    bioSection.style.display = 'none';
+                }
+                
+                // Badges section
+                const badgesSection = document.getElementById('viewUserBadgesSection');
+                const badgesList = document.getElementById('viewUserBadgesList');
+                if (user.badges && user.badges.length > 0) {
+                    badgesSection.style.display = 'block';
+                    badgesList.innerHTML = user.badges.map(b => `
+                        <span class="badge bg-warning text-dark" title="${b.description || b.name || b}">
+                            <i class="fas fa-award me-1"></i>${b.name || b}
+                        </span>
+                    `).join('');
+                } else {
+                    badgesSection.style.display = 'none';
+                }
+                
+                // Join date
+                if (user.created_at) {
+                    const joinDate = new Date(user.created_at);
+                    document.getElementById('viewUserJoined').textContent = joinDate.toLocaleDateString('en-US', { 
+                        year: 'numeric', 
+                        month: 'long', 
+                        day: 'numeric' 
+                    });
+                } else {
+                    document.getElementById('viewUserJoined').textContent = '-';
+                }
+                
+                // Show modal
+                if (!viewUserModal) {
+                    viewUserModal = new bootstrap.Modal(document.getElementById('viewUserModal'));
+                }
+                viewUserModal.show();
+                
+            } catch (error) {
+                console.error('Error loading user profile:', error);
+                await showCustomAlert('Failed to load user profile', 'Error');
+            }
+        }
 
         async function loadLeaderboard() {
             try {
@@ -117,7 +248,9 @@
                             <td>${user.badges?.length || 0}</td>
                             <td>${user.groups_count || 0}</td>
                             <td>
-                                <a href="#" class="btn btn-sm btn-primary">View</a>
+                                <button onclick="viewUserProfile('${user.id}')" class="btn btn-sm btn-primary">
+                                    <i class="fas fa-eye"></i> View
+                                </button>
                             </td>
                         </tr>
                     `;
@@ -186,9 +319,11 @@
                         <td><strong>${user.username}</strong></td>
                         <td><span class="badge bg-success">${user.points || 0}</span></td>
                         <td>${user.badges?.length || 0}</td>
-                        <td>0</td>
+                        <td>${user.groups_count || 0}</td>
                         <td>
-                            <a href="#" class="btn btn-sm btn-primary">View</a>
+                            <button onclick="viewUserProfile('${user._id || user.id}')" class="btn btn-sm btn-primary">
+                                <i class="fas fa-eye"></i> View
+                            </button>
                         </td>
                     </tr>
                 `).join('');
