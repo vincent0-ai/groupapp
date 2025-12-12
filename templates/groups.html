@@ -190,9 +190,15 @@
                                                             ${g.is_private ? '<i class="fas fa-lock ms-2" title="Private"></i>' : ''}
                                                         </small>
                                                         <div class="mt-auto pt-3">
-                                                            <button class="btn btn-sm btn-success" onclick="joinGroup('${g.id || g._id}', ${g.is_private})">
-                                                                ${g.is_private ? 'Request to Join' : 'Join'}
-                                                            </button>
+                                                            ${g.is_member ? 
+                                                                `<button class="btn btn-sm btn-outline-secondary" disabled>Joined</button>` : 
+                                                                (g.is_pending ? 
+                                                                    `<button class="btn btn-sm btn-secondary" disabled>Request Sent</button>` : 
+                                                                    `<button class="btn btn-sm btn-success" onclick="joinGroup('${g.id || g._id}', ${g.is_private})">
+                                                                        ${g.is_private ? 'Request to Join' : 'Join'}
+                                                                    </button>`
+                                                                )
+                                                            }
                                                         </div>
                                                     </div>
                                                 </div>

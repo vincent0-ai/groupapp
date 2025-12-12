@@ -3,7 +3,7 @@ from app.utils import (
     success_response, error_response, serialize_document
 )
 from app.services import Database
-from app.models import Group, Channel
+from app.models import Group, Channel, Whiteboard
 from bson import ObjectId
 from functools import wraps
 from flask import g
@@ -43,23 +43,20 @@ def require_auth(f):
 @groups_bp.route('', methods=['GET'])
 @require_auth
 def get_all_groups():
-    """Get all groups (public or member of)"""
+    """Get all groups"""
     db = Database()
     user_id_obj = ObjectId(g.user_id)
     
-    # Get all public groups or groups user is member of
-    groups = list(db.find('groups', {
-        '$or': [
-            {'is_private': False},
-            {'members': user_id_obj}
-        ]
-    }))
+    # Get all groups
+    groups = list(db.find('groups', {}))
     
     # Add member count and id field
     for group in groups:
         group['member_count'] = len(group.get('members', []))
         group['id'] = str(group['_id'])
         group['is_member'] = user_id_obj in group.get('members', [])
+        # Check if pending
+        group['is_pending'] = user_id_obj in group.get('pending_members', [])
     
     return success_response({'groups': [serialize_document(grp) for grp in groups]}, 'Groups retrieved successfully', 200)
 
@@ -243,7 +240,9 @@ def join_group(group_id):
     if not group:
         return error_response('Group not found', 404)
     
-    if group['is_private']:
+    user_id_obj = ObjectId(g.user_id)
+
+    if group.get('is_private'):
         # Check if already pending
         if user_id_obj in group.get('pending_members', []):
             return error_response('Join request already sent', 400)
@@ -325,6 +324,58 @@ def leave_group(group_id):
     
     return success_response(None, 'Left group successfully', 200)
 
+@groups_bp.route('/<group_id>/remove_member', methods=['POST'])
+@require_auth
+def remove_member(group_id):
+    """Remove a member from the group (Owner/Moderator only)"""
+    try:
+        group_id_obj = ObjectId(group_id)
+    except:
+        return error_response('Invalid group ID', 400)
+    
+    data = request.get_json()
+    target_user_id = data.get('user_id')
+    if not target_user_id:
+        return error_response('User ID is required', 400)
+        
+    try:
+        target_user_id_obj = ObjectId(target_user_id)
+    except:
+        return error_response('Invalid user ID', 400)
+    
+    db = Database()
+    group = db.find_one('groups', {'_id': group_id_obj})
+    
+    if not group:
+        return error_response('Group not found', 404)
+    
+    # Check permissions
+    user_id_obj = ObjectId(g.user_id)
+    is_owner = str(group['owner_id']) == g.user_id
+    is_mod = user_id_obj in group.get('moderators', [])
+    
+    if not (is_owner or is_mod):
+        return error_response('Only owners and moderators can remove members', 403)
+        
+    # Cannot remove owner
+    if str(group['owner_id']) == target_user_id:
+        return error_response('Cannot remove the group owner', 400)
+        
+    # Moderators cannot remove other moderators or owner
+    if is_mod and not is_owner:
+        if target_user_id_obj in group.get('moderators', []) or str(group['owner_id']) == target_user_id:
+            return error_response('Moderators cannot remove other moderators or the owner', 403)
+            
+    if target_user_id_obj not in group.get('members', []):
+        return error_response('User is not a member of this group', 404)
+        
+    # Remove user
+    db.pull_from_array('groups', {'_id': group_id_obj}, 'members', target_user_id_obj)
+    db.pull_from_array('groups', {'_id': group_id_obj}, 'moderators', target_user_id_obj)
+    db.pull_from_array('users', {'_id': target_user_id_obj}, 'groups', group_id_obj)
+    
+    return success_response(None, 'Member removed successfully', 200)
+
 @groups_bp.route('/<group_id>/members', methods=['GET'])
 @require_auth
 def get_group_members(group_id):
@@ -390,17 +441,82 @@ def list_channels():
     result = []
 
     for ch in channels:
-        groups = list(db.find('groups', {'channel_id': ch['_id'], '$or': [{'is_private': False}, {'members': user_id_obj}]}))
+        # List all groups in the channel so users can find private ones
+        groups = list(db.find('groups', {'channel_id': ch['_id']}))
         for group in groups:
             group['member_count'] = len(group.get('members', []))
             group['id'] = str(group['_id'])
             group['is_member'] = user_id_obj in group.get('members', [])
+            group['is_pending'] = user_id_obj in group.get('pending_members', [])
         ch['group_count'] = len(groups)
         ch['groups'] = [serialize_document(g) for g in groups]
         ch['id'] = str(ch['_id'])
         result.append(serialize_document(ch))
 
     return success_response({'channels': result}, 'Channels retrieved successfully', 200)
+
+
+@groups_bp.route('/<group_id>/whiteboards', methods=['POST'])
+@require_auth
+def create_whiteboard_session(group_id):
+    """Create a new whiteboard session for a group (only owner)"""
+    try:
+        group_id_obj = ObjectId(group_id)
+    except:
+        return error_response('Invalid group ID', 400)
+
+    db = Database()
+    group = db.find_one('groups', {'_id': group_id_obj})
+    if not group:
+        return error_response('Group not found', 404)
+
+    # Only owner can create a session
+    if str(group['owner_id']) != g.user_id:
+        return error_response('Only group owners can create whiteboard sessions', 403)
+
+    data = request.get_json() or {}
+    title = data.get('title', '').strip()
+
+    whiteboard_doc = Whiteboard.create_whiteboard_doc(group_id, str(group.get('channel_id')) if group.get('channel_id') else None, g.user_id, title)
+    inserted_id = db.insert_one('whiteboards', whiteboard_doc)
+    if not inserted_id:
+        return error_response('Failed to create whiteboard session', 500)
+
+    # Add invite token (simple): use the inserted _id as token; return usable URL path
+    whiteboard_doc = db.find_one('whiteboards', {'_id': whiteboard_doc['_id']})
+    whiteboard_doc['id'] = str(whiteboard_doc['_id'])
+    # Default permissions: only owner can draw and speak unless updated
+    whiteboard_doc['can_draw'] = [ObjectId(g.user_id)]
+    whiteboard_doc['can_speak'] = [ObjectId(g.user_id)]
+    db.update_one('whiteboards', {'_id': whiteboard_doc['_id']}, {'can_draw': whiteboard_doc['can_draw'], 'can_speak': whiteboard_doc['can_speak']})
+
+    # Build a simple invite URL
+    invite_url = f"/whiteboard?session={whiteboard_doc['id']}"
+    return success_response({'whiteboard': serialize_document(whiteboard_doc), 'invite_url': invite_url}, 'Whiteboard session created', 201)
+
+
+@groups_bp.route('/<group_id>/whiteboards', methods=['GET'])
+@require_auth
+def list_whiteboards_for_group(group_id):
+    try:
+        group_id_obj = ObjectId(group_id)
+    except:
+        return error_response('Invalid group ID', 400)
+
+    db = Database()
+    group = db.find_one('groups', {'_id': group_id_obj})
+    if not group:
+        return error_response('Group not found', 404)
+
+    user_id_obj = ObjectId(g.user_id)
+    if group.get('is_private') and user_id_obj not in group.get('members', []):
+        return error_response('Access denied', 403)
+
+    # Treat missing is_active as True
+    whiteboards = list(db.find('whiteboards', {'group_id': group_id_obj, 'is_active': {'$ne': False}}))
+    for wb in whiteboards:
+        wb['id'] = str(wb['_id'])
+    return success_response({'whiteboards': [serialize_document(wb) for wb in whiteboards]}, 'Whiteboards retrieved', 200)
 
 
 @groups_bp.route('/channels', methods=['POST'])

@@ -11,6 +11,18 @@
                         <i class="fas fa-arrow-left me-1"></i> Groups
                     </a>
                     <h5 id="groupNameTitle" class="mb-0">Loading...</h5>
+                    <div class="ms-auto" id="groupAdminControls" style="display: none;">
+                        <div class="dropdown">
+                            <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown">
+                                <i class="fas fa-cog"></i> Settings
+                            </button>
+                            <ul class="dropdown-menu dropdown-menu-end">
+                                <li><a class="dropdown-item text-danger" href="#" id="clearChatBtn"><i class="fas fa-trash-alt me-2"></i>Clear Chat</a></li>
+                                <li><a class="dropdown-item" href="#" id="manageMembersBtn"><i class="fas fa-users-cog me-2"></i>Manage Members</a></li>
+                                <li><a class="dropdown-item" href="#" id="viewRequestsBtn"><i class="fas fa-user-plus me-2"></i>Join Requests</a></li>
+                            </ul>
+                        </div>
+                    </div>
                 </div>
                 <div class="card-body overflow-auto bg-light" id="messagesArea">
                     <div class="h-100 d-flex align-items-center justify-content-center">
@@ -23,6 +35,42 @@
                         <button class="btn btn-primary" id="sendBtn" type="button">
                             <i class="fas fa-paper-plane"></i>
                         </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+{% endblock %}
+
+{% block modals %}
+    <!-- Manage Members Modal -->
+    <div class="modal fade" id="manageMembersModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Manage Members</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div id="membersList" class="list-group">
+                        <!-- Members will be loaded here -->
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Join Requests Modal -->
+    <div class="modal fade" id="joinRequestsModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Join Requests</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div id="requestsList" class="list-group">
+                        <!-- Requests will be loaded here -->
                     </div>
                 </div>
             </div>
@@ -69,12 +117,181 @@
                 const group = groupData.data;
                 document.getElementById('groupNameTitle').textContent = group.name;
 
+                // Check permissions
+                const isOwner = group.owner_id === userId;
+                const isMod = (group.moderators || []).includes(userId);
+                
+                if (isOwner || isMod) {
+                    document.getElementById('groupAdminControls').style.display = 'block';
+                    
+                    // Setup event listeners
+                    document.getElementById('clearChatBtn').onclick = isOwner ? clearChat : (e) => { e.preventDefault(); alert('Only owner can clear chat'); };
+                    if (!isOwner) document.getElementById('clearChatBtn').classList.add('disabled');
+                    
+                    document.getElementById('manageMembersBtn').onclick = () => {
+                        loadMembers();
+                        new bootstrap.Modal(document.getElementById('manageMembersModal')).show();
+                    };
+                    
+                    document.getElementById('viewRequestsBtn').onclick = () => {
+                        loadRequests();
+                        new bootstrap.Modal(document.getElementById('joinRequestsModal')).show();
+                    };
+                }
+
                 // No per-group channels: load messages for the group directly
                 document.getElementById('messageInputArea').style.display = 'block';
                 await loadMessages();
 
             } catch (error) {
                 console.error('Error loading group details:', error);
+            }
+        }
+
+        async function clearChat(e) {
+            e.preventDefault();
+            if (!confirm('Are you sure you want to clear all messages? This cannot be undone.')) return;
+            
+            try {
+                const res = await fetch(`/api/messages/group/${currentGroupId}`, {
+                    method: 'DELETE',
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                
+                if (res.ok) {
+                    alert('Chat cleared');
+                    loadMessages();
+                } else {
+                    const data = await res.json();
+                    alert(data.message || 'Failed to clear chat');
+                }
+            } catch (err) {
+                console.error(err);
+                alert('Error clearing chat');
+            }
+        }
+
+        async function loadMembers() {
+            const list = document.getElementById('membersList');
+            list.innerHTML = '<div class="text-center p-3">Loading...</div>';
+            
+            try {
+                const res = await fetch(`/api/groups/${currentGroupId}/members`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                const data = await res.json();
+                
+                if (res.ok) {
+                    list.innerHTML = '';
+                    data.data.forEach(m => {
+                        const isMe = m.id === userId;
+                        const item = document.createElement('div');
+                        item.className = 'list-group-item d-flex justify-content-between align-items-center';
+                        item.innerHTML = `
+                            <div>
+                                <strong>${m.full_name || m.username}</strong>
+                                <small class="text-muted d-block">${m.email}</small>
+                            </div>
+                            ${!isMe ? `<button class="btn btn-sm btn-outline-danger remove-member-btn" data-id="${m.id}">Remove</button>` : '<span class="badge bg-secondary">You</span>'}
+                        `;
+                        list.appendChild(item);
+                    });
+                    
+                    document.querySelectorAll('.remove-member-btn').forEach(btn => {
+                        btn.addEventListener('click', () => removeMember(btn.dataset.id));
+                    });
+                } else {
+                    list.innerHTML = '<div class="text-danger p-3">Failed to load members</div>';
+                }
+            } catch (err) {
+                list.innerHTML = '<div class="text-danger p-3">Error loading members</div>';
+            }
+        }
+
+        async function removeMember(uid) {
+            if (!confirm('Remove this user from the group?')) return;
+            
+            try {
+                const res = await fetch(`/api/groups/${currentGroupId}/remove_member`, {
+                    method: 'POST',
+                    headers: { 
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ user_id: uid })
+                });
+                
+                if (res.ok) {
+                    loadMembers(); // Reload list
+                } else {
+                    const data = await res.json();
+                    alert(data.message || 'Failed to remove member');
+                }
+            } catch (err) {
+                alert('Error removing member');
+            }
+        }
+
+        async function loadRequests() {
+            const list = document.getElementById('requestsList');
+            list.innerHTML = '<div class="text-center p-3">Loading...</div>';
+            
+            try {
+                const res = await fetch(`/api/groups/${currentGroupId}/requests`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                const data = await res.json();
+                
+                if (res.ok) {
+                    list.innerHTML = '';
+                    if (data.data.length === 0) {
+                        list.innerHTML = '<div class="text-center p-3 text-muted">No pending requests</div>';
+                        return;
+                    }
+                    
+                    data.data.forEach(u => {
+                        const item = document.createElement('div');
+                        item.className = 'list-group-item d-flex justify-content-between align-items-center';
+                        item.innerHTML = `
+                            <div>
+                                <strong>${u.full_name || u.username}</strong>
+                            </div>
+                            <div>
+                                <button class="btn btn-sm btn-success me-1 approve-btn" data-id="${u.id}"><i class="fas fa-check"></i></button>
+                                <button class="btn btn-sm btn-danger reject-btn" data-id="${u.id}"><i class="fas fa-times"></i></button>
+                            </div>
+                        `;
+                        list.appendChild(item);
+                    });
+                    
+                    document.querySelectorAll('.approve-btn').forEach(btn => {
+                        btn.addEventListener('click', () => handleRequest(btn.dataset.id, 'approve'));
+                    });
+                    document.querySelectorAll('.reject-btn').forEach(btn => {
+                        btn.addEventListener('click', () => handleRequest(btn.dataset.id, 'reject'));
+                    });
+                } else {
+                    list.innerHTML = '<div class="text-danger p-3">Failed to load requests</div>';
+                }
+            } catch (err) {
+                list.innerHTML = '<div class="text-danger p-3">Error loading requests</div>';
+            }
+        }
+
+        async function handleRequest(uid, action) {
+            try {
+                const res = await fetch(`/api/groups/${currentGroupId}/requests/${uid}/${action}`, {
+                    method: 'POST',
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                
+                if (res.ok) {
+                    loadRequests(); // Reload list
+                } else {
+                    alert('Failed to process request');
+                }
+            } catch (err) {
+                alert('Error processing request');
             }
         }
 

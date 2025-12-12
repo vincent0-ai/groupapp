@@ -2,8 +2,10 @@ from flask import Flask, render_template, jsonify, request
 from flask_cors import CORS
 from flask_socketio import SocketIO, emit, join_room, leave_room
 from config.config import config
+from app.services import Database
 import os
 from datetime import datetime
+from bson import ObjectId
 
 def create_app(config_name='development'):
     """Create and configure Flask app"""
@@ -29,6 +31,7 @@ def create_app(config_name='development'):
     from app.routes.competitions import competitions_bp
     from app.routes.files import files_bp
     from app.routes.users import users_bp
+    from app.routes.whiteboards import whiteboards_bp
     
     app.register_blueprint(auth_bp)
     app.register_blueprint(groups_bp)
@@ -36,6 +39,7 @@ def create_app(config_name='development'):
     app.register_blueprint(competitions_bp)
     app.register_blueprint(files_bp)
     app.register_blueprint(users_bp)
+    app.register_blueprint(whiteboards_bp)
     
     # Page routes (serving templates)
 
@@ -116,10 +120,41 @@ def create_app(config_name='development'):
         user_id = data.get('user_id')
         
         if room and user_id:
+            # If joining a whiteboard session, check if active and persist participant
+            if room.startswith('whiteboard:'):
+                try:
+                    wb_id = room.split(':', 1)[1]
+                    db = Database()
+                    wb = db.find_one('whiteboards', {'_id': ObjectId(wb_id)})
+                    if not wb or not wb.get('is_active', True):
+                        emit('error', {'message': 'Session has ended'})
+                        return
+                    
+                    db.push_to_array('whiteboards', {'_id': ObjectId(wb_id)}, 'participants', ObjectId(user_id))
+                except Exception as e:
+                    print(f"Error joining whiteboard: {e}")
+                    pass
+
             join_room(room)
             connected_users[user_id] = request.sid
+            
+            # Include basic user profile info
+            try:
+                db = Database()
+                user_doc = db.find_one('users', {'_id': ObjectId(user_id)})
+                profile = None
+                if user_doc:
+                    profile = {
+                        'id': str(user_doc['_id']),
+                        'full_name': user_doc.get('full_name', ''),
+                        'avatar_url': user_doc.get('avatar_url', ''),
+                        'username': user_doc.get('username', '')
+                    }
+            except Exception:
+                profile = None
             emit('user_joined', {
                 'user_id': user_id,
+                'profile': profile,
                 'timestamp': datetime.utcnow().isoformat()
             }, room=room)
     
@@ -137,6 +172,27 @@ def create_app(config_name='development'):
                 'timestamp': datetime.utcnow().isoformat()
             }, room=room)
     
+    @socketio.on('clear_board')
+    def handle_clear_board(data):
+        """Handle clearing the whiteboard"""
+        room = data.get('room')
+        user_id = data.get('user_id')
+        
+        if room and room.startswith('whiteboard:'):
+            wb_id = room.split(':', 1)[1]
+            # Verify permissions (creator or can_draw)
+            db = Database()
+            wb = db.find_one('whiteboards', {'_id': ObjectId(wb_id)})
+            if wb:
+                # Check if creator or has draw permission
+                is_creator = str(wb.get('created_by')) == str(user_id)
+                can_draw = str(user_id) in [str(x) for x in wb.get('can_draw', [])]
+                
+                if is_creator or can_draw:
+                    # Clear drawing data in DB
+                    db.update_one('whiteboards', {'_id': ObjectId(wb_id)}, {'drawing_data': []})
+                    emit('board_cleared', {'user_id': user_id}, room=room)
+
     @socketio.on('whiteboard_draw')
     def handle_whiteboard_draw(data):
         """Handle whiteboard drawing"""
@@ -145,11 +201,33 @@ def create_app(config_name='development'):
         user_id = data.get('user_id')
         
         if room and drawing_data:
-            emit('draw_update', {
-                'user_id': user_id,
-                'drawing_data': drawing_data,
-                'timestamp': datetime.utcnow().isoformat()
-            }, room=room, skip_sid=request.sid)
+            # enforce draw permissions if room is a whiteboard session (format: 'whiteboard:<id>')
+            allowed = True
+            try:
+                if room.startswith('whiteboard:'):
+                    wb_id = room.split(':', 1)[1]
+                    from app.services import Database
+                    db = Database()
+                    wb = db.find_one('whiteboards', {'_id': ObjectId(wb_id)})
+                    if wb and wb.get('can_draw'):
+                        # can_draw contains ObjectIds
+                        ids = [str(x) for x in wb.get('can_draw', [])]
+                        allowed = str(user_id) in ids
+            except Exception:
+                allowed = True
+            if allowed:
+                emit('draw_update', {
+                    'user_id': user_id,
+                    'drawing_data': drawing_data,
+                    'timestamp': datetime.utcnow().isoformat()
+                }, room=room, skip_sid=request.sid)
+                # Persist drawing to the whiteboard document
+                try:
+                    if room.startswith('whiteboard:'):
+                        wb_id = room.split(':', 1)[1]
+                        db.push_to_array('whiteboards', {'_id': ObjectId(wb_id)}, 'drawing_data', drawing_data)
+                except Exception:
+                    pass
     
     @socketio.on('typing_indicator')
     def handle_typing(data):
@@ -163,6 +241,192 @@ def create_app(config_name='development'):
                 'user_id': user_id,
                 'is_typing': is_typing
             }, room=room, skip_sid=request.sid)
+
+
+    @socketio.on('whiteboard_audio')
+    def handle_whiteboard_audio(data):
+        """Broadcast base64 audio chunks to room; clients will assemble/play them."""
+        room = data.get('room')
+        user_id = data.get('user_id')
+        audio_b64 = data.get('audio_b64')
+        if room and audio_b64:
+            # Enforce speak permissions similar to draw
+            allowed = True
+            try:
+                if room.startswith('whiteboard:'):
+                    wb_id = room.split(':', 1)[1]
+                    db = Database()
+                    wb = db.find_one('whiteboards', {'_id': ObjectId(wb_id)})
+                    if wb and wb.get('can_speak'):
+                        ids = [str(x) for x in wb.get('can_speak', [])]
+                        allowed = str(user_id) in ids
+            except Exception:
+                allowed = True
+            if allowed:
+                emit('audio_clip', {
+                    'user_id': user_id,
+                    'audio_b64': audio_b64,
+                    'timestamp': datetime.utcnow().isoformat()
+                }, room=room, skip_sid=request.sid)
+
+
+    @socketio.on('raise_hand')
+    def handle_raise_hand(data):
+        room = data.get('room')
+        user_id = data.get('user_id')
+        if not room or not room.startswith('whiteboard:'):
+            return
+        wb_id = room.split(':', 1)[1]
+        db = Database()
+        try:
+            db.push_to_array('whiteboards', {'_id': ObjectId(wb_id)}, 'raised_hands', ObjectId(user_id))
+            user_doc = db.find_one('users', {'_id': ObjectId(user_id)})
+            profile = {'id': str(user_doc['_id']), 'full_name': user_doc.get('full_name', ''), 'avatar_url': user_doc.get('avatar_url', ''), 'username': user_doc.get('username', '')} if user_doc else None
+            emit('hand_raised', {'user_id': user_id, 'profile': profile}, room=room)
+        except Exception:
+            pass
+
+    @socketio.on('clear_hand')
+    def handle_clear_hand(data):
+        room = data.get('room')
+        user_id = data.get('user_id')
+        if not room or not room.startswith('whiteboard:'):
+            return
+        wb_id = room.split(':', 1)[1]
+        db = Database()
+        try:
+            db.pull_from_array('whiteboards', {'_id': ObjectId(wb_id)}, 'raised_hands', ObjectId(user_id))
+            emit('hand_cleared', {'user_id': user_id}, room=room)
+        except Exception:
+            pass
+
+    # WebRTC signaling
+    @socketio.on('webrtc_offer')
+    def handle_webrtc_offer(data):
+        room = data.get('room')
+        offer = data.get('offer')
+        user_id = data.get('user_id')
+        target = data.get('target')
+        if not room or not offer:
+            return
+        if target:
+            emit('webrtc_offer', {'offer': offer, 'user_id': user_id}, room=room, include_self=False)
+        else:
+            emit('webrtc_offer', {'offer': offer, 'user_id': user_id}, room=room, skip_sid=request.sid)
+
+    @socketio.on('webrtc_answer')
+    def handle_webrtc_answer(data):
+        room = data.get('room')
+        answer = data.get('answer')
+        user_id = data.get('user_id')
+        if not room or not answer:
+            return
+        emit('webrtc_answer', {'answer': answer, 'user_id': user_id}, room=room, skip_sid=request.sid)
+
+    @socketio.on('webrtc_ice')
+    def handle_webrtc_ice(data):
+        room = data.get('room')
+        candidate = data.get('candidate')
+        user_id = data.get('user_id')
+        if not room or not candidate:
+            return
+        emit('webrtc_ice', {'candidate': candidate, 'user_id': user_id}, room=room, skip_sid=request.sid)
+
+
+    @socketio.on('grant_draw')
+    def handle_grant_draw(data):
+        room = data.get('room')
+        target_user = data.get('user_id')
+        requester = data.get('requester_id')
+        if not room or not room.startswith('whiteboard:'):
+            return
+        wb_id = room.split(':', 1)[1]
+        db = Database()
+        try:
+            wb = db.find_one('whiteboards', {'_id': ObjectId(wb_id)})
+            if not wb:
+                return
+            # only creator can grant
+            if str(wb.get('created_by')) != requester:
+                return
+            current = wb.get('can_draw', [])
+            if ObjectId(target_user) not in current:
+                current.append(ObjectId(target_user))
+                db.update_one('whiteboards', {'_id': wb['_id']}, {'can_draw': current})
+                emit('permissions_updated', {'can_draw': [str(x) for x in current]}, room=room)
+        except Exception:
+            return
+
+
+    @socketio.on('revoke_draw')
+    def handle_revoke_draw(data):
+        room = data.get('room')
+        target_user = data.get('user_id')
+        requester = data.get('requester_id')
+        if not room or not room.startswith('whiteboard:'):
+            return
+        wb_id = room.split(':', 1)[1]
+        db = Database()
+        try:
+            wb = db.find_one('whiteboards', {'_id': ObjectId(wb_id)})
+            if not wb:
+                return
+            if str(wb.get('created_by')) != requester:
+                return
+            current = wb.get('can_draw', [])
+            current = [x for x in current if str(x) != target_user]
+            db.update_one('whiteboards', {'_id': wb['_id']}, {'can_draw': current})
+            emit('permissions_updated', {'can_draw': [str(x) for x in current]}, room=room)
+        except Exception:
+            return
+
+
+    @socketio.on('grant_speak')
+    def handle_grant_speak(data):
+        room = data.get('room')
+        target_user = data.get('user_id')
+        requester = data.get('requester_id')
+        if not room or not room.startswith('whiteboard:'):
+            return
+        wb_id = room.split(':', 1)[1]
+        db = Database()
+        try:
+            wb = db.find_one('whiteboards', {'_id': ObjectId(wb_id)})
+            if not wb:
+                return
+            # only creator can grant
+            if str(wb.get('created_by')) != requester:
+                return
+            current = wb.get('can_speak', [])
+            if ObjectId(target_user) not in current:
+                current.append(ObjectId(target_user))
+                db.update_one('whiteboards', {'_id': wb['_id']}, {'can_speak': current})
+                emit('permissions_updated', {'can_speak': [str(x) for x in current]}, room=room)
+        except Exception:
+            return
+
+
+    @socketio.on('revoke_speak')
+    def handle_revoke_speak(data):
+        room = data.get('room')
+        target_user = data.get('user_id')
+        requester = data.get('requester_id')
+        if not room or not room.startswith('whiteboard:'):
+            return
+        wb_id = room.split(':', 1)[1]
+        db = Database()
+        try:
+            wb = db.find_one('whiteboards', {'_id': ObjectId(wb_id)})
+            if not wb:
+                return
+            if str(wb.get('created_by')) != requester:
+                return
+            current = wb.get('can_speak', [])
+            current = [x for x in current if str(x) != target_user]
+            db.update_one('whiteboards', {'_id': wb['_id']}, {'can_speak': current})
+            emit('permissions_updated', {'can_speak': [str(x) for x in current]}, room=room)
+        except Exception:
+            return
     
     @socketio.on('leave_room')
     def on_leave_room(data):
@@ -174,15 +438,39 @@ def create_app(config_name='development'):
             leave_room(room)
             if user_id in connected_users:
                 del connected_users[user_id]
-            emit('user_left', {
-                'user_id': user_id,
-                'timestamp': datetime.utcnow().isoformat()
-            }, room=room)
+            try:
+                if room.startswith('whiteboard:'):
+                    wb_id = room.split(':', 1)[1]
+                    db = Database()
+                    db.pull_from_array('whiteboards', {'_id': ObjectId(wb_id)}, 'participants', ObjectId(user_id))
+            except Exception:
+                pass
+            # Emit with profile if possible
+            try:
+                user_doc = db.find_one('users', {'_id': ObjectId(user_id)})
+                profile = None
+                if user_doc:
+                    profile = {'id': str(user_doc['_id']), 'full_name': user_doc.get('full_name', ''), 'avatar_url': user_doc.get('avatar_url', ''), 'username': user_doc.get('username', '')}
+                emit('user_left', {'user_id': user_id, 'profile': profile, 'timestamp': datetime.utcnow().isoformat()}, room=room)
+            except Exception:
+                # Fallback to minimal event
+                emit('user_left', {'user_id': user_id, 'timestamp': datetime.utcnow().isoformat()}, room=room)
+
     
     @socketio.on('disconnect')
     def handle_disconnect():
         """Handle user disconnect"""
         print(f'Client disconnected: {request.sid}')
+        # Attempt to remove user from any whiteboard participant lists based on connected_users reverse mapping
+        try:
+            user_ids_to_remove = [u for u, sid in connected_users.items() if sid == request.sid]
+            for uid in user_ids_to_remove:
+                del connected_users[uid]
+                # remove from all whiteboards where user present
+                db = Database()
+                db.pull_from_array('whiteboards', {'participants': ObjectId(uid)}, 'participants', ObjectId(uid))
+        except Exception:
+            pass
     
     return app, socketio
 

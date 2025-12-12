@@ -124,6 +124,29 @@ def get_group_messages(group_id):
         'per_page': per_page
     }, 'Messages retrieved successfully', 200)
 
+@messages_bp.route('/group/<group_id>', methods=['DELETE'])
+@require_auth
+def clear_group_messages(group_id):
+    """Clear all messages in a group (Owner only)"""
+    try:
+        group_id_obj = ObjectId(group_id)
+    except:
+        return error_response('Invalid group ID', 400)
+    
+    db = Database()
+    group = db.find_one('groups', {'_id': group_id_obj})
+    
+    if not group:
+        return error_response('Group not found', 404)
+    
+    # Check if user is owner
+    if str(group['owner_id']) != g.user_id:
+        return error_response('Only group owner can clear chat', 403)
+    
+    result = db.delete_many('messages', {'group_id': group_id_obj})
+    
+    return success_response({'deleted_count': result}, 'Chat cleared successfully', 200)
+
 @messages_bp.route('', methods=['POST'])
 @require_auth
 def send_message():

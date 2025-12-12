@@ -113,6 +113,8 @@ class Whiteboard:
             'created_by': ObjectId(created_by),
             'title': title or 'Untitled Whiteboard',
             'drawing_data': [],  # Stores drawing actions
+            'audio_files': [],
+            'raised_hands': [],
             'participants': [ObjectId(created_by)],
             'created_at': datetime.utcnow(),
             'updated_at': datetime.utcnow(),

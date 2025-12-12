@@ -25,34 +25,76 @@
     </div>
 </div>
 
-<div class="row mt-4">
+<!-- Landing View -->
+<div id="landingView" style="display:none;">
+    <div class="row mt-4">
+        <div class="col-md-8 offset-md-2">
+            <div class="card shadow-sm border-0 mb-4">
+                <div class="card-body text-center p-5">
+                    <h3 class="mb-4">Start Collaborating</h3>
+                    <div class="d-flex justify-content-center gap-3">
+                        <button id="createSessionBtnLanding" class="btn btn-primary btn-lg">
+                            <i class="fas fa-plus-circle"></i> Create Session
+                        </button>
+                        <button id="joinSessionBtnLanding" class="btn btn-secondary btn-lg">
+                            <i class="fas fa-sign-in-alt"></i> Join Session
+                        </button>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="card shadow-sm border-0" id="mySessionsCardLanding" style="display:none;">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="fas fa-list"></i> My Active Sessions</h5>
+                </div>
+                <div class="card-body p-0">
+                    <div class="list-group list-group-flush" id="mySessionsListLanding">
+                        <!-- Sessions will be loaded here -->
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Session View -->
+<div id="sessionView" class="row mt-4" style="display:none;">
     <div class="col-lg-2">
         <div class="card shadow-sm border-0 mb-3">
             <div class="card-body">
-                <h6 class="card-title">Drawing Tools</h6>
-                <div class="controls mb-3">
-                    <label for="colorPicker" class="form-label">Color</label>
-                    <input type="color" class="form-control form-control-color" id="colorPicker" value="#000000">
-                </div>
-                <div class="controls mb-3">
-                    <label for="brushSize" class="form-label">Brush Size: <span id="sizeValue">3</span>px</label>
-                    <input type="range" class="form-range" id="brushSize" min="1" max="20" value="3">
-                </div>
-                <div class="controls mb-3">
-                    <label for="opacity" class="form-label">Opacity</label>
-                    <input type="range" class="form-range" id="opacity" min="0" max="1" step="0.1" value="1">
-                </div>
-                <div class="btn-group-vertical w-100">
-                    <button id="clearBtn" class="btn btn-warning mb-2">
-                        <i class="fas fa-trash"></i> Clear Canvas
-                    </button>
-                    <button id="undoBtn" class="btn btn-secondary mb-2">
-                        <i class="fas fa-undo"></i> Undo
-                    </button>
-                    <button id="downloadBtn" class="btn btn-info">
-                        <i class="fas fa-download"></i> Download
-                    </button>
-                </div>
+                    <div class="d-flex justify-content-between align-items-center">
+                        <h6 class="card-title mb-0">Drawing Tools</h6>
+                        <button class="btn btn-sm btn-outline-secondary" data-bs-toggle="collapse" data-bs-target="#drawingToolsCollapse" aria-expanded="false" aria-controls="drawingToolsCollapse" id="toggleDrawingTools">Show Tools</button>
+                    </div>
+                    <div id="permissionStatus" class="mb-2 text-muted small mt-2"></div>
+                    <div class="collapse" id="drawingToolsCollapse">
+                        <div class="controls mb-3">
+                            <label for="colorPicker" class="form-label">Color</label>
+                            <input type="color" class="form-control form-control-color" id="colorPicker" value="#000000">
+                        </div>
+                        <div class="controls mb-3">
+                            <label for="brushSize" class="form-label">Brush Size: <span id="sizeValue">3</span>px</label>
+                            <input type="range" class="form-range" id="brushSize" min="1" max="20" value="3">
+                        </div>
+                        <div class="controls mb-3">
+                            <label for="opacity" class="form-label">Opacity</label>
+                            <input type="range" class="form-range" id="opacity" min="0" max="1" step="0.1" value="1">
+                        </div>
+                        <div class="btn-group-vertical w-100">
+                            <button id="clearBtn" class="btn btn-warning mb-2">
+                                <i class="fas fa-trash"></i> Clear Canvas
+                            </button>
+                            <button id="undoBtn" class="btn btn-secondary mb-2">
+                                <i class="fas fa-undo"></i> Undo
+                            </button>
+                            <button id="downloadBtn" class="btn btn-info">
+                                <i class="fas fa-download"></i> Download
+                            </button>
+                        </div>
+                    </div>
+                    <div class="d-grid mt-3" id="leaveSessionContainer">
+                        <a href="/whiteboard" class="btn btn-sm btn-outline-danger">Leave Session</a>
+                    </div>
             </div>
         </div>
 
@@ -60,8 +102,13 @@
             <div class="card-header">
                 <h6 class="mb-0"><i class="fas fa-users"></i> Participants</h6>
             </div>
-            <div class="card-body" id="participants">
-                <small class="text-body-secondary">Connecting...</small>
+            <div class="card-body">
+                <div id="participantsList">
+                    <small class="text-body-secondary">Connecting...</small>
+                </div>
+                <div id="sessionControls" class="mt-3 border-top pt-2 d-flex flex-wrap gap-2"></div>
+                <div id="inviteLinkContainer" class="mt-3 border-top pt-2"></div>
+                <div id="audioFilesContainer" class="mt-3 border-top pt-2"></div>
             </div>
         </div>
     </div>
@@ -69,7 +116,87 @@
     <div class="col-lg-10">
         <div class="card shadow-sm border-0">
             <div class="card-body overflow-auto text-center bg-light">
-                <canvas id="whiteboard" width="1200" height="600"></canvas>
+                <div style="position:relative;">
+                    <canvas id="whiteboard" style="width:100%;height:50vh;display:block;" width="1200" height="600"></canvas>
+                    <div id="canvasOverlay" style="position:absolute;inset:0;display:none;align-items:center;justify-content:center;background:rgba(255,255,255,0.6);">
+                        <div class="text-muted">You don't have permission to draw in this session</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block modals %}
+<!-- Create/Join Session Modals -->
+<!-- Create Session Modal -->
+<div class="modal fade" id="createSessionModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Select Group for Session</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p class="text-muted">Select which group this session is for:</p>
+                <div class="mb-3">
+                    <label for="sessionGroupSelect" class="form-label">Group</label>
+                    <select id="sessionGroupSelect" class="form-select"></select>
+                </div>
+                <div class="mb-3">
+                    <label for="sessionNameInput" class="form-label">Session Name</label>
+                    <input type="text" class="form-control" id="sessionNameInput" placeholder="Enter session name (optional)">
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button id="createSessionSubmit" type="button" class="btn btn-primary">Create Session</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Session Created Modal -->
+<div class="modal fade" id="sessionCreatedModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Session Created</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p>Share this link with your group members:</p>
+                <div class="input-group mb-3">
+                    <input type="text" class="form-control" id="createdSessionLink" readonly>
+                    <button class="btn btn-outline-secondary" type="button" onclick="navigator.clipboard.writeText(document.getElementById('createdSessionLink').value); this.textContent='Copied!'; setTimeout(()=>this.textContent='Copy', 2000);">Copy</button>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                <button id="goToSessionBtn" type="button" class="btn btn-primary">Go to Session</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Join Session Modal -->
+<div class="modal fade" id="joinSessionModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Join Whiteboard Session</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3">
+                    <label class="form-label">Session ID</label>
+                    <input id="joinSessionId" class="form-control" placeholder="Enter session ID or paste invite link">
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button id="joinSessionSubmit" type="button" class="btn btn-primary">Join</button>
             </div>
         </div>
     </div>
@@ -90,12 +217,30 @@
 
         const canvas = document.getElementById('whiteboard');
         const ctx = canvas.getContext('2d');
-        const participantsEl = document.getElementById('participants');
+        const sessionId = new URLSearchParams(window.location.search).get('session');
+        const participantsEl = document.getElementById('participantsList');
+
+        // View Toggling Logic
+        const landingView = document.getElementById('landingView');
+        const sessionView = document.getElementById('sessionView');
+
+        if (sessionId) {
+            if (landingView) landingView.style.display = 'none';
+            if (sessionView) sessionView.style.display = 'flex';
+        } else {
+            if (landingView) landingView.style.display = 'block';
+            if (sessionView) sessionView.style.display = 'none';
+        }
+
+        console.log('whiteboard script loaded');
+        console.log('sessionId:', sessionId, 'userId:', userId);
 
         let isDrawing = false;
         let lastX = 0;
         let lastY = 0;
         let history = [];
+        let participants = {};
+        let isCreator = false;
 
         const socket = io();
 
@@ -138,7 +283,7 @@
 
         function emitDraw(x0, y0, x1, y1) {
             socket.emit('whiteboard_draw', {
-                room: 'whiteboard',
+                room: sessionId ? `whiteboard:${sessionId}` : 'whiteboard',
                 user_id: userId,
                 drawing_data: {
                     x0,
@@ -152,8 +297,24 @@
             });
         }
 
+        // Resize canvas to container size and handle high DPI screens
+        function resizeCanvas() {
+            const rect = canvas.getBoundingClientRect();
+            const ratio = window.devicePixelRatio || 1;
+            canvas.width = Math.max(300, Math.floor(rect.width * ratio));
+            canvas.height = Math.max(200, Math.floor(rect.height * ratio));
+            // Reset scaling for drawing operations
+            ctx.setTransform(ratio, 0, 0, ratio, 0, 0);
+        }
+        window.addEventListener('resize', () => {
+            try { history.push(canvas.toDataURL()); } catch{}
+            resizeCanvas();
+        });
+        resizeCanvas();
+
         // Mouse events
         canvas.addEventListener('mousedown', (e) => {
+            if (!canDraw) return;
             isDrawing = true;
             const p = getPos(e.clientX, e.clientY);
             lastX = p.x;
@@ -180,6 +341,7 @@
         // Touch events
         canvas.addEventListener('touchstart', (e) => {
             e.preventDefault();
+            if (!canDraw) return;
             const t = e.touches[0];
             isDrawing = true;
             const p = getPos(t.clientX, t.clientY);
@@ -205,9 +367,20 @@
         // Controls
         document.getElementById('clearBtn').addEventListener('click', async () => {
             if (await showCustomConfirm('Clear the entire whiteboard?', 'Confirm Clear')) {
+                // Local clear
                 ctx.clearRect(0, 0, canvas.width, canvas.height);
                 history = [];
+                // Emit clear event
+                socket.emit('clear_board', { 
+                    room: sessionId ? `whiteboard:${sessionId}` : 'whiteboard', 
+                    user_id: userId 
+                });
             }
+        });
+
+        socket.on('board_cleared', () => {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            history = [];
         });
 
         document.getElementById('undoBtn').addEventListener('click', () => {
@@ -234,20 +407,557 @@
         });
 
         // Socket events
+        let canDraw = true;
+        let canSpeak = true;
+
+        async function loadSessionInfo() {
+            if (!sessionId) return;
+            try {
+                const res = await fetch(`/api/whiteboards/${sessionId}`, { headers: { 'Authorization': `Bearer ${token}` } });
+                if (res.ok) {
+                    const data = await res.json();
+                    const wb = data.data;
+                    
+                    // Update page title
+                    if (wb.title) {
+                        document.querySelector('h1').innerHTML = `<i class="fas fa-chalkboard"></i> ${wb.title}`;
+                        document.title = `${wb.title} - Discussio`;
+                    }
+                    
+                    // Set creator status early
+                    if (wb.created_by && wb.created_by === userId) {
+                        isCreator = true;
+                        // Change Leave button to End Session for creator
+                        const leaveBtnContainer = document.getElementById('leaveSessionContainer');
+                        if (leaveBtnContainer) {
+                            leaveBtnContainer.innerHTML = `
+                                <button id="endSessionBtn" class="btn btn-sm btn-danger w-100">End Session</button>
+                            `;
+                            document.getElementById('endSessionBtn').addEventListener('click', async () => {
+                                if (confirm('Are you sure you want to end this session? It will be closed for everyone.')) {
+                                    await endSession(sessionId);
+                                }
+                            });
+                        }
+                    }
+
+                    if (wb.can_draw) {
+                        const ids = wb.can_draw.map(x => x.toString());
+                        canDraw = ids.includes(userId);
+                    }
+                    if (wb.can_speak) {
+                        const ids2 = wb.can_speak.map(x => x.toString());
+                        canSpeak = ids2.includes(userId);
+                    }
+                    // Setup participants initial state
+                    if (wb.participants) {
+                        wb.participants.forEach(p => {
+                            const uid = p.id || p._id || p;
+                            participants[uid] = { name: p.full_name || p.username || 'User ' + String(uid).substr(-4), avatar_url: p.avatar_url || '', can_draw: wb.can_draw ? wb.can_draw.map(x => x.toString()).includes(uid) : false, can_speak: wb.can_speak ? wb.can_speak.map(x => x.toString()).includes(uid) : false };
+                        });
+                        renderParticipants();
+                    }
+                    // Show invite link if creator
+                    if (isCreator) {
+                        const inviteContainer = document.getElementById('inviteLinkContainer');
+                        if (inviteContainer) {
+                            inviteContainer.innerHTML = `<small class="text-muted">Invite: <a href="/whiteboard?session=${wb.id}">Join Session</a></small>`;
+                        }
+                    }
+                    // Render audio files list
+                    if (wb.audio_files && wb.audio_files.length) {
+                        const audioContainer = document.getElementById('audioFilesContainer');
+                        if (audioContainer) {
+                            audioContainer.innerHTML = ''; // Clear previous
+                            const list = document.createElement('div');
+                            list.className = 'mt-2';
+                            wb.audio_files.forEach(f => {
+                                const row = document.createElement('div');
+                                const playBtn = document.createElement('button');
+                                playBtn.className = 'btn btn-sm btn-outline-secondary me-2';
+                                playBtn.textContent = 'Play';
+                                playBtn.addEventListener('click', async () => {
+                                    const res = await fetch(`/api/files/${f.id}`, { headers: { 'Authorization': `Bearer ${token}` } });
+                                    if (res.ok) {
+                                        const data = await res.json();
+                                        const url = data.data.download_url;
+                                        const audioEl = document.createElement('audio');
+                                        audioEl.src = url; audioEl.controls = true; list.appendChild(audioEl);
+                                    }
+                                });
+                                row.appendChild(playBtn);
+                                row.appendChild(document.createTextNode(f.filename || f.filename || 'Audio'));
+                                list.appendChild(row);
+                            });
+                            audioContainer.appendChild(list);
+                        }
+                    }
+                    // Render existing drawings
+                    if (wb.drawing_data && Array.isArray(wb.drawing_data)) {
+                        wb.drawing_data.forEach(d => {
+                            draw(d.x0, d.y0, d.x1, d.y1, d.color, d.size, d.opacity);
+                        });
+                    }
+                }
+            } catch (e) {
+                console.error('Failed to fetch session info', e);
+            }
+        }
+
         socket.on('connect_response', () => {
             if (participantsEl) {
                 participantsEl.innerHTML = '<small class="text-body-secondary">Connected</small>';
             }
         });
+        // Load session info (permissions)
+        loadSessionInfo();
+        // Update permission status UI element and overlay
+        function updatePermissionUI() {
+            const el = document.getElementById('permissionStatus');
+            if (el) el.textContent = canDraw ? 'You can draw' : 'You cannot draw';
+            const overlay = document.getElementById('canvasOverlay');
+            if (overlay) overlay.style.display = canDraw ? 'none' : 'flex';
+        }
+        setInterval(updatePermissionUI, 500);
 
+        // Remote draw updates from other users
         socket.on('draw_update', (data) => {
             const d = data?.drawing_data;
             if (!d) return;
             draw(d.x0, d.y0, d.x1, d.y1, d.color, d.size, d.opacity);
         });
 
+        // Update participants list
+        function renderParticipants() {
+            participantsEl.innerHTML = '';
+            for (const [uid, meta] of Object.entries(participants)) {
+                const el = document.createElement('div');
+                el.className = 'd-flex align-items-center justify-content-between mb-2';
+                const left = document.createElement('div');
+                const avatarSrc = meta.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(meta.name || meta.username || uid)}`;
+                const avatarHtml = `<img src="${avatarSrc}" class="rounded-circle me-2" width="28" height="28"/>`;
+                left.innerHTML = avatarHtml + `<strong>${meta.name || uid}</strong>`;
+                el.appendChild(left);
+                const right = document.createElement('div');
+                if (isCreator && uid !== userId) {
+                    const grantDraw = document.createElement('button');
+                    grantDraw.className = 'btn btn-sm btn-outline-primary me-1';
+                    grantDraw.textContent = meta.can_draw ? 'Revoke Draw' : 'Grant Draw';
+                    grantDraw.addEventListener('click', () => {
+                        socket.emit(meta.can_draw ? 'revoke_draw' : 'grant_draw', { room: sessionId ? `whiteboard:${sessionId}` : 'whiteboard', user_id: uid, requester_id: userId });
+                    });
+                    const grantSpeak = document.createElement('button');
+                    grantSpeak.className = 'btn btn-sm btn-outline-secondary';
+                    grantSpeak.textContent = meta.can_speak ? 'Revoke Speak' : 'Grant Speak';
+                    grantSpeak.addEventListener('click', () => {
+                        socket.emit(meta.can_speak ? 'revoke_speak' : 'grant_speak', { room: sessionId ? `whiteboard:${sessionId}` : 'whiteboard', user_id: uid, requester_id: userId });
+                    });
+                    right.appendChild(grantDraw);
+                    right.appendChild(grantSpeak);
+                    if (meta.raised) {
+                        const clearHand = document.createElement('button');
+                        clearHand.className = 'btn btn-sm btn-outline-danger ms-1';
+                        clearHand.textContent = 'Clear Hand';
+                        clearHand.addEventListener('click', () => {
+                            socket.emit('clear_hand', { room: sessionId ? `whiteboard:${sessionId}` : 'whiteboard', user_id: uid });
+                        });
+                        right.appendChild(clearHand);
+                    }
+                } else {
+                    right.textContent = (meta.can_draw ? 'Can draw' : '') + (meta.raised ? ' • Raised hand' : '');
+                }
+                el.appendChild(right);
+                participantsEl.appendChild(el);
+            }
+        }
+
+        socket.on('user_joined', (data) => {
+            const uid = data.user_id;
+            const p = data.profile;
+            const name = p?.full_name || p?.username || 'User ' + uid.substr(-4);
+            const avatar = p?.avatar_url || '';
+            if (!participants[uid]) participants[uid] = { name, avatar_url: avatar, can_draw: false, can_speak: false };
+            renderParticipants();
+        });
+        socket.on('user_left', (data) => {
+            const uid = data.user_id;
+            delete participants[uid];
+            renderParticipants();
+        });
+
+        socket.on('permissions_updated', (data) => {
+            const can_draw = data.can_draw || [];
+            const can_speak = data.can_speak || [];
+            for (const uid of Object.keys(participants)) {
+                participants[uid].can_draw = can_draw.includes(uid);
+                participants[uid].can_speak = can_speak.includes(uid);
+            }
+            // Update local flags too
+            canDraw = can_draw.includes(userId);
+            canSpeak = can_speak.includes(userId);
+            renderParticipants();
+        });
+
+        socket.on('hand_raised', (data) => {
+            const uid = data.user_id;
+            const profile = data.profile;
+            if (!participants[uid]) participants[uid] = { name: profile?.full_name || profile?.username || 'User ' + uid.substr(-4), avatar_url: profile?.avatar_url || '', can_draw: false, can_speak: false };
+            participants[uid].raised = true;
+            renderParticipants();
+        });
+
+        socket.on('hand_cleared', (data) => {
+            const uid = data.user_id;
+            if (participants[uid]) {
+                participants[uid].raised = false;
+                renderParticipants();
+            }
+        });
+
+        // Audio: start/stop recording and emit base64 data; also upload recorded clip on stop
+        let mediaRecorder = null;
+        let isSpeaking = false;
+        let audioChunks = [];
+        
+        const controlsContainer = document.getElementById('sessionControls');
+        
+        const speakBtn = document.createElement('button');
+        speakBtn.className = 'btn btn-sm btn-outline-primary';
+        speakBtn.innerHTML = '<i class="fas fa-microphone"></i> Push to Talk';
+        if (controlsContainer) controlsContainer.appendChild(speakBtn);
+        
+        // Removed broken "Start Live" WebRTC button for now
+        
+        const raiseBtn = document.createElement('button');
+        raiseBtn.className = 'btn btn-sm btn-outline-secondary';
+        raiseBtn.innerHTML = '<i class="fas fa-hand-paper"></i> Raise Hand';
+        if (controlsContainer) controlsContainer.appendChild(raiseBtn);
+
+        speakBtn.addEventListener('mousedown', async () => {
+            if (!canSpeak) {
+                alert('You are not permitted to speak in this session.');
+                return;
+            }
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                mediaRecorder = new MediaRecorder(stream);
+                mediaRecorder.ondataavailable = e => {
+                    audioChunks.push(e.data);
+                    // Send chunks for near-realtime
+                    const reader = new FileReader();
+                    reader.onload = () => {
+                        const b64 = reader.result.split(',')[1];
+                        socket.emit('whiteboard_audio', { room: sessionId ? `whiteboard:${sessionId}` : 'whiteboard', user_id: userId, audio_b64: b64 });
+                    };
+                    reader.readAsDataURL(e.data);
+                };
+                mediaRecorder.start(200); // Smaller chunks for lower latency
+                isSpeaking = true;
+                speakBtn.className = 'btn btn-sm btn-danger';
+                speakBtn.innerHTML = '<i class="fas fa-microphone"></i> Speaking...';
+            } catch (err) {
+                console.error('Error accessing microphone', err);
+                alert('Could not access microphone');
+            }
+        });
+
+        const stopSpeaking = () => {
+            if (isSpeaking && mediaRecorder) {
+                mediaRecorder.stop();
+                mediaRecorder.stream && mediaRecorder.stream.getTracks().forEach(t => t.stop());
+                // upload the recorded clip
+                if (audioChunks.length > 0) {
+                    const blob = new Blob(audioChunks, { type: 'audio/webm' });
+                    const form = new FormData();
+                    form.append('file', blob, `whiteboard-${Date.now()}.webm`);
+                    fetch(`/api/whiteboards/${sessionId}/upload_audio`, { method: 'POST', headers: { 'Authorization': `Bearer ${token}` }, body: form })
+                        .then(r => r.json()).then(d => console.log('Uploaded audio clip', d)).catch(e => console.error('Upload failed', e));
+                }
+                audioChunks = [];
+            }
+            isSpeaking = false;
+            speakBtn.className = 'btn btn-sm btn-outline-primary';
+            speakBtn.innerHTML = '<i class="fas fa-microphone"></i> Push to Talk';
+        };
+
+        speakBtn.addEventListener('mouseup', stopSpeaking);
+        speakBtn.addEventListener('mouseleave', stopSpeaking);
+        speakBtn.addEventListener('touchend', stopSpeaking);
+
+        // WebRTC live audio (low-latency) - DISABLED for now as it's unstable for groups
+        /*
+        let pc = null;
+        let localStream = null;
+        liveBtn.addEventListener('click', async () => {
+            // ... existing code ...
+        });
+        */
+
+        raiseBtn.addEventListener('click', async () => {
+            socket.emit('raise_hand', { room: sessionId ? `whiteboard:${sessionId}` : 'whiteboard', user_id: userId });
+            participants[userId] = participants[userId] || { name: 'You', avatar_url: '', can_draw: false, can_speak: false };
+            participants[userId].raised = true;
+            renderParticipants();
+        });
+
+        // Playback incoming audio clips
+        socket.on('audio_clip', (data) => {
+            const b64 = data?.audio_b64;
+            if (!b64) return;
+            const binary = atob(b64);
+            const len = binary.length;
+            const buffer = new Uint8Array(len);
+            for (let i = 0; i < len; i++) buffer[i] = binary.charCodeAt(i);
+            const blob = new Blob([buffer], { type: 'audio/webm' });
+            const url = URL.createObjectURL(blob);
+            const audioEl = document.createElement('audio');
+            audioEl.src = url;
+            audioEl.autoplay = true;
+            participantsEl.appendChild(audioEl);
+            audioEl.onended = () => { URL.revokeObjectURL(url); audioEl.remove(); };
+        });
+
+        // WebRTC signaling handlers
+        socket.on('webrtc_offer', async (data) => {
+            const offer = data.offer;
+            const from = data.user_id;
+            if (!offer) return;
+            try {
+                const pc2 = new RTCPeerConnection({ iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] });
+                pc2.onicecandidate = (e) => { if (e.candidate) socket.emit('webrtc_ice', { room: sessionId ? `whiteboard:${sessionId}` : 'whiteboard', user_id: userId, candidate: e.candidate }); };
+                pc2.ontrack = (e) => { const audioEl = document.createElement('audio'); audioEl.srcObject = e.streams[0]; audioEl.autoplay = true; participantsEl.appendChild(audioEl); };
+                // Optionally add local audio if user wants to send audio back
+                try {
+                    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                    stream.getTracks().forEach(t => pc2.addTrack(t, stream));
+                } catch (e) { /* ignore */ }
+                await pc2.setRemoteDescription(new RTCSessionDescription(offer));
+                const answer = await pc2.createAnswer();
+                await pc2.setLocalDescription(answer);
+                socket.emit('webrtc_answer', { room: sessionId ? `whiteboard:${sessionId}` : 'whiteboard', user_id: userId, answer: answer });
+            } catch (e) {
+                console.error('Error handling offer', e);
+            }
+        });
+
+        socket.on('webrtc_answer', async (data) => {
+            const answer = data.answer;
+            try {
+                if (pc && answer) { await pc.setRemoteDescription(new RTCSessionDescription(answer)); }
+            } catch (e) { console.error('Error setting remote answer', e); }
+        });
+
+        socket.on('webrtc_ice', async (data) => {
+            const candidate = data.candidate;
+            try {
+                if (pc && candidate) { await pc.addIceCandidate(candidate); }
+            } catch (e) { console.error('Error adding ice candidate', e); }
+        });
+
         // Join room
-        socket.emit('join_room', { room: 'whiteboard', user_id: userId });
+        socket.emit('join_room', { room: sessionId ? `whiteboard:${sessionId}` : 'whiteboard', user_id: userId });
+
+            // Create/Join session UI handlers
+            const createSessionBtnMobile = document.getElementById('createSessionBtn');
+            const joinSessionBtnMobile = document.getElementById('joinSessionBtn');
+            const createSessionBtnDesktop = document.getElementById('createSessionBtnDesktop');
+            const joinSessionBtnDesktop = document.getElementById('joinSessionBtnDesktop');
+            const createModal = new bootstrap.Modal(document.getElementById('createSessionModal'));
+            const joinModal = new bootstrap.Modal(document.getElementById('joinSessionModal'));
+            const toggleDrawingToolsBtn = document.getElementById('toggleDrawingTools');
+            const drawingToolsCollapseEl = document.getElementById('drawingToolsCollapse');
+            console.log('toggleDrawingToolsBtn:', !!toggleDrawingToolsBtn, 'drawingToolsCollapseEl:', !!drawingToolsCollapseEl);
+            if (toggleDrawingToolsBtn && drawingToolsCollapseEl) {
+                drawingToolsCollapseEl.addEventListener('shown.bs.collapse', () => { toggleDrawingToolsBtn.textContent = 'Hide Tools'; });
+                drawingToolsCollapseEl.addEventListener('hidden.bs.collapse', () => { toggleDrawingToolsBtn.textContent = 'Show Tools'; });
+            }
+            console.log('createSessionBtnDesktop exists?', !!createSessionBtnDesktop, 'joinSessionBtnDesktop exists?', !!joinSessionBtnDesktop);
+            const openCreateModal = async (e) => { 
+                if (e) e.preventDefault();
+                console.log('openCreateModal called');
+                try {
+                    const grpRes = await fetch('/api/users/groups', { headers: { 'Authorization': `Bearer ${token}` } });
+                    if (grpRes.ok) {
+                        const d = await grpRes.json();
+                        // Filter groups where user is owner
+                        const groups = (d.data.groups || []).filter(g => g.owner_id === userId);
+                        
+                        if (groups.length === 0) {
+                            alert('You must be a group owner to create a session.');
+                            return;
+                        }
+                        
+                        if (groups.length === 1) {
+                            // Only one group, create immediately
+                            createSession(groups[0].id);
+                        } else {
+                            // Multiple groups, show selection
+                            const select = document.getElementById('sessionGroupSelect');
+                            select.innerHTML = '<option value="">Select a group</option>' + (groups.map(g => `<option value="${g.id}">${g.name}</option>`).join(''));
+                            createModal.show();
+                        }
+                    }
+                } catch (e) {
+                    console.error('Failed to load groups', e);
+                }
+            };
+
+            async function createSession(groupId, title) {
+                try {
+                    const res = await fetch(`/api/groups/${groupId}/whiteboards`, {
+                        method: 'POST',
+                        headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ title: title || 'Whiteboard Session ' + new Date().toLocaleTimeString() })
+                    });
+                    if (res.ok) {
+                        const data = await res.json();
+                        const invite = data.data.invite_url;
+                        const fullUrl = window.location.origin + invite;
+                        
+                        document.getElementById('createdSessionLink').value = fullUrl;
+                        document.getElementById('goToSessionBtn').onclick = () => window.location.href = invite;
+                        new bootstrap.Modal(document.getElementById('sessionCreatedModal')).show();
+                        createModal.hide();
+                    } else {
+                        const data = await res.json();
+                        alert(data.message || 'Failed to create session');
+                    }
+                } catch (e) {
+                    console.error('Failed to create session', e);
+                    alert('Error creating session');
+                }
+            }
+            createSessionBtnMobile && createSessionBtnMobile.addEventListener('click', openCreateModal);
+            // createSessionBtnDesktop removed from DOM, using landing button
+            const createSessionBtnLanding = document.getElementById('createSessionBtnLanding');
+            if (createSessionBtnLanding) {
+                createSessionBtnLanding.addEventListener('click', openCreateModal);
+            }
+
+            // Preload user's groups into the create modal select (don't auto-open modal)
+            (async function preloadGroups() {
+                try {
+                    const grpRes = await fetch('/api/users/groups', { headers: { 'Authorization': `Bearer ${token}` } });
+                    if (grpRes.ok) {
+                        const d = await grpRes.json();
+                        const groups = d.data.groups || [];
+                        const select = document.getElementById('sessionGroupSelect');
+                        select.innerHTML = '<option value="">Select a group</option>' + (groups.map(g => `<option value="${g.id}">${g.name}</option>`).join(''));
+                    }
+                } catch (e) {
+                    console.error('Failed to preload groups', e);
+                }
+            })();
+            const openJoinModal = (e) => { 
+                if (e) e.preventDefault();
+                console.log('openJoinModal called'); 
+                joinModal.show(); 
+            };
+            joinSessionBtnMobile && joinSessionBtnMobile.addEventListener('click', openJoinModal);
+            // joinSessionBtnDesktop removed from DOM, using landing button
+            const joinSessionBtnLanding = document.getElementById('joinSessionBtnLanding');
+            if (joinSessionBtnLanding) {
+                joinSessionBtnLanding.addEventListener('click', openJoinModal);
+            }
+
+            document.getElementById('createSessionSubmit').addEventListener('click', async () => {
+                const gid = document.getElementById('sessionGroupSelect').value;
+                const title = document.getElementById('sessionNameInput').value.trim();
+                if (!gid) {
+                    alert('Please select a group');
+                    return;
+                }
+                createSession(gid, title);
+            });
+
+            document.getElementById('joinSessionSubmit').addEventListener('click', () => {
+                const raw = document.getElementById('joinSessionId').value.trim();
+                if (!raw) return;
+                // Support full URL or plain session id
+                let id = raw;
+                try {
+                    const url = new URL(raw);
+                    const params = new URLSearchParams(url.search);
+                    id = params.get('session') || id;
+                } catch (e) { /* not a URL */ }
+                if (!id) return;
+                window.location.href = `/whiteboard?session=${encodeURIComponent(id)}`;
+            });
+
+            // Load my active sessions
+            async function loadMySessions() {
+                try {
+                    const res = await fetch('/api/whiteboards/mine', { headers: { 'Authorization': `Bearer ${token}` } });
+                    if (res.ok) {
+                        const data = await res.json();
+                        const sessions = data.data.whiteboards || [];
+                        // Updated IDs for landing view
+                        const list = document.getElementById('mySessionsListLanding');
+                        const card = document.getElementById('mySessionsCardLanding');
+                        
+                        if (list && card) {
+                            if (sessions.length > 0) {
+                                card.style.display = 'block';
+                                list.innerHTML = '';
+                                sessions.forEach(s => {
+                                    const item = document.createElement('div');
+                                    item.className = 'list-group-item d-flex justify-content-between align-items-center';
+                                    item.innerHTML = `
+                                        <div>
+                                            <div class="fw-bold text-truncate" style="max-width: 150px;">${s.title || 'Untitled'}</div>
+                                            <small class="text-muted">${s.group_name}</small>
+                                        </div>
+                                        <div class="btn-group btn-group-sm">
+                                            <a href="/whiteboard?session=${s.id}" class="btn btn-outline-primary">Join</a>
+                                            <button class="btn btn-outline-danger end-session-btn" data-id="${s.id}">End</button>
+                                        </div>
+                                    `;
+                                    list.appendChild(item);
+                                });
+                                
+                                // Add event listeners for end buttons
+                                document.querySelectorAll('.end-session-btn').forEach(btn => {
+                                    btn.addEventListener('click', async (e) => {
+                                        e.preventDefault();
+                                        const id = e.target.getAttribute('data-id');
+                                        if (confirm('Are you sure you want to end this session? It will be closed for everyone.')) {
+                                            await endSession(id);
+                                        }
+                                    });
+                                });
+                            } else {
+                                card.style.display = 'none';
+                            }
+                        }
+                    }
+                } catch (e) {
+                    console.error('Failed to load my sessions', e);
+                }
+            }
+            
+            async function endSession(id) {
+                try {
+                    const res = await fetch(`/api/whiteboards/${id}`, { 
+                        method: 'DELETE',
+                        headers: { 'Authorization': `Bearer ${token}` } 
+                    });
+                    if (res.ok) {
+                        loadMySessions(); // Refresh list
+                        if (sessionId === id) {
+                            alert('Session ended');
+                            window.location.href = '/whiteboard';
+                        }
+                    } else {
+                        alert('Failed to end session');
+                    }
+                } catch (e) {
+                    console.error('Failed to end session', e);
+                }
+            }
+            
+            loadMySessions();
+            // Refresh list periodically
+            setInterval(loadMySessions, 30000);
     })();
 </script>
 {% endblock %}
