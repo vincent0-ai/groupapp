@@ -486,6 +486,12 @@
                 const data = await res.json();
                 const messages = data.data?.messages || [];
                 
+                // Mark messages as read
+                fetch(`/api/messages/group/${currentGroupId}/read`, {
+                    method: 'POST',
+                    headers: { 'Authorization': `Bearer ${token}` }
+                }).catch(err => console.warn('Failed to mark messages as read:', err));
+                
                 // Create message map for reply lookups
                 const messageMap = {};
                 messages.forEach(m => { messageMap[m._id] = m; });

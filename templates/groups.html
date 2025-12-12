@@ -122,24 +122,44 @@
                 const data = await res.json();
                 const groups = data.data?.groups || [];
 
-                const html = groups.length ? groups.map(g => `
+                // Fetch unread counts
+                let unreadMap = {};
+                try {
+                    const unreadRes = await fetch('/api/messages/unread/count', {
+                        headers: { 'Authorization': `Bearer ${token}` }
+                    });
+                    const unreadData = await unreadRes.json();
+                    (unreadData.data?.groups || []).forEach(g => {
+                        unreadMap[g.group_id] = g.unread_count;
+                    });
+                } catch (e) {
+                    console.warn('Failed to load unread counts:', e);
+                }
+
+                const html = groups.length ? groups.map(g => {
+                    const groupId = g.id || g._id;
+                    const unreadCount = unreadMap[groupId] || 0;
+                    const unreadBadge = unreadCount > 0 
+                        ? `<span class="badge bg-danger ms-2" title="${unreadCount} unread messages">${unreadCount > 99 ? '99+' : unreadCount}</span>` 
+                        : '';
+                    return `
                     <div class="col-md-4 mb-3">
                         <div class="card h-100 shadow-sm border-0">
                             <div class="card-body d-flex flex-column">
-                                <h5 class="card-title">${g.name}</h5>
+                                <h5 class="card-title">${g.name}${unreadBadge}</h5>
                                 <p class="card-text text-body-secondary">${g.description || 'No description'}</p>
                                 <small class="text-body-secondary">
                                     <i class="fas fa-users"></i> ${g.member_count || 0} members
                                     ${g.channel && g.channel.name ? `<span class="badge bg-light text-muted ms-2">${g.channel.name}</span>` : ''}
                                 </small>
                                 <div class="mt-auto pt-3">
-                                    <button class="btn btn-sm btn-primary" onclick="viewGroup('${g.id || g._id}')">View</button>
-                                    <button class="btn btn-sm btn-danger" onclick="leaveGroup('${g.id || g._id}')">Leave</button>
+                                    <button class="btn btn-sm btn-primary" onclick="viewGroup('${groupId}')">View</button>
+                                    <button class="btn btn-sm btn-danger" onclick="leaveGroup('${groupId}')">Leave</button>
                                 </div>
                             </div>
                         </div>
                     </div>
-                `).join('') : '<div class="col-12 text-center text-secondary"><p>You haven\'t joined any groups yet</p></div>';
+                `}).join('') : '<div class="col-12 text-center text-secondary"><p>You haven\'t joined any groups yet</p></div>';
 
                 document.getElementById('myGroupsList').innerHTML = html;
             } catch (error) {

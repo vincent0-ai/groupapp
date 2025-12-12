@@ -105,7 +105,7 @@
                         <button class="btn btn-primary me-2 mb-2" data-bs-toggle="modal" data-bs-target="#createGroupModal">
                             <i class="fas fa-plus"></i> Create Group
                         </button>
-                        <button class="btn btn-primary me-2 mb-2" data-bs-toggle="modal" data-bs-target="#createCompetitionModal">
+                        <button class="btn btn-primary me-2 mb-2" data-bs-toggle="modal" data-bs-target="#createCompModal">
                             <i class="fas fa-plus"></i> Create Competition
                         </button>
                         <a href="{{ url_for('messages_page') }}" class="btn btn-primary me-2 mb-2">
@@ -153,26 +153,43 @@
     </div>
 
     <!-- Create Competition Modal -->
-    <div class="modal fade" id="createCompetitionModal" tabindex="-1">
-        <div class="modal-dialog">
+    <div class="modal fade" id="createCompModal" tabindex="-1">
+        <div class="modal-dialog modal-lg">
             <div class="modal-content">
                 <div class="modal-header">
                     <h5 class="modal-title">Create Competition</h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                 </div>
-                <form id="createCompetitionForm">
+                <form id="createCompForm">
                     <div class="modal-body">
-                        <div class="mb-3">
-                            <label for="compName" class="form-label">Competition Name</label>
-                            <input type="text" class="form-control" id="compName" required>
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label for="compName" class="form-label">Competition Name</label>
+                                <input type="text" class="form-control" id="compName" required>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label for="compGroup" class="form-label">Group</label>
+                                <select class="form-control" id="compGroup" required></select>
+                            </div>
                         </div>
                         <div class="mb-3">
-                            <label for="compGroup" class="form-label">Group</label>
-                            <select class="form-control" id="compGroup" required></select>
+                            <label for="compDescription" class="form-label">Description</label>
+                            <textarea class="form-control" id="compDescription" rows="2"></textarea>
                         </div>
                         <div class="mb-3">
                             <label for="compDuration" class="form-label">Duration (minutes)</label>
                             <input type="number" class="form-control" id="compDuration" value="60" required>
+                        </div>
+                        
+                        <hr>
+                        <div class="d-flex justify-content-between align-items-center mb-3">
+                            <h6>Questions</h6>
+                            <button type="button" class="btn btn-sm btn-outline-primary" onclick="addQuestionField()">
+                                <i class="fas fa-plus"></i> Add Question
+                            </button>
+                        </div>
+                        <div id="questionsContainer">
+                            <!-- Questions will be added here -->
                         </div>
                     </div>
                     <div class="modal-footer">
@@ -183,6 +200,7 @@
             </div>
         </div>
     </div>
+
 {% endblock %}
 
 {% block scripts %}
@@ -221,10 +239,16 @@
                 });
                 const leaderboardData = await leaderboardRes.json();
 
+                // Load unread messages count
+                const unreadRes = await fetch('/api/messages/unread/count', {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                const unreadData = await unreadRes.json();
+
                 // Update stats
                 document.getElementById('groupsCount').textContent = groupsData.data?.groups?.length || 0;
                 document.getElementById('pointsCount').textContent = userData.data?.points || 0;
-                document.getElementById('messagesCount').textContent = '0';
+                document.getElementById('messagesCount').textContent = unreadData.data?.unread_count || 0;
                 document.getElementById('competitionsCount').textContent = '0';
 
                 // Update recent groups
@@ -327,7 +351,7 @@
                 if (res.ok) {
                     await showCustomAlert('Competition created successfully!', 'Success');
                     document.getElementById('createCompetitionForm').reset();
-                    const modal = bootstrap.Modal.getOrCreateInstance(document.getElementById('createCompetitionModal'));
+                    const modal = bootstrap.Modal.getOrCreateInstance(document.getElementById('createCompModal'));
                     modal.hide();
                     loadDashboard();
                 } else {

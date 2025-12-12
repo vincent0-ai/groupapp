@@ -381,3 +381,100 @@ def unpin_message(message_id):
     # Attach display name
     _attach_user_first_name(db, updated_message)
     return success_response(serialize_document(updated_message), 'Message unpinned successfully', 200)
+
+@messages_bp.route('/unread/count', methods=['GET'])
+@require_auth
+def get_unread_count():
+    """Get total unread message count across all groups"""
+    db = Database()
+    user_id_obj = ObjectId(g.user_id)
+    
+    # Get user's groups
+    groups = list(db.find('groups', {'members': user_id_obj}))
+    
+    if not groups:
+        return success_response({'unread_count': 0, 'groups': []}, 'Unread count retrieved', 200)
+    
+    # Get or create read receipts for user
+    read_receipts = db.find_one('read_receipts', {'user_id': user_id_obj})
+    if not read_receipts:
+        read_receipts = {'user_id': user_id_obj, 'groups': {}}
+    
+    total_unread = 0
+    group_unreads = []
+    
+    for group in groups:
+        group_id = group['_id']
+        group_id_str = str(group_id)
+        
+        # Get last read timestamp for this group
+        last_read = read_receipts.get('groups', {}).get(group_id_str)
+        
+        # Count messages after last_read
+        if last_read:
+            unread_count = db.count('messages', {
+                'group_id': group_id,
+                'created_at': {'$gt': last_read},
+                'user_id': {'$ne': user_id_obj}  # Don't count own messages
+            })
+        else:
+            # Never read - count all messages not from this user
+            unread_count = db.count('messages', {
+                'group_id': group_id,
+                'user_id': {'$ne': user_id_obj}
+            })
+        
+        if unread_count > 0:
+            total_unread += unread_count
+            group_unreads.append({
+                'group_id': group_id_str,
+                'group_name': group.get('name', 'Unknown'),
+                'unread_count': unread_count
+            })
+    
+    return success_response({
+        'unread_count': total_unread,
+        'groups': group_unreads
+    }, 'Unread count retrieved', 200)
+
+@messages_bp.route('/group/<group_id>/read', methods=['POST'])
+@require_auth
+def mark_group_read(group_id):
+    """Mark all messages in a group as read"""
+    try:
+        group_id_obj = ObjectId(group_id)
+    except:
+        return error_response('Invalid group ID', 400)
+    
+    db = Database()
+    user_id_obj = ObjectId(g.user_id)
+    
+    # Verify user is in group
+    group = db.find_one('groups', {'_id': group_id_obj})
+    if not group:
+        return error_response('Group not found', 404)
+    
+    if user_id_obj not in group.get('members', []):
+        return error_response('You are not a member of this group', 403)
+    
+    # Update or create read receipt
+    now = datetime.utcnow()
+    
+    existing = db.find_one('read_receipts', {'user_id': user_id_obj})
+    if existing:
+        # Update existing
+        db.update_one(
+            'read_receipts',
+            {'user_id': user_id_obj},
+            {f'groups.{group_id}': now, 'updated_at': now}
+        )
+    else:
+        # Create new
+        db.insert_one('read_receipts', {
+            'user_id': user_id_obj,
+            'groups': {group_id: now},
+            'created_at': now,
+            'updated_at': now
+        })
+    
+    return success_response({'marked_at': now.isoformat()}, 'Messages marked as read', 200)
