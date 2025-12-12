@@ -884,16 +884,24 @@
             const joinSessionBtnMobile = document.getElementById('joinSessionBtn');
             const createSessionBtnDesktop = document.getElementById('createSessionBtnDesktop');
             const joinSessionBtnDesktop = document.getElementById('joinSessionBtnDesktop');
-            const createModal = new bootstrap.Modal(document.getElementById('createSessionModal'));
-            const joinModal = new bootstrap.Modal(document.getElementById('joinSessionModal'));
+            
+            // Initialize modals
+            const createModalEl = document.getElementById('createSessionModal');
+            const joinModalEl = document.getElementById('joinSessionModal');
+            const sessionCreatedModalEl = document.getElementById('sessionCreatedModal');
+            
+            const createModal = new bootstrap.Modal(createModalEl);
+            const joinModal = new bootstrap.Modal(joinModalEl);
+            const sessionCreatedModal = new bootstrap.Modal(sessionCreatedModalEl);
+
             const toggleDrawingToolsBtn = document.getElementById('toggleDrawingTools');
             const drawingToolsCollapseEl = document.getElementById('drawingToolsCollapse');
-            console.log('toggleDrawingToolsBtn:', !!toggleDrawingToolsBtn, 'drawingToolsCollapseEl:', !!drawingToolsCollapseEl);
+            
             if (toggleDrawingToolsBtn && drawingToolsCollapseEl) {
                 drawingToolsCollapseEl.addEventListener('shown.bs.collapse', () => { toggleDrawingToolsBtn.textContent = 'Hide Tools'; });
                 drawingToolsCollapseEl.addEventListener('hidden.bs.collapse', () => { toggleDrawingToolsBtn.textContent = 'Show Tools'; });
             }
-            console.log('createSessionBtnDesktop exists?', !!createSessionBtnDesktop, 'joinSessionBtnDesktop exists?', !!joinSessionBtnDesktop);
+            
             const openCreateModal = async (e) => { 
                 if (e) e.preventDefault();
                 console.log('openCreateModal called');
@@ -938,8 +946,9 @@
                         
                         document.getElementById('createdSessionLink').value = fullUrl;
                         document.getElementById('goToSessionBtn').onclick = () => window.location.href = invite;
-                        new bootstrap.Modal(document.getElementById('sessionCreatedModal')).show();
+                        
                         createModal.hide();
+                        sessionCreatedModal.show();
                     } else {
                         const data = await res.json();
                         alert(data.message || 'Failed to create session');
@@ -949,8 +958,9 @@
                     alert('Error creating session');
                 }
             }
-            createSessionBtnMobile && createSessionBtnMobile.addEventListener('click', openCreateModal);
-            // createSessionBtnDesktop removed from DOM, using landing button
+            
+            if (createSessionBtnMobile) createSessionBtnMobile.addEventListener('click', openCreateModal);
+            
             const createSessionBtnLanding = document.getElementById('createSessionBtnLanding');
             if (createSessionBtnLanding) {
                 createSessionBtnLanding.addEventListener('click', openCreateModal);
@@ -964,47 +974,57 @@
                         const d = await grpRes.json();
                         const groups = d.data.groups || [];
                         const select = document.getElementById('sessionGroupSelect');
-                        select.innerHTML = '<option value="">Select a group</option>' + (groups.map(g => `<option value="${g.id}">${g.name}</option>`).join(''));
+                        if (select) {
+                            select.innerHTML = '<option value="">Select a group</option>' + (groups.map(g => `<option value="${g.id}">${g.name}</option>`).join(''));
+                        }
                     }
                 } catch (e) {
                     console.error('Failed to preload groups', e);
                 }
             })();
+            
             const openJoinModal = (e) => { 
                 if (e) e.preventDefault();
                 console.log('openJoinModal called'); 
                 joinModal.show(); 
             };
-            joinSessionBtnMobile && joinSessionBtnMobile.addEventListener('click', openJoinModal);
-            // joinSessionBtnDesktop removed from DOM, using landing button
+            
+            if (joinSessionBtnMobile) joinSessionBtnMobile.addEventListener('click', openJoinModal);
+            
             const joinSessionBtnLanding = document.getElementById('joinSessionBtnLanding');
             if (joinSessionBtnLanding) {
                 joinSessionBtnLanding.addEventListener('click', openJoinModal);
             }
 
-            document.getElementById('createSessionSubmit').addEventListener('click', async () => {
-                const gid = document.getElementById('sessionGroupSelect').value;
-                const title = document.getElementById('sessionNameInput').value.trim();
-                if (!gid) {
-                    alert('Please select a group');
-                    return;
-                }
-                createSession(gid, title);
-            });
+            const createSessionSubmitBtn = document.getElementById('createSessionSubmit');
+            if (createSessionSubmitBtn) {
+                createSessionSubmitBtn.addEventListener('click', async () => {
+                    const gid = document.getElementById('sessionGroupSelect').value;
+                    const title = document.getElementById('sessionNameInput').value.trim();
+                    if (!gid) {
+                        alert('Please select a group');
+                        return;
+                    }
+                    createSession(gid, title);
+                });
+            }
 
-            document.getElementById('joinSessionSubmit').addEventListener('click', () => {
-                const raw = document.getElementById('joinSessionId').value.trim();
-                if (!raw) return;
-                // Support full URL or plain session id
-                let id = raw;
-                try {
-                    const url = new URL(raw);
-                    const params = new URLSearchParams(url.search);
-                    id = params.get('session') || id;
-                } catch (e) { /* not a URL */ }
-                if (!id) return;
-                window.location.href = `/whiteboard?session=${encodeURIComponent(id)}`;
-            });
+            const joinSessionSubmitBtn = document.getElementById('joinSessionSubmit');
+            if (joinSessionSubmitBtn) {
+                joinSessionSubmitBtn.addEventListener('click', () => {
+                    const raw = document.getElementById('joinSessionId').value.trim();
+                    if (!raw) return;
+                    // Support full URL or plain session id
+                    let id = raw;
+                    try {
+                        const url = new URL(raw);
+                        const params = new URLSearchParams(url.search);
+                        id = params.get('session') || id;
+                    } catch (e) { /* not a URL */ }
+                    if (!id) return;
+                    window.location.href = `/whiteboard?session=${encodeURIComponent(id)}`;
+                });
+            }
 
             // Load my active sessions
             async function loadMySessions() {
