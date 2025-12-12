@@ -23,4 +23,4 @@ RUN mkdir -p uploads
 EXPOSE 5000
 
 # Run application
-CMD ["python", "main.py"]
+CMD ["gunicorn", "--worker-class", "eventlet", "-w", "1", "-b", "0.0.0.0:5000", "main:app"]
