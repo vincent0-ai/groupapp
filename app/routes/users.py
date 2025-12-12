@@ -124,19 +124,29 @@ def get_leaderboard():
     skip = (page - 1) * per_page
     
     # Get users sorted by points
-    users = db.find('users', {}, skip=skip, limit=per_page, sort=('points', -1))
+    users = list(db.find('users', {}, skip=skip, limit=per_page, sort=('points', -1)))
     
     total = db.count('users')
     
+    # Build public profile data for each user
+    leaderboard_users = []
     for user in users:
-        if 'password_hash' in user:
-            del user['password_hash']
-        if 'preferences' in user:
-            del user['preferences']
+        user_id_obj = user['_id']
+        groups_count = db.count('groups', {'members': user_id_obj})
+        leaderboard_users.append({
+            'id': str(user['_id']),
+            '_id': str(user['_id']),
+            'username': user.get('username', ''),
+            'full_name': user.get('full_name', ''),
+            'avatar_url': user.get('avatar_url') or f"https://api.dicebear.com/7.x/avataaars/svg?seed={user.get('username', '')}",
+            'points': user.get('points', 0),
+            'badges': user.get('badges', []),
+            'groups_count': groups_count
+        })
     
     return success_response({
-        'leaderboard': [serialize_document(u) for u in users],
-        'users': [serialize_document(u) for u in users],  # Keep for backward compatibility
+        'leaderboard': leaderboard_users,
+        'users': leaderboard_users,  # Keep for backward compatibility
         'total': total,
         'page': page,
         'per_page': per_page

@@ -65,9 +65,12 @@ def get_competitions():
     
     competitions = list(db.find('competitions', query))
     
-    # Add id field for frontend
+    # Add id field for frontend and convert participant user_ids
     for comp in competitions:
         comp['id'] = str(comp['_id'])
+        for participant in comp.get('participants', []):
+            if participant.get('user_id'):
+                participant['user_id'] = str(participant['user_id'])
     
     return success_response({'competitions': [serialize_document(c) for c in competitions]}, 'Competitions retrieved successfully', 200)
 
@@ -142,6 +145,14 @@ def get_competition(comp_id):
     
     if not competition:
         return error_response('Competition not found', 404)
+    
+    # Add id field for frontend
+    competition['id'] = str(competition['_id'])
+    
+    # Convert participant user_ids to strings for frontend comparison
+    for participant in competition.get('participants', []):
+        if participant.get('user_id'):
+            participant['user_id'] = str(participant['user_id'])
     
     return success_response(serialize_document(competition), 'Competition retrieved successfully', 200)
 
