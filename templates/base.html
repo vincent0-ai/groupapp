@@ -75,11 +75,70 @@
 {% endblock %}
 
 {% block footer %}
-<footer class="py-4">
-    <div class="container text-center">
-        <small class="text-body-secondary">&copy; {{ now().year if now is defined else '' }} Discussio</small>
+<footer class="fixed-bottom bg-white border-top shadow-sm py-2">
+    <div class="container-fluid">
+        <div class="d-flex justify-content-around align-items-center">
+            <a href="{{ url_for('dashboard') }}" class="footer-nav-link text-center text-decoration-none {% if ep == 'dashboard' %}active{% endif %}">
+                <i class="fas fa-home"></i>
+                <small class="d-block">Home</small>
+            </a>
+            <a href="{{ url_for('profile_page') }}" class="footer-nav-link text-center text-decoration-none {% if ep == 'profile_page' %}active{% endif %}">
+                <i class="fas fa-user"></i>
+                <small class="d-block">Profile</small>
+            </a>
+            <a href="#" class="footer-nav-link text-center text-decoration-none" data-bs-toggle="modal" data-bs-target="#aboutModal">
+                <i class="fas fa-info-circle"></i>
+                <small class="d-block">About</small>
+            </a>
+        </div>
     </div>
 </footer>
+
+<!-- About Modal -->
+<div class="modal fade" id="aboutModal" tabindex="-1" aria-labelledby="aboutModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="aboutModalLabel"><i class="fas fa-info-circle"></i> About Discussio</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body text-center">
+                <h4 class="mb-3">Discussio</h4>
+                <p class="text-muted">A collaborative learning platform for groups, discussions, and competitions.</p>
+                <hr>
+                <p class="small text-muted mb-1">&copy; {{ now().year if now is defined else '2025' }} Discussio</p>
+                <p class="small text-muted">Version 1.0.0</p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-primary" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    .footer-nav-link {
+        color: var(--text-muted);
+        padding: 5px 15px;
+        transition: color 0.2s ease;
+    }
+    .footer-nav-link:hover {
+        color: var(--primary-color);
+    }
+    .footer-nav-link.active {
+        color: var(--primary-color);
+    }
+    .footer-nav-link i {
+        font-size: 1.2rem;
+    }
+    .footer-nav-link small {
+        font-size: 0.7rem;
+    }
+    /* Add padding to main content to prevent footer overlap */
+    main {
+        padding-bottom: 70px !important;
+    }
+</style>
 {% endblock %}
 
 {% block modals %}{% endblock %}
