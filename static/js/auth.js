@@ -134,7 +134,11 @@ class AuthManager {
 
     showNotification(message, type) {
         const alertDiv = document.createElement('div');
-        alertDiv.className = `alert alert-${type} alert-dismissible fade show`;
+        alertDiv.className = `alert alert-${type} alert-dismissible fade show position-fixed top-0 start-50 translate-middle-x mt-3 shadow-sm`;
+        alertDiv.style.zIndex = '1050';
+        alertDiv.style.minWidth = '320px';
+        alertDiv.style.maxWidth = '90%';
+        
         alertDiv.innerHTML = `
             ${message}
             <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
