@@ -113,10 +113,26 @@ class Database:
             return []
     
     def update_one(self, collection_name: str, query: Dict, 
-                  update: Dict) -> bool:
-        """Update a single document"""
+                  update: Dict, raw: bool = False) -> bool:
+        """Update a single document.
+        
+        Args:
+            collection_name: Name of the collection
+            query: Query to find the document
+            update: Update operations to apply
+            raw: If True, use update as-is (for $push, $inc, etc.)
+                 If False (default), wrap in $set for simple field updates
+        """
         try:
-            result = self.db[collection_name].update_one(query, {'$set': update})
+            # Check if update contains MongoDB operators (keys starting with $)
+            has_operators = any(key.startswith('$') for key in update.keys())
+            
+            if raw or has_operators:
+                # Use update as-is for operator-based updates
+                result = self.db[collection_name].update_one(query, update)
+            else:
+                # Wrap in $set for simple field updates
+                result = self.db[collection_name].update_one(query, {'$set': update})
             return result.modified_count > 0
         except Exception as e:
             print(f"Error updating document: {e}")
