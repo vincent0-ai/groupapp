@@ -205,6 +205,42 @@
 
 {% block scripts %}
     <script>
+        const token = localStorage.getItem('token');
+        const userId = localStorage.getItem('userId');
+        let questionCount = 0;
+
+        function viewGroup(groupId) {
+            localStorage.setItem('selectedGroupId', groupId);
+            window.location.href = "{{ url_for('messages_page') }}";
+        }
+
+        function addQuestionField() {
+            questionCount++;
+            const container = document.getElementById('questionsContainer');
+            const div = document.createElement('div');
+            div.className = 'card mb-3 bg-light';
+            div.innerHTML = `
+                <div class="card-body">
+                    <div class="d-flex justify-content-between mb-2">
+                        <h6>Question ${questionCount}</h6>
+                        <button type="button" class="btn btn-sm btn-danger" onclick="this.closest('.card').remove()">
+                            <i class="fas fa-trash"></i>
+                        </button>
+                    </div>
+                    <div class="mb-2">
+                        <input type="text" class="form-control form-control-sm question-text" placeholder="Question Text" required>
+                    </div>
+                    <div class="mb-2">
+                        <input type="text" class="form-control form-control-sm question-options" placeholder="Options (comma separated, e.g. A,B,C,D)" required>
+                    </div>
+                    <div>
+                        <input type="text" class="form-control form-control-sm question-answer" placeholder="Correct Answer" required>
+                    </div>
+                </div>
+            `;
+            container.appendChild(div);
+        }
+
         // Load dashboard data
         async function loadDashboard() {
             try {
@@ -245,41 +281,57 @@
                 });
                 const unreadData = await unreadRes.json();
 
+                // Load competitions count
+                const compsRes = await fetch('/api/competitions', {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                const compsData = await compsRes.json();
+                const activeComps = (compsData.data?.competitions || []).filter(c => !c.completed);
+
                 // Update stats
-                document.getElementById('groupsCount').textContent = groupsData.data?.groups?.length || 0;
+                const groups = groupsData.data?.groups || [];
+                document.getElementById('groupsCount').textContent = groups.length;
                 document.getElementById('pointsCount').textContent = userData.data?.points || 0;
                 document.getElementById('messagesCount').textContent = unreadData.data?.unread_count || 0;
-                document.getElementById('competitionsCount').textContent = '0';
+                document.getElementById('competitionsCount').textContent = activeComps.length;
 
                 // Update recent groups
-                const groupsHtml = groupsData.data?.groups?.slice(0, 5).map(g => `
+                const groupsHtml = groups.slice(0, 5).map(g => `
                     <div class="mb-2">
-                        <a href="#" class="text-decoration-none text-dark"><strong>${g.name}</strong></a>
+                        <a href="#" onclick="viewGroup('${g.id || g._id}')" class="text-decoration-none text-dark"><strong>${g.name}</strong></a>
                         <br><small class="text-body-secondary">${g.member_count || 0} members</small>
                     </div>
                 `).join('') || '<p class="text-secondary">No groups yet</p>';
-                document.getElementById('recentGroups').innerHTML = groupsHtml;
+                document.getElementById('recentGroups').innerHTML = groupsHtml || '<p class="text-secondary">No groups yet</p>';
 
                 // Update top performers
-                const performersHtml = leaderboardData.data?.leaderboard?.slice(0, 5).map((u, i) => `
+                const leaderboard = leaderboardData.data?.leaderboard || [];
+                const performersHtml = leaderboard.slice(0, 5).map((u, i) => `
                     <div class="mb-2">
                         <span class="badge bg-${['primary', 'success', 'warning', 'info', 'secondary'][i]}">
                             ${i + 1}
                         </span>
-                        <strong>${u.username}</strong> - ${u.points} points
+                        <strong>${u.username}</strong> - ${u.points || 0} points
                     </div>
                 `).join('') || '<p class="text-secondary">No data available</p>';
-                document.getElementById('topPerformers').innerHTML = performersHtml;
+                document.getElementById('topPerformers').innerHTML = performersHtml || '<p class="text-secondary">No data available</p>';
 
-                // Populate group dropdown
+                // Populate group dropdown with only groups where user is owner
                 const groupSelect = document.getElementById('compGroup');
-                groupSelect.innerHTML = '';
-                groupsData.data?.groups?.forEach(g => {
-                    const option = document.createElement('option');
-                    option.value = g.id;
-                    option.textContent = g.name;
-                    groupSelect.appendChild(option);
-                });
+                const allGroups = groups;
+                const myModeratedGroups = allGroups.filter(g => g.owner_id === userId);
+                
+                groupSelect.innerHTML = '<option value="">Select a group</option>';
+                if (myModeratedGroups.length === 0) {
+                    groupSelect.innerHTML = '<option value="">No groups (you must be a group owner)</option>';
+                } else {
+                    myModeratedGroups.forEach(g => {
+                        const option = document.createElement('option');
+                        option.value = g.id;
+                        option.textContent = g.name;
+                        groupSelect.appendChild(option);
+                    });
+                }
             } catch (error) {
                 console.error('Error loading dashboard:', error);
             }
@@ -322,13 +374,56 @@
         });
 
         // Create competition
-        document.getElementById('createCompetitionForm').addEventListener('submit', async (e) => {
+        document.getElementById('createCompForm').addEventListener('submit', async (e) => {
             e.preventDefault();
             try {
-                const token = localStorage.getItem('token');
                 const duration = parseInt(document.getElementById('compDuration').value);
                 const startTime = new Date();
                 const endTime = new Date(startTime.getTime() + duration * 60000);
+
+                // Gather questions
+                const questions = [];
+                const questionCards = document.querySelectorAll('#questionsContainer .card');
+                
+                if (questionCards.length === 0) {
+                    await showCustomAlert('Please add at least one question', 'Error');
+                    return;
+                }
+                
+                let hasError = false;
+                questionCards.forEach(card => {
+                    const text = card.querySelector('.question-text').value.trim();
+                    const optionsStr = card.querySelector('.question-options').value.trim();
+                    const answer = card.querySelector('.question-answer').value.trim();
+                    
+                    if (!text || !optionsStr || !answer) {
+                        hasError = true;
+                        return;
+                    }
+                    
+                    const options = optionsStr.split(',').map(o => o.trim()).filter(o => o);
+                    if (options.length < 2) {
+                        hasError = true;
+                        return;
+                    }
+                    
+                    questions.push({
+                        text: text,
+                        options: options,
+                        correct_answer: answer
+                    });
+                });
+                
+                if (hasError) {
+                    await showCustomAlert('Please fill in all question fields. Each question needs text, at least 2 options (comma-separated), and a correct answer.', 'Validation Error');
+                    return;
+                }
+
+                const groupId = document.getElementById('compGroup').value;
+                if (!groupId) {
+                    await showCustomAlert('Please select a group', 'Error');
+                    return;
+                }
 
                 const res = await fetch('/api/competitions', {
                     method: 'POST',
@@ -338,27 +433,36 @@
                     },
                     body: JSON.stringify({
                         title: document.getElementById('compName').value,
-                        group_id: document.getElementById('compGroup').value,
+                        description: document.getElementById('compDescription').value,
+                        group_id: groupId,
                         start_time: startTime.toISOString(),
-                        end_time: endTime.toISOString()
+                        end_time: endTime.toISOString(),
+                        questions: questions
                     })
                 });
-                if (res.status === 401) {
-                    localStorage.removeItem('token');
-                    window.location.href = "{{ url_for('auth_page') }}";
-                    return;
-                }
+                
+                const data = await res.json();
+                
                 if (res.ok) {
-                    await showCustomAlert('Competition created successfully!', 'Success');
-                    document.getElementById('createCompetitionForm').reset();
-                    const modal = bootstrap.Modal.getOrCreateInstance(document.getElementById('createCompModal'));
-                    modal.hide();
+                    await showCustomAlert('Competition created!', 'Success');
+                    document.getElementById('createCompForm').reset();
+                    document.getElementById('questionsContainer').innerHTML = '';
+                    questionCount = 0;
+                    const modal = bootstrap.Modal.getInstance(document.getElementById('createCompModal'));
+                    if (modal) {
+                        modal.hide();
+                    }
                     loadDashboard();
+                } else if (res.status === 401) {
+                    localStorage.removeItem('token');
+                    sessionStorage.setItem('redirectAfterLogin', window.location.href);
+                    window.location.href = "{{ url_for('auth_page') }}";
                 } else {
-                    await showCustomAlert('Failed to create competition', 'Error');
+                    await showCustomAlert(data.message || 'Failed to create competition', 'Error');
                 }
             } catch (error) {
                 console.error('Error creating competition:', error);
+                await showCustomAlert('An error occurred while creating the competition', 'Error');
             }
         });
 
