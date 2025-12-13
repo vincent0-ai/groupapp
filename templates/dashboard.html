@@ -488,24 +488,28 @@
 
                 // Update recent groups
                 const groupsHtml = groups.slice(0, 5).map(g => `
-                    <div class="mb-2">
-                        <a href="#" onclick="viewGroup('${g.id || g._id}')" class="text-decoration-none text-dark"><strong>${g.name}</strong></a>
-                        <br><small class="text-body-secondary">${g.member_count || 0} members</small>
+                    <div class="group-item">
+                        <div class="flex-grow-1">
+                            <a href="#" onclick="viewGroup('${g.id || g._id}')" class="text-decoration-none fw-semibold" style="color: var(--text-dark);">${g.name}</a>
+                            <div class="small text-muted">${g.member_count || 0} members</div>
+                        </div>
+                        <i class="fas fa-chevron-right text-muted"></i>
                     </div>
-                `).join('') || '<p class="text-secondary">No groups yet</p>';
-                document.getElementById('recentGroups').innerHTML = groupsHtml || '<p class="text-secondary">No groups yet</p>';
+                `).join('') || '<p class="text-muted text-center py-3">No groups yet</p>';
+                document.getElementById('recentGroups').innerHTML = groupsHtml || '<p class="text-muted text-center py-3">No groups yet</p>';
 
                 // Update top performers
                 const leaderboard = leaderboardData.data?.leaderboard || [];
                 const performersHtml = leaderboard.slice(0, 5).map((u, i) => `
-                    <div class="mb-2">
-                        <span class="badge bg-${['primary', 'success', 'warning', 'info', 'secondary'][i]}">
-                            ${i + 1}
-                        </span>
-                        <strong>${u.username}</strong> - ${u.points || 0} points
+                    <div class="performer-item">
+                        <div class="performer-rank ${['gold', 'silver', 'bronze', 'default', 'default'][i]}">${i + 1}</div>
+                        <div class="flex-grow-1">
+                            <div class="fw-semibold" style="color: var(--text-dark);">${u.username}</div>
+                            <div class="small text-muted">${u.points || 0} points</div>
+                        </div>
                     </div>
-                `).join('') || '<p class="text-secondary">No data available</p>';
-                document.getElementById('topPerformers').innerHTML = performersHtml || '<p class="text-secondary">No data available</p>';
+                `).join('') || '<p class="text-muted text-center py-3">No data available</p>';
+                document.getElementById('topPerformers').innerHTML = performersHtml || '<p class="text-muted text-center py-3">No data available</p>';
 
                 // Populate group dropdown with only groups where user is owner
                 const groupSelect = document.getElementById('compGroup');
