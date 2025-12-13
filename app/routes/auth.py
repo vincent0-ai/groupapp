@@ -1,5 +1,9 @@
-from flask import Blueprint, request
+from flask import Blueprint, request, url_for, redirect
 import os
+import secrets
+import smtplib
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
 from datetime import datetime
 
 from app.utils import (
@@ -15,6 +19,45 @@ from app.services import Database
 from app.models import User
 
 auth_bp = Blueprint("auth", __name__, url_prefix="/api/auth")
+
+
+def send_verification_email(to_email, token):
+    smtp_server = os.environ.get("SMTP_SERVER", "smtp.gmail.com")
+    smtp_port = int(os.environ.get("SMTP_PORT", 587))
+    smtp_user = os.environ.get("SMTP_USER")
+    smtp_password = os.environ.get("SMTP_PASSWORD")
+    
+    # Generate verification URL
+    verify_url = url_for('auth.verify_email', token=token, _external=True)
+    
+    if not smtp_user or not smtp_password:
+        print(f"============================================")
+        print(f"EMAIL VERIFICATION for {to_email}")
+        print(f"Link: {verify_url}")
+        print(f"============================================")
+        return
+
+    msg = MIMEMultipart()
+    msg["From"] = smtp_user
+    msg["To"] = to_email
+    msg["Subject"] = "Verify your email - Discussio"
+
+    body = f"""
+    <h3>Welcome to Discussio!</h3>
+    <p>Please verify your email address by clicking the link below:</p>
+    <a href="{verify_url}" style="padding: 10px 20px; background-color: #4F46E5; color: white; text-decoration: none; border-radius: 5px;">Verify Email</a>
+    <p>Or copy this link: {verify_url}</p>
+    """
+    msg.attach(MIMEText(body, "html"))
+
+    try:
+        server = smtplib.SMTP(smtp_server, smtp_port)
+        server.starttls()
+        server.login(smtp_user, smtp_password)
+        server.send_message(msg)
+        server.quit()
+    except Exception as e:
+        print(f"Failed to send email: {e}")
 
 
 # =========================
@@ -58,18 +101,19 @@ def signup():
         auth_provider="local"
     )
 
+    # Add verification
+    user_doc["is_verified"] = False
+    user_doc["verification_token"] = secrets.token_urlsafe(32)
+
     user_id = db.insert_one("users", user_doc)
     if not user_id:
         return error_response("User creation failed", 500)
 
-    user_doc["_id"] = user_id
-    del user_doc["password_hash"]
-
-    token = generate_token(str(user_id))
+    send_verification_email(email, user_doc["verification_token"])
 
     return success_response(
-        {"user": serialize_document(user_doc), "token": token},
-        "Signup successful",
+        None,
+        "Signup successful. Please check your email to verify your account.",
         201
     )
 
@@ -96,6 +140,9 @@ def login():
     if user.get("auth_provider", "local") != "local":
         return error_response("Use Google login for this account", 400)
 
+    if not user.get("is_verified", True):
+        return error_response("Please verify your email address", 403)
+
     if not verify_password(password, user.get("password_hash", "")):
         return error_response("Invalid email or password", 401)
 
@@ -116,6 +163,22 @@ def login():
         "Login successful"
     )
 
+
+@auth_bp.route("/verify-email/<token>", methods=["GET"])
+def verify_email(token):
+    db = Database()
+    user = db.find_one("users", {"verification_token": token})
+    
+    if not user:
+        return "Invalid or expired verification link.", 400
+        
+    db.update_one(
+        "users",
+        {"_id": user["_id"]},
+        {"$set": {"is_verified": True}, "$unset": {"verification_token": ""}}
+    )
+    
+    return redirect(url_for('auth_page', verified='true'))
 
 
 @auth_bp.route("/google", methods=["GET", "POST"])
