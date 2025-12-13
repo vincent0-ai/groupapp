@@ -261,6 +261,34 @@
                     </div>
                 </div>
 
+                <!-- Settings Card -->
+                <div class="card info-card mb-4">
+                    <div class="card-header">
+                        <h5 class="mb-0"><i class="fas fa-cog me-2"></i>Settings</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="d-flex align-items-center justify-content-between py-2">
+                            <div>
+                                <h6 class="mb-0">Push Notifications</h6>
+                                <small class="text-muted">Receive notifications even when the app is closed</small>
+                            </div>
+                            <div class="form-check form-switch">
+                                <input class="form-check-input" type="checkbox" id="pushNotificationToggle" style="width: 50px; height: 25px;">
+                            </div>
+                        </div>
+                        <hr class="my-2">
+                        <div class="d-flex align-items-center justify-content-between py-2">
+                            <div>
+                                <h6 class="mb-0">Email Notifications</h6>
+                                <small class="text-muted">Receive email updates about activity</small>
+                            </div>
+                            <div class="form-check form-switch">
+                                <input class="form-check-input" type="checkbox" id="emailNotificationToggle" style="width: 50px; height: 25px;">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
                 <!-- Recent Activity -->
                 <div class="card info-card">
                     <div class="card-header">
@@ -379,6 +407,47 @@
                 console.error('Error updating profile:', error);
             }
         });
+        
+        // Push notification toggle
+        const pushToggle = document.getElementById('pushNotificationToggle');
+        
+        async function initPushToggle() {
+            if (!('PushManager' in window)) {
+                pushToggle.disabled = true;
+                pushToggle.parentElement.innerHTML += '<br><small class="text-muted">Not supported in this browser</small>';
+                return;
+            }
+            
+            // Check current subscription status
+            try {
+                const registration = await navigator.serviceWorker.ready;
+                const subscription = await registration.pushManager.getSubscription();
+                pushToggle.checked = !!subscription;
+            } catch (err) {
+                console.log('Error checking push subscription:', err);
+            }
+        }
+        
+        pushToggle.addEventListener('change', async () => {
+            if (pushToggle.checked) {
+                // Subscribe
+                if (window.pwaManager && window.pwaManager.subscribeToPush) {
+                    const success = await window.pwaManager.subscribeToPush();
+                    if (!success) {
+                        pushToggle.checked = false;
+                        await showCustomAlert('Failed to enable notifications. Please allow notifications in your browser settings.', 'Notification Error');
+                    } else {
+                        await showCustomAlert('Push notifications enabled!', 'Success');
+                    }
+                }
+            } else {
+                // Unsubscribe
+                if (window.pwaManager && window.pwaManager.unsubscribeFromPush) {
+                    await window.pwaManager.unsubscribeFromPush();
+                    await showCustomAlert('Push notifications disabled', 'Success');
+                }
+            }
+        });
 
         document.addEventListener('DOMContentLoaded', () => {
             if (!token) {
@@ -387,6 +456,7 @@
                 return;
             }
             loadProfile();
+            initPushToggle();
         });
     </script>
 {% endblock %}

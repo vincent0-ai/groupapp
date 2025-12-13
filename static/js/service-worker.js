@@ -1,18 +1,32 @@
 // Service Worker for PWA offline support and push notifications
-const CACHE_NAME = 'Discussio-v2';
+const CACHE_NAME = 'Discussio-v3';
+const STATIC_CACHE = 'Discussio-static-v3';
+const DATA_CACHE = 'Discussio-data-v3';
+
 const urlsToCache = [
   '/',
-  '/dashboard.html',
+  '/dashboard',
+  '/groups',
+  '/messages',
+  '/profile',
   '/static/css/style.css',
   '/static/js/app.js',
-  '/static/js/socket.io.js',
-  '/static/images/icon-192x192.png'
+  '/static/js/auth.js',
+  '/static/js/pwa.js',
+  '/static/manifest.json'
+];
+
+// API routes to cache for offline
+const API_CACHE_ROUTES = [
+  '/api/users/profile',
+  '/api/groups',
+  '/api/messages/unread/count'
 ];
 
 // Install event
 self.addEventListener('install', event => {
   event.waitUntil(
-    caches.open(CACHE_NAME)
+    caches.open(STATIC_CACHE)
       .then(cache => cache.addAll(urlsToCache))
       .then(() => self.skipWaiting())
   );
@@ -24,7 +38,7 @@ self.addEventListener('activate', event => {
     caches.keys().then(cacheNames => {
       return Promise.all(
         cacheNames.map(cacheName => {
-          if (cacheName !== CACHE_NAME) {
+          if (![STATIC_CACHE, DATA_CACHE].includes(cacheName)) {
             return caches.delete(cacheName);
           }
         })
@@ -33,59 +47,123 @@ self.addEventListener('activate', event => {
   );
 });
 
-// Fetch event - Network first, fallback to cache
+// Fetch event - Network first for API, Cache first for static
 self.addEventListener('fetch', event => {
   if (event.request.method !== 'GET') {
     return;
   }
 
-  // Don't cache HTML navigations (templates change often; caching can break routing/UI)
-  const acceptHeader = event.request.headers.get('accept') || '';
-  const isNavigation = event.request.mode === 'navigate' || acceptHeader.includes('text/html');
-  if (isNavigation) {
+  const url = new URL(event.request.url);
+  
+  // Handle API requests - Network first, cache fallback
+  if (url.pathname.startsWith('/api/')) {
     event.respondWith(
-      fetch(event.request).catch(() => caches.match('/'))
+      fetch(event.request)
+        .then(response => {
+          // Cache successful API responses
+          if (response.status === 200) {
+            const responseClone = response.clone();
+            caches.open(DATA_CACHE).then(cache => {
+              cache.put(event.request, responseClone);
+            });
+          }
+          return response;
+        })
+        .catch(() => {
+          // Return cached data when offline
+          return caches.match(event.request);
+        })
     );
     return;
   }
 
-  event.respondWith(
-    fetch(event.request)
-      .then(response => {
-        // Clone the response
-        const responseClone = response.clone();
-        
-        // Cache successful responses
-        if (response.status === 200 && response.type === 'basic') {
-          caches.open(CACHE_NAME).then(cache => {
+  // Handle navigation requests
+  const acceptHeader = event.request.headers.get('accept') || '';
+  const isNavigation = event.request.mode === 'navigate' || acceptHeader.includes('text/html');
+  if (isNavigation) {
+    event.respondWith(
+      fetch(event.request)
+        .then(response => {
+          const responseClone = response.clone();
+          caches.open(STATIC_CACHE).then(cache => {
             cache.put(event.request, responseClone);
           });
+          return response;
+        })
+        .catch(() => caches.match(event.request) || caches.match('/'))
+    );
+    return;
+  }
+
+  // Static assets - Cache first
+  event.respondWith(
+    caches.match(event.request)
+      .then(response => {
+        if (response) {
+          // Refresh cache in background
+          fetch(event.request).then(freshResponse => {
+            if (freshResponse.status === 200) {
+              caches.open(STATIC_CACHE).then(cache => {
+                cache.put(event.request, freshResponse);
+              });
+            }
+          }).catch(() => {});
+          return response;
         }
-        
-        return response;
-      })
-      .catch(() => {
-        // Fallback to cache if network fails
-        return caches.match(event.request)
-          .then(response => {
-            return response || caches.match('/offline.html');
-          });
+        return fetch(event.request).then(response => {
+          if (response.status === 200) {
+            const responseClone = response.clone();
+            caches.open(STATIC_CACHE).then(cache => {
+              cache.put(event.request, responseClone);
+            });
+          }
+          return response;
+        });
       })
   );
 });
 
 // Push notification event
 self.addEventListener('push', event => {
-  const options = {
-    body: event.data.text(),
+  let data = {
+    title: 'Discussio',
+    body: 'You have a new notification',
     icon: '/static/images/icon-192x192.png',
     badge: '/static/images/badge-72x72.png',
     tag: 'Discussio-notification',
-    requireInteraction: false
+    data: { url: '/' }
   };
 
+  if (event.data) {
+    try {
+      const payload = event.data.json();
+      data = {
+        title: payload.title || 'Discussio',
+        body: payload.body || payload.message || 'You have a new notification',
+        icon: payload.icon || '/static/images/icon-192x192.png',
+        badge: '/static/images/badge-72x72.png',
+        tag: payload.tag || 'Discussio-notification',
+        data: { url: payload.url || payload.link || '/' },
+        requireInteraction: payload.requireInteraction || false
+      };
+    } catch (e) {
+      data.body = event.data.text();
+    }
+  }
+
   event.waitUntil(
-    self.registration.showNotification('Discussio', options)
+    self.registration.showNotification(data.title, {
+      body: data.body,
+      icon: data.icon,
+      badge: data.badge,
+      tag: data.tag,
+      data: data.data,
+      requireInteraction: data.requireInteraction,
+      actions: [
+        { action: 'open', title: 'Open' },
+        { action: 'dismiss', title: 'Dismiss' }
+      ]
+    })
   );
 });
 
@@ -93,15 +171,24 @@ self.addEventListener('push', event => {
 self.addEventListener('notificationclick', event => {
   event.notification.close();
 
+  const urlToOpen = event.notification.data?.url || '/';
+
+  // Handle action buttons
+  if (event.action === 'dismiss') {
+    return;
+  }
+
   event.waitUntil(
-    clients.matchAll({ type: 'window' }).then(clientList => {
+    clients.matchAll({ type: 'window', includeUncontrolled: true }).then(clientList => {
+      // Try to focus existing window
       for (let client of clientList) {
-        if (client.url === '/' && 'focus' in client) {
+        if (client.url.includes(urlToOpen) && 'focus' in client) {
           return client.focus();
         }
       }
+      // Open new window
       if (clients.openWindow) {
-        return clients.openWindow('/');
+        return clients.openWindow(urlToOpen);
       }
     })
   );

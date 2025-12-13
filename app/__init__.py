@@ -33,6 +33,8 @@ def create_app(config_name='development'):
     from app.routes.users import users_bp
     from app.routes.whiteboards import whiteboards_bp
     from app.routes.admin import admin_bp
+    from app.routes.notifications import notifications_bp
+    from app.routes.dm import dm_bp
     
     app.register_blueprint(auth_bp)
     app.register_blueprint(groups_bp)
@@ -42,6 +44,8 @@ def create_app(config_name='development'):
     app.register_blueprint(users_bp)
     app.register_blueprint(whiteboards_bp)
     app.register_blueprint(admin_bp)
+    app.register_blueprint(notifications_bp)
+    app.register_blueprint(dm_bp)
     
     # Page routes (serving templates)
 
@@ -71,6 +75,11 @@ def create_app(config_name='development'):
     def messages_page():
         """Serve messages page"""
         return render_template('messages.html')
+    
+    @app.route('/dm')
+    def dm_page():
+        """Serve direct messages page"""
+        return render_template('dm.html')
     
     @app.route('/competitions')
     def competitions_page():
@@ -113,6 +122,7 @@ def create_app(config_name='development'):
     
     # Socket.IO events for real-time communication
     connected_users = {}  # Store user connections {user_id: sid}
+    online_users = {}  # Track online users per room {room: {user_id: {profile, last_seen}}}
     
     @socketio.on('connect')
     def handle_connect():
@@ -159,11 +169,54 @@ def create_app(config_name='development'):
                     }
             except Exception:
                 profile = None
+            
+            # Track online status per room
+            if room not in online_users:
+                online_users[room] = {}
+            online_users[room][user_id] = {
+                'profile': profile,
+                'last_seen': datetime.utcnow(),
+                'sid': request.sid
+            }
+            
+            # Emit updated online users list to the room
+            online_list = [{'user_id': uid, 'profile': info['profile']} 
+                          for uid, info in online_users.get(room, {}).items()]
+            emit('online_users', {'users': online_list}, room=room)
+            
             emit('user_joined', {
                 'user_id': user_id,
                 'profile': profile,
                 'timestamp': datetime.utcnow().isoformat()
             }, room=room)
+    
+    @socketio.on('leave_room')
+    def on_leave_room(data):
+        """Handle user leaving a room"""
+        room = data.get('room')
+        user_id = data.get('user_id')
+        
+        if room and user_id:
+            leave_room(room)
+            
+            # Remove from online users
+            if room in online_users and user_id in online_users[room]:
+                del online_users[room][user_id]
+                
+                # Emit updated online users list
+                online_list = [{'user_id': uid, 'profile': info['profile']} 
+                              for uid, info in online_users.get(room, {}).items()]
+                emit('online_users', {'users': online_list}, room=room)
+                emit('user_left', {'user_id': user_id, 'timestamp': datetime.utcnow().isoformat()}, room=room)
+    
+    @socketio.on('get_online_users')
+    def on_get_online_users(data):
+        """Get list of online users in a room"""
+        room = data.get('room')
+        if room:
+            online_list = [{'user_id': uid, 'profile': info['profile']} 
+                          for uid, info in online_users.get(room, {}).items()]
+            emit('online_users', {'users': online_list})
     
     @socketio.on('message')
     def handle_message(data):
@@ -511,7 +564,18 @@ def create_app(config_name='development'):
                 # remove from all whiteboards where user present
                 db = Database()
                 db.pull_from_array('whiteboards', {'participants': ObjectId(uid)}, 'participants', ObjectId(uid))
-        except Exception:
+                
+                # Remove from online_users and notify rooms
+                for room, users in list(online_users.items()):
+                    if uid in users:
+                        del online_users[room][uid]
+                        # Emit updated online users list
+                        online_list = [{'user_id': u, 'profile': info['profile']} 
+                                      for u, info in online_users.get(room, {}).items()]
+                        socketio.emit('online_users', {'users': online_list}, room=room)
+                        socketio.emit('user_left', {'user_id': uid, 'timestamp': datetime.utcnow().isoformat()}, room=room)
+        except Exception as e:
+            print(f"Error in disconnect handler: {e}")
             pass
     
     return app, socketio

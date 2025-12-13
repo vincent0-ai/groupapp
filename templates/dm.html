@@ -1,0 +1,603 @@
+{% extends "base.html" %}
+
+{% block title %}Direct Messages - Discussio{% endblock %}
+
+{% block footer %}
+<!-- Hide footer on DM page to prevent overlap with chat input -->
+{% endblock %}
+
+{% block main_class %}container-fluid py-4 px-3 px-lg-4{% endblock %}
+
+{% block content %}
+    <style>
+        .dm-container {
+            display: flex;
+            height: calc(100vh - 160px);
+            gap: 1rem;
+        }
+        
+        .dm-sidebar {
+            width: 320px;
+            flex-shrink: 0;
+            background: var(--card-bg);
+            border-radius: 16px;
+            border: 1px solid var(--border-color);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+        
+        .dm-sidebar-header {
+            padding: 1rem 1.25rem;
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+        
+        .dm-threads {
+            flex: 1;
+            overflow-y: auto;
+        }
+        
+        .dm-thread-item {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 12px 16px;
+            cursor: pointer;
+            transition: background 0.15s;
+            border-bottom: 1px solid var(--border-color);
+        }
+        
+        .dm-thread-item:hover {
+            background: var(--primary-ultra-light);
+        }
+        
+        .dm-thread-item.active {
+            background: rgba(99, 102, 241, 0.1);
+            border-left: 3px solid var(--primary-color);
+        }
+        
+        .dm-thread-avatar {
+            width: 48px;
+            height: 48px;
+            border-radius: 50%;
+            object-fit: cover;
+            border: 2px solid var(--border-color);
+        }
+        
+        .dm-thread-info {
+            flex: 1;
+            min-width: 0;
+        }
+        
+        .dm-thread-name {
+            font-weight: 600;
+            margin-bottom: 2px;
+        }
+        
+        .dm-thread-preview {
+            font-size: 0.85rem;
+            color: var(--text-muted);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        
+        .dm-thread-meta {
+            text-align: right;
+            font-size: 0.75rem;
+            color: var(--text-muted);
+        }
+        
+        .dm-unread-badge {
+            background: var(--primary-color);
+            color: white;
+            border-radius: 12px;
+            padding: 2px 8px;
+            font-size: 0.7rem;
+            font-weight: 600;
+        }
+        
+        .dm-chat {
+            flex: 1;
+            background: var(--card-bg);
+            border-radius: 16px;
+            border: 1px solid var(--border-color);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+        
+        .dm-chat-header {
+            padding: 1rem 1.25rem;
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        
+        .dm-messages {
+            flex: 1;
+            overflow-y: auto;
+            padding: 1rem;
+            background: var(--cream-bg);
+        }
+        
+        .dm-input-area {
+            padding: 12px 16px;
+            border-top: 1px solid var(--border-color);
+        }
+        
+        .dm-message {
+            display: flex;
+            margin-bottom: 12px;
+        }
+        
+        .dm-message.sent {
+            justify-content: flex-end;
+        }
+        
+        .dm-message-bubble {
+            max-width: 70%;
+            padding: 10px 14px;
+            border-radius: 16px;
+        }
+        
+        .dm-message.sent .dm-message-bubble {
+            background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+            color: white;
+            border-bottom-right-radius: 4px;
+        }
+        
+        .dm-message.received .dm-message-bubble {
+            background: white;
+            border: 1px solid var(--border-color);
+            border-bottom-left-radius: 4px;
+        }
+        
+        .dm-message-time {
+            font-size: 0.7rem;
+            color: var(--text-muted);
+            margin-top: 4px;
+        }
+        
+        .dm-message.sent .dm-message-time {
+            text-align: right;
+        }
+        
+        .dm-empty-state {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100%;
+            color: var(--text-muted);
+        }
+        
+        .dm-empty-state i {
+            font-size: 4rem;
+            margin-bottom: 1rem;
+            opacity: 0.5;
+        }
+        
+        /* New conversation modal */
+        .user-search-result {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 10px 12px;
+            cursor: pointer;
+            border-radius: 8px;
+            transition: background 0.15s;
+        }
+        
+        .user-search-result:hover {
+            background: var(--primary-ultra-light);
+        }
+        
+        .user-search-result img {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            object-fit: cover;
+        }
+        
+        @media (max-width: 768px) {
+            .dm-container {
+                flex-direction: column;
+            }
+            
+            .dm-sidebar {
+                width: 100%;
+                max-height: 40vh;
+            }
+            
+            .dm-sidebar.hidden-mobile {
+                display: none;
+            }
+            
+            .dm-chat.hidden-mobile {
+                display: none;
+            }
+        }
+    </style>
+    
+    <div class="dm-container">
+        <!-- Sidebar with threads -->
+        <div class="dm-sidebar" id="dmSidebar">
+            <div class="dm-sidebar-header">
+                <h5 class="mb-0"><i class="fas fa-envelope text-primary me-2"></i>Messages</h5>
+                <button class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#newDmModal">
+                    <i class="fas fa-plus"></i>
+                </button>
+            </div>
+            <div class="dm-threads" id="dmThreads">
+                <div class="dm-empty-state py-5">
+                    <i class="fas fa-comments"></i>
+                    <p>No conversations yet</p>
+                    <button class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#newDmModal">
+                        Start a conversation
+                    </button>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Chat area -->
+        <div class="dm-chat" id="dmChat">
+            <div class="dm-empty-state" id="noChatSelected">
+                <i class="fas fa-comment-dots"></i>
+                <p>Select a conversation or start a new one</p>
+            </div>
+            
+            <div id="chatContainer" style="display: none; height: 100%; display: none; flex-direction: column;">
+                <div class="dm-chat-header" id="dmChatHeader">
+                    <button class="btn btn-sm btn-outline-secondary d-md-none" onclick="showSidebar()">
+                        <i class="fas fa-arrow-left"></i>
+                    </button>
+                    <img src="" alt="" class="dm-thread-avatar" id="chatAvatar">
+                    <div>
+                        <div class="fw-semibold" id="chatUserName"></div>
+                        <small class="text-muted" id="chatUserHandle"></small>
+                    </div>
+                </div>
+                <div class="dm-messages" id="dmMessages">
+                    <!-- Messages will be loaded here -->
+                </div>
+                <div class="dm-input-area">
+                    <div class="input-group">
+                        <input type="text" class="form-control" id="dmMessageInput" placeholder="Type a message...">
+                        <button class="btn btn-primary" id="dmSendBtn">
+                            <i class="fas fa-paper-plane"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+{% endblock %}
+
+{% block modals %}
+    <!-- New DM Modal -->
+    <div class="modal fade" id="newDmModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">New Message</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <input type="text" class="form-control mb-3" id="userSearchInput" placeholder="Search for a user...">
+                    <div id="userSearchResults" style="max-height: 300px; overflow-y: auto;">
+                        <!-- Search results will appear here -->
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+{% endblock %}
+
+{% block scripts %}
+    <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
+    <script>
+        const token = localStorage.getItem('token');
+        const userId = localStorage.getItem('userId');
+        const socket = io();
+        
+        let currentThreadId = null;
+        let currentOtherUserId = null;
+        let threads = [];
+        
+        async function initPage() {
+            await loadThreads();
+            
+            // Check if coming from a link with dm parameter
+            const urlParams = new URLSearchParams(window.location.search);
+            const dmUserId = urlParams.get('dm');
+            if (dmUserId) {
+                await startConversation(dmUserId);
+            }
+        }
+        
+        async function loadThreads() {
+            try {
+                const res = await fetch('/api/dm/threads', {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                const data = await res.json();
+                
+                if (data.success) {
+                    threads = data.data || [];
+                    renderThreads();
+                }
+            } catch (err) {
+                console.error('Error loading threads:', err);
+            }
+        }
+        
+        function renderThreads() {
+            const container = document.getElementById('dmThreads');
+            
+            if (threads.length === 0) {
+                container.innerHTML = `
+                    <div class="dm-empty-state py-5">
+                        <i class="fas fa-comments"></i>
+                        <p>No conversations yet</p>
+                        <button class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#newDmModal">
+                            Start a conversation
+                        </button>
+                    </div>
+                `;
+                return;
+            }
+            
+            container.innerHTML = threads.map(t => {
+                const avatar = t.other_user.avatar_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(t.other_user.full_name || t.other_user.username)}&background=6366f1&color=fff`;
+                const timeStr = t.last_message_at ? formatTimeAgo(t.last_message_at) : '';
+                
+                return `
+                    <div class="dm-thread-item ${t._id === currentThreadId ? 'active' : ''}" onclick="selectThread('${t._id}', '${t.other_user.id}')">
+                        <img src="${avatar}" alt="" class="dm-thread-avatar">
+                        <div class="dm-thread-info">
+                            <div class="dm-thread-name">${escapeHtml(t.other_user.full_name || t.other_user.username)}</div>
+                            <div class="dm-thread-preview">${escapeHtml(t.last_message || 'No messages yet')}</div>
+                        </div>
+                        <div class="dm-thread-meta">
+                            <div>${timeStr}</div>
+                            ${t.unread_count > 0 ? `<span class="dm-unread-badge">${t.unread_count}</span>` : ''}
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+        
+        async function selectThread(threadId, otherUserId) {
+            currentThreadId = threadId;
+            currentOtherUserId = otherUserId;
+            
+            // Update UI
+            document.querySelectorAll('.dm-thread-item').forEach(el => el.classList.remove('active'));
+            event.currentTarget?.classList.add('active');
+            
+            document.getElementById('noChatSelected').style.display = 'none';
+            document.getElementById('chatContainer').style.display = 'flex';
+            
+            // Set chat header
+            const thread = threads.find(t => t._id === threadId);
+            if (thread) {
+                const avatar = thread.other_user.avatar_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(thread.other_user.full_name || thread.other_user.username)}&background=6366f1&color=fff`;
+                document.getElementById('chatAvatar').src = avatar;
+                document.getElementById('chatUserName').textContent = thread.other_user.full_name || thread.other_user.username;
+                document.getElementById('chatUserHandle').textContent = '@' + thread.other_user.username;
+            }
+            
+            // Join socket room for real-time updates
+            socket.emit('join_room', { room: `dm:${threadId}`, user_id: userId });
+            
+            // Load messages
+            await loadMessages();
+            
+            // Hide sidebar on mobile
+            if (window.innerWidth < 768) {
+                document.getElementById('dmSidebar').classList.add('hidden-mobile');
+            }
+        }
+        
+        async function loadMessages() {
+            if (!currentThreadId) return;
+            
+            try {
+                const res = await fetch(`/api/dm/thread/${currentThreadId}/messages`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                const data = await res.json();
+                
+                if (data.success) {
+                    renderMessages(data.data || []);
+                }
+            } catch (err) {
+                console.error('Error loading messages:', err);
+            }
+        }
+        
+        function renderMessages(messages) {
+            const container = document.getElementById('dmMessages');
+            
+            if (messages.length === 0) {
+                container.innerHTML = `
+                    <div class="dm-empty-state">
+                        <i class="fas fa-envelope-open-text"></i>
+                        <p>No messages yet. Say hello!</p>
+                    </div>
+                `;
+                return;
+            }
+            
+            container.innerHTML = messages.map(m => {
+                const isMine = m.sender_id === userId;
+                const timeStr = m.created_at ? new Date(m.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '';
+                
+                return `
+                    <div class="dm-message ${isMine ? 'sent' : 'received'}">
+                        <div>
+                            <div class="dm-message-bubble">${escapeHtml(m.content)}</div>
+                            <div class="dm-message-time">${timeStr}</div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+            
+            container.scrollTop = container.scrollHeight;
+        }
+        
+        async function sendMessage() {
+            const input = document.getElementById('dmMessageInput');
+            const content = input.value.trim();
+            
+            if (!content || !currentThreadId) return;
+            
+            input.value = '';
+            
+            try {
+                const res = await fetch(`/api/dm/thread/${currentThreadId}/messages`, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ content })
+                });
+                
+                if (res.ok) {
+                    await loadMessages();
+                    await loadThreads();
+                    
+                    // Notify via socket
+                    socket.emit('message', {
+                        room: `dm:${currentThreadId}`,
+                        user_id: userId,
+                        message: content
+                    });
+                }
+            } catch (err) {
+                console.error('Error sending message:', err);
+            }
+        }
+        
+        async function startConversation(otherUserId) {
+            try {
+                const res = await fetch(`/api/dm/thread/${otherUserId}`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                const data = await res.json();
+                
+                if (data.success) {
+                    // Reload threads and select this one
+                    await loadThreads();
+                    await selectThread(data.data.thread_id, otherUserId);
+                    
+                    // Close modal if open
+                    const modal = bootstrap.Modal.getInstance(document.getElementById('newDmModal'));
+                    if (modal) modal.hide();
+                }
+            } catch (err) {
+                console.error('Error starting conversation:', err);
+            }
+        }
+        
+        // User search for new DM
+        let searchTimeout;
+        document.getElementById('userSearchInput').addEventListener('input', (e) => {
+            clearTimeout(searchTimeout);
+            searchTimeout = setTimeout(() => searchUsers(e.target.value), 300);
+        });
+        
+        async function searchUsers(query) {
+            if (!query || query.length < 2) {
+                document.getElementById('userSearchResults').innerHTML = '<p class="text-muted text-center py-3">Type at least 2 characters to search</p>';
+                return;
+            }
+            
+            try {
+                const res = await fetch(`/api/users/search?q=${encodeURIComponent(query)}`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                const data = await res.json();
+                
+                if (data.success) {
+                    const users = (data.data || []).filter(u => u._id !== userId);
+                    
+                    if (users.length === 0) {
+                        document.getElementById('userSearchResults').innerHTML = '<p class="text-muted text-center py-3">No users found</p>';
+                        return;
+                    }
+                    
+                    document.getElementById('userSearchResults').innerHTML = users.map(u => {
+                        const avatar = u.avatar_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(u.full_name || u.username)}&background=6366f1&color=fff`;
+                        return `
+                            <div class="user-search-result" onclick="startConversation('${u._id}')">
+                                <img src="${avatar}" alt="">
+                                <div>
+                                    <div class="fw-semibold">${escapeHtml(u.full_name || u.username)}</div>
+                                    <small class="text-muted">@${escapeHtml(u.username)}</small>
+                                </div>
+                            </div>
+                        `;
+                    }).join('');
+                }
+            } catch (err) {
+                console.error('Error searching users:', err);
+            }
+        }
+        
+        function showSidebar() {
+            document.getElementById('dmSidebar').classList.remove('hidden-mobile');
+            document.getElementById('chatContainer').style.display = 'none';
+            document.getElementById('noChatSelected').style.display = 'flex';
+        }
+        
+        function formatTimeAgo(dateStr) {
+            const date = new Date(dateStr);
+            const now = new Date();
+            const seconds = Math.floor((now - date) / 1000);
+            
+            if (seconds < 60) return 'now';
+            if (seconds < 3600) return `${Math.floor(seconds / 60)}m`;
+            if (seconds < 86400) return `${Math.floor(seconds / 3600)}h`;
+            if (seconds < 604800) return `${Math.floor(seconds / 86400)}d`;
+            return date.toLocaleDateString();
+        }
+        
+        function escapeHtml(text) {
+            if (!text) return '';
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+        
+        // Event listeners
+        document.getElementById('dmSendBtn').addEventListener('click', sendMessage);
+        document.getElementById('dmMessageInput').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') sendMessage();
+        });
+        
+        // Socket listeners for real-time updates
+        socket.on('new_message', (data) => {
+            if (data.room === `dm:${currentThreadId}`) {
+                loadMessages();
+                loadThreads();
+            }
+        });
+        
+        // Init
+        document.addEventListener('DOMContentLoaded', () => {
+            if (!token) {
+                sessionStorage.setItem('redirectAfterLogin', window.location.href);
+                window.location.href = "{{ url_for('auth_page') }}";
+                return;
+            }
+            initPage();
+        });
+    </script>
+{% endblock %}

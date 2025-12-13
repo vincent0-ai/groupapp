@@ -124,6 +124,73 @@
             border: 1px solid var(--border-color);
             box-shadow: var(--shadow-sm);
         }
+        
+        /* Reactions styling */
+        .reactions-container {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 4px;
+        }
+        .reaction-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            padding: 2px 8px;
+            border-radius: 12px;
+            font-size: 0.75rem;
+            background: rgba(0,0,0,0.05);
+            border: 1px solid rgba(0,0,0,0.1);
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .reaction-badge:hover {
+            background: rgba(99, 102, 241, 0.1);
+            border-color: rgba(99, 102, 241, 0.3);
+        }
+        .reaction-badge.reacted {
+            background: rgba(99, 102, 241, 0.15);
+            border-color: var(--primary-color);
+        }
+        .sent .reaction-badge {
+            background: rgba(255,255,255,0.2);
+            border-color: rgba(255,255,255,0.3);
+            color: white;
+        }
+        .sent .reaction-badge:hover {
+            background: rgba(255,255,255,0.3);
+        }
+        .sent .reaction-badge.reacted {
+            background: rgba(255,255,255,0.35);
+        }
+        .reaction-picker {
+            position: absolute;
+            bottom: 100%;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            gap: 4px;
+            padding: 8px;
+            background: var(--card-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 24px;
+            box-shadow: var(--shadow-lg);
+            z-index: 100;
+            margin-bottom: 8px;
+        }
+        .reaction-option {
+            border: none;
+            background: none;
+            font-size: 1.25rem;
+            cursor: pointer;
+            padding: 4px 8px;
+            border-radius: 8px;
+            transition: all 0.15s;
+        }
+        .reaction-option:hover {
+            background: var(--primary-ultra-light);
+            transform: scale(1.2);
+        }
+        
         .reply-preview {
             font-size: 0.75rem;
             padding: 6px 10px;
@@ -278,6 +345,31 @@
                 max-width: 90% !important;
             }
         }
+        
+        /* Announcement styling */
+        .announcement-bubble {
+            background: linear-gradient(135deg, #f59e0b 0%, #f97316 100%) !important;
+            color: white !important;
+            border: none !important;
+            max-width: 100% !important;
+        }
+        
+        .announcement-bubble .announcement-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            font-size: 0.7rem;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            font-weight: 700;
+            margin-bottom: 6px;
+            opacity: 0.9;
+        }
+        
+        .announcement-container {
+            width: 100%;
+            max-width: none !important;
+        }
     </style>
     <div class="row g-3" style="height: calc(100vh - 160px);">
         <div class="col-12 h-100">
@@ -287,6 +379,16 @@
                         <i class="fas fa-arrow-left me-1"></i> Groups
                     </a>
                     <h5 id="groupNameTitle" class="mb-0">Loading...</h5>
+                    
+                    <!-- Online Users Indicator -->
+                    <div class="ms-3 d-flex align-items-center" id="onlineUsersIndicator" style="display: none;">
+                        <div class="online-indicator me-1"></div>
+                        <span class="text-muted small" id="onlineCount">0 online</span>
+                        <button class="btn btn-sm btn-link p-0 ms-2" type="button" data-bs-toggle="offcanvas" data-bs-target="#onlineUsersPanel" title="View online users">
+                            <i class="fas fa-users text-muted"></i>
+                        </button>
+                    </div>
+                    
                     <div class="ms-auto" id="groupAdminControls" style="display: none;">
                         <div class="dropdown">
                             <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown">
@@ -316,11 +418,17 @@
                     <div class="p-2 position-relative">
                         <div class="mention-dropdown" id="mentionDropdown"></div>
                         <div class="input-group">
+                            <button class="btn btn-outline-warning" id="announcementToggle" type="button" title="Send as Announcement" style="display: none;">
+                                <i class="fas fa-bullhorn"></i>
+                            </button>
                             <input type="text" class="form-control border-end-0" id="messageInput" placeholder="Type a message... (@ to mention)">
                             <button class="btn btn-primary" id="sendBtn" type="button">
                                 <i class="fas fa-paper-plane"></i>
                             </button>
                         </div>
+                        <small id="announcementMode" class="text-warning mt-1" style="display: none;">
+                            <i class="fas fa-bullhorn me-1"></i> Sending as announcement (visible to all members)
+                        </small>
                     </div>
                 </div>
             </div>
@@ -329,6 +437,21 @@
 {% endblock %}
 
 {% block modals %}
+    <!-- Online Users Panel (Offcanvas) -->
+    <div class="offcanvas offcanvas-end" tabindex="-1" id="onlineUsersPanel" aria-labelledby="onlineUsersPanelLabel">
+        <div class="offcanvas-header">
+            <h5 class="offcanvas-title" id="onlineUsersPanelLabel">
+                <i class="fas fa-users text-primary me-2"></i>Online Users
+            </h5>
+            <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="Close"></button>
+        </div>
+        <div class="offcanvas-body">
+            <div id="onlineUsersList" class="list-group list-group-flush">
+                <p class="text-muted text-center">No users online</p>
+            </div>
+        </div>
+    </div>
+
     <!-- Manage Members Modal -->
     <div class="modal fade" id="manageMembersModal" tabindex="-1">
         <div class="modal-dialog">
@@ -453,6 +576,8 @@
                 
                 if (isOwner || isMod) {
                     document.getElementById('groupAdminControls').style.display = 'block';
+                    // Show announcement button for mods/owners
+                    document.getElementById('announcementToggle').style.display = 'block';
                     
                     // Setup event listeners
                     document.getElementById('clearChatBtn').onclick = isOwner ? clearChat : (e) => { e.preventDefault(); alert('Only owner can clear chat'); };
@@ -654,6 +779,7 @@
                     const isMine = m.user_id === userId;
                     const canDelete = isMine || isOwner || isMod;
                     const formattedContent = formatMessageContent(m.content);
+                    const isAnnouncement = m.is_announcement === true;
                     
                     // Build reply preview if this is a reply
                     let replyHtml = '';
@@ -675,12 +801,42 @@
                     const isToday = new Date().toLocaleDateString() === dateStr;
                     const displayTime = isToday ? timeStr : `${dateStr} ${timeStr}`;
                     
+                    // Announcement rendering
+                    if (isAnnouncement) {
+                        return `
+                            <div class="mb-3 d-flex justify-content-center" id="msg-${m._id}">
+                                <div class="d-flex flex-column announcement-container">
+                                    <div class="message-bubble p-3 rounded shadow-sm announcement-bubble">
+                                        <div class="announcement-badge">
+                                            <i class="fas fa-bullhorn"></i> Announcement
+                                        </div>
+                                        <div class="message-actions">
+                                            ${canDelete ? `
+                                                <button class="btn btn-sm btn-light text-danger" onclick="deleteMessage('${m._id}')" title="Delete">
+                                                    <i class="fas fa-trash"></i>
+                                                </button>
+                                            ` : ''}
+                                        </div>
+                                        <p class="mb-0 message-content">${formattedContent}</p>
+                                        ${renderReactions(m)}
+                                    </div>
+                                    <small class="text-muted mt-1 text-center" style="font-size: 0.7rem;">
+                                        ${m.user_first_name || 'Moderator'} • ${displayTime}
+                                    </small>
+                                </div>
+                            </div>
+                        `;
+                    }
+                    
                     return `
                         <div class="mb-2 d-flex ${isMine ? 'justify-content-end' : 'justify-content-start'}" id="msg-${m._id}">
                             <div class="d-flex flex-column ${isMine ? 'align-items-end' : 'align-items-start'}" style="max-width: 85%;">
-                                <div class="message-bubble p-2 rounded shadow-sm ${isMine ? 'bg-primary text-white' : 'bg-white text-dark border'}">
+                                <div class="message-bubble p-2 rounded shadow-sm ${isMine ? 'bg-primary text-white sent' : 'bg-white text-dark border received'}">
                                     ${replyHtml}
                                     <div class="message-actions ${isMine ? '' : 'message-actions-left'}">
+                                        <button class="btn btn-sm btn-light" onclick="showReactionPicker('${m._id}')" title="React">
+                                            <i class="fas fa-smile"></i>
+                                        </button>
                                         <button class="btn btn-sm btn-light" onclick="replyToMessage('${m._id}', '${m.user_first_name || 'User'}', \`${m.content.replace(/`/g, "'").replace(/\\/g, "\\\\")}\`)" title="Reply">
                                             <i class="fas fa-reply"></i>
                                         </button>
@@ -691,6 +847,7 @@
                                         ` : ''}
                                     </div>
                                     <p class="mb-0 message-content">${formattedContent}</p>
+                                    ${renderReactions(m)}
                                 </div>
                                 <small class="text-muted mt-1" style="font-size: 0.7rem;">
                                     ${isMine ? 'You' : (m.user_first_name || 'User ' + m.user_id.substr(-4))} • ${displayTime}
@@ -758,6 +915,106 @@
                 }
             } catch (err) {
                 console.error('Error deleting message:', err);
+            }
+        }
+        
+        // =====================
+        // REACTIONS SYSTEM
+        // =====================
+        const availableReactions = ['👍', '❤️', '😂', '😮', '😢', '🎉'];
+        
+        function renderReactions(message) {
+            const reactions = message.reactions || {};
+            const reactionEntries = Object.entries(reactions);
+            
+            if (reactionEntries.length === 0) return '';
+            
+            const reactionHtml = reactionEntries.map(([emoji, users]) => {
+                const hasReacted = users.includes(userId);
+                return `
+                    <button class="reaction-badge ${hasReacted ? 'reacted' : ''}" 
+                            onclick="toggleReaction('${message._id}', '${emoji}')"
+                            title="${users.length} reaction${users.length > 1 ? 's' : ''}">
+                        ${emoji} ${users.length}
+                    </button>
+                `;
+            }).join('');
+            
+            return `<div class="reactions-container mt-2">${reactionHtml}</div>`;
+        }
+        
+        function showReactionPicker(messageId) {
+            // Remove any existing picker
+            const existingPicker = document.querySelector('.reaction-picker');
+            if (existingPicker) existingPicker.remove();
+            
+            const msgEl = document.getElementById(`msg-${messageId}`);
+            if (!msgEl) return;
+            
+            const picker = document.createElement('div');
+            picker.className = 'reaction-picker';
+            picker.innerHTML = availableReactions.map(emoji => 
+                `<button class="reaction-option" onclick="addReaction('${messageId}', '${emoji}')">${emoji}</button>`
+            ).join('');
+            
+            const bubble = msgEl.querySelector('.message-bubble');
+            bubble.appendChild(picker);
+            
+            // Close picker on outside click
+            setTimeout(() => {
+                document.addEventListener('click', function closePicker(e) {
+                    if (!picker.contains(e.target)) {
+                        picker.remove();
+                        document.removeEventListener('click', closePicker);
+                    }
+                });
+            }, 100);
+        }
+        
+        async function addReaction(messageId, emoji) {
+            try {
+                const res = await fetch(`/api/messages/${messageId}/react`, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ emoji })
+                });
+                
+                if (res.ok) {
+                    loadMessages();
+                }
+            } catch (err) {
+                console.error('Error adding reaction:', err);
+            }
+            
+            // Remove picker
+            const picker = document.querySelector('.reaction-picker');
+            if (picker) picker.remove();
+        }
+        
+        async function toggleReaction(messageId, emoji) {
+            // Check if we already reacted - if so, unreact
+            const msgEl = document.getElementById(`msg-${messageId}`);
+            const badge = msgEl?.querySelector(`.reaction-badge.reacted[onclick*="${emoji}"]`);
+            const endpoint = badge ? 'unreact' : 'react';
+            
+            try {
+                const res = await fetch(`/api/messages/${messageId}/${endpoint}`, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ emoji })
+                });
+                
+                if (res.ok) {
+                    loadMessages();
+                }
+            } catch (err) {
+                console.error('Error toggling reaction:', err);
             }
         }
         
@@ -872,6 +1129,25 @@
             document.getElementById('mentionDropdown').classList.remove('show');
         }
 
+        // Announcement mode toggle
+        let isAnnouncementMode = false;
+        
+        document.getElementById('announcementToggle').addEventListener('click', () => {
+            isAnnouncementMode = !isAnnouncementMode;
+            const btn = document.getElementById('announcementToggle');
+            const modeIndicator = document.getElementById('announcementMode');
+            
+            if (isAnnouncementMode) {
+                btn.classList.remove('btn-outline-warning');
+                btn.classList.add('btn-warning');
+                modeIndicator.style.display = 'block';
+            } else {
+                btn.classList.remove('btn-warning');
+                btn.classList.add('btn-outline-warning');
+                modeIndicator.style.display = 'none';
+            }
+        });
+
         document.getElementById('sendBtn').addEventListener('click', async () => {
             const content = document.getElementById('messageInput').value;
             if (!content.trim() || !currentGroupId) return;
@@ -885,6 +1161,11 @@
                 // Include reply_to if replying
                 if (replyToMessageId) {
                     payload.reply_to = replyToMessageId;
+                }
+                
+                // Include announcement flag if in announcement mode
+                if (isAnnouncementMode && (isOwner || isMod)) {
+                    payload.is_announcement = true;
                 }
                 
                 const res = await fetch('/api/messages', {
@@ -901,6 +1182,10 @@
                     replyToMessageId = null;
                     replyToContent = '';
                     document.getElementById('replyBar').classList.remove('active');
+                    // Reset announcement mode
+                    if (isAnnouncementMode) {
+                        document.getElementById('announcementToggle').click();
+                    }
                     // Notify other clients via socket
                     socket.emit('message', { room: currentGroupId, user_id: userId, message: content });
                     loadMessages();
@@ -922,6 +1207,63 @@
                 loadMessages();
             }
         });
+
+        // Online users tracking
+        let onlineUsers = [];
+        
+        socket.on('online_users', (data) => {
+            onlineUsers = data.users || [];
+            updateOnlineUsersUI();
+        });
+        
+        socket.on('user_joined', (data) => {
+            // User joined is already handled by online_users event
+            console.log('User joined:', data.user_id);
+        });
+        
+        socket.on('user_left', (data) => {
+            // User left is already handled by online_users event
+            console.log('User left:', data.user_id);
+        });
+        
+        function updateOnlineUsersUI() {
+            const indicator = document.getElementById('onlineUsersIndicator');
+            const countEl = document.getElementById('onlineCount');
+            const listEl = document.getElementById('onlineUsersList');
+            
+            if (indicator) indicator.style.display = onlineUsers.length > 0 ? 'flex' : 'none';
+            if (countEl) countEl.textContent = `${onlineUsers.length} online`;
+            
+            if (listEl) {
+                if (onlineUsers.length === 0) {
+                    listEl.innerHTML = '<p class="text-muted text-center py-4">No users online</p>';
+                } else {
+                    listEl.innerHTML = onlineUsers.map(u => {
+                        const profile = u.profile || {};
+                        const avatar = profile.avatar_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(profile.full_name || profile.username || 'U')}&background=6366f1&color=fff`;
+                        return `
+                            <div class="list-group-item d-flex align-items-center gap-3 border-0">
+                                <div class="position-relative">
+                                    <img src="${avatar}" alt="" class="rounded-circle" style="width: 40px; height: 40px; object-fit: cover;">
+                                    <span class="online-indicator position-absolute" style="bottom: 2px; right: 2px; width: 10px; height: 10px;"></span>
+                                </div>
+                                <div>
+                                    <div class="fw-semibold">${escapeHtml(profile.full_name || profile.username || 'Unknown')}</div>
+                                    <small class="text-muted">@${escapeHtml(profile.username || '')}</small>
+                                </div>
+                            </div>
+                        `;
+                    }).join('');
+                }
+            }
+        }
+        
+        function escapeHtml(text) {
+            if (!text) return '';
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
 
         document.addEventListener('DOMContentLoaded', () => {
             if (!token) {

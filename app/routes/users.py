@@ -200,6 +200,41 @@ def get_user_groups(user_id):
     
     return success_response([serialize_document(g) for g in groups], 'User groups retrieved successfully', 200)
 
+
+@users_bp.route('/push-subscription', methods=['POST'])
+@require_auth
+def save_push_subscription():
+    """Save push notification subscription for the user"""
+    data = request.get_json()
+    
+    if not data or 'subscription' not in data:
+        return error_response('Subscription data required', 400)
+    
+    db = Database()
+    
+    # Store the subscription
+    db.update_one('users', {'_id': ObjectId(g.user_id)}, {
+        'push_subscription': data['subscription'],
+        'push_subscribed_at': datetime.utcnow()
+    })
+    
+    return success_response(None, 'Push subscription saved', 200)
+
+
+@users_bp.route('/push-subscription', methods=['DELETE'])
+@require_auth
+def remove_push_subscription():
+    """Remove push notification subscription for the user"""
+    db = Database()
+    
+    db.db.users.update_one(
+        {'_id': ObjectId(g.user_id)},
+        {'$unset': {'push_subscription': '', 'push_subscribed_at': ''}}
+    )
+    
+    return success_response(None, 'Push subscription removed', 200)
+
+
 @users_bp.route('/search', methods=['GET'])
 def search_users():
     """Search users"""

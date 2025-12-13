@@ -29,9 +29,29 @@
             <i class="fas fa-graduation-cap me-2" style="background: linear-gradient(135deg, #6366f1, #8b5cf6); -webkit-background-clip: text; -webkit-text-fill-color: transparent;"></i>
             Discussio
         </a>
-        <button class="navbar-toggler border-0 shadow-none" type="button" id="navbarToggler" aria-label="Toggle navigation">
-            <span class="navbar-toggler-icon"></span>
-        </button>
+        
+        <!-- Notification Bell & User Actions (visible on mobile) -->
+        <div class="d-flex align-items-center gap-2 d-lg-none">
+            <div class="dropdown">
+                <button class="btn btn-link text-dark position-relative p-2" id="notifBellMobile" data-bs-toggle="dropdown" data-bs-auto-close="outside">
+                    <i class="fas fa-bell fa-lg"></i>
+                    <span class="notification-badge" id="notifBadgeMobile" style="display: none;">0</span>
+                </button>
+                <div class="dropdown-menu dropdown-menu-end notification-dropdown" style="width: 320px; max-height: 400px; overflow-y: auto;">
+                    <div class="dropdown-header d-flex justify-content-between align-items-center">
+                        <strong>Notifications</strong>
+                        <button class="btn btn-link btn-sm p-0" id="markAllReadMobile">Mark all read</button>
+                    </div>
+                    <div id="notificationListMobile" class="notification-list">
+                        <div class="text-center py-3 text-muted">No notifications</div>
+                    </div>
+                </div>
+            </div>
+            <button class="navbar-toggler border-0 shadow-none" type="button" id="navbarToggler" aria-label="Toggle navigation">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+        </div>
+        
         <div class="navbar-collapse" id="navbarNav">
             <button class="mobile-menu-close d-lg-none" id="menuClose" aria-label="Close menu">
                 <i class="fas fa-times"></i>
@@ -47,6 +67,9 @@
                     <a class="nav-link {% if ep == 'messages_page' %}active{% endif %}" href="{{ url_for('messages_page') }}"><i class="fas fa-comments"></i> Messages</a>
                 </li>
                 <li class="nav-item">
+                    <a class="nav-link {% if ep == 'dm_page' %}active{% endif %}" href="{{ url_for('dm_page') }}"><i class="fas fa-envelope"></i> DMs</a>
+                </li>
+                <li class="nav-item">
                     <a class="nav-link {% if ep == 'competitions_page' %}active{% endif %}" href="{{ url_for('competitions_page') }}"><i class="fas fa-trophy"></i> Competitions</a>
                 </li>
                 <li class="nav-item">
@@ -60,6 +83,22 @@
                 </li>
                 <li class="nav-item">
                     <a class="nav-link {% if ep == 'whiteboard_page' %}active{% endif %}" href="{{ url_for('whiteboard_page') }}"><i class="fas fa-chalkboard"></i> Whiteboard</a>
+                </li>
+                <!-- Notification Bell (Desktop) -->
+                <li class="nav-item dropdown d-none d-lg-block">
+                    <button class="btn btn-link nav-link position-relative" id="notifBellDesktop" data-bs-toggle="dropdown" data-bs-auto-close="outside">
+                        <i class="fas fa-bell"></i>
+                        <span class="notification-badge" id="notifBadgeDesktop" style="display: none;">0</span>
+                    </button>
+                    <div class="dropdown-menu dropdown-menu-end notification-dropdown" style="width: 360px; max-height: 450px; overflow-y: auto;">
+                        <div class="dropdown-header d-flex justify-content-between align-items-center">
+                            <strong>Notifications</strong>
+                            <button class="btn btn-link btn-sm p-0" id="markAllReadDesktop">Mark all read</button>
+                        </div>
+                        <div id="notificationListDesktop" class="notification-list">
+                            <div class="text-center py-3 text-muted">No notifications</div>
+                        </div>
+                    </div>
                 </li>
                 <li class="nav-item">
                     <a class="nav-link text-danger" id="logoutBtn" href="#"><i class="fas fa-sign-out-alt"></i> Logout</a>
@@ -84,28 +123,68 @@
 {% endblock %}
 
 {% block footer %}
-<footer class="fixed-bottom border-top py-2" style="background: rgba(255, 255, 255, 0.95); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);">
+<footer class="fixed-bottom border-top py-2 d-md-none" id="mobileBottomNav" style="background: rgba(255, 255, 255, 0.95); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);">
     <div class="container-fluid">
         <div class="d-flex justify-content-around align-items-center">
             <a href="{{ url_for('dashboard') }}" class="footer-nav-link text-center text-decoration-none {% if ep == 'dashboard' %}active{% endif %}">
                 <i class="fas fa-home"></i>
                 <small class="d-block">Home</small>
             </a>
-            <a href="{{ url_for('messages_page') }}" class="footer-nav-link text-center text-decoration-none {% if ep == 'messages_page' %}active{% endif %}">
-                <i class="fas fa-comments"></i>
-                <small class="d-block">Chat</small>
+            <a href="{{ url_for('groups_page') }}" class="footer-nav-link text-center text-decoration-none {% if ep == 'groups_page' %}active{% endif %}">
+                <i class="fas fa-users"></i>
+                <small class="d-block">Groups</small>
+            </a>
+            <a href="{{ url_for('dm_page') }}" class="footer-nav-link text-center text-decoration-none {% if ep == 'dm_page' %}active{% endif %}">
+                <i class="fas fa-envelope"></i>
+                <small class="d-block">DMs</small>
             </a>
             <a href="{{ url_for('profile_page') }}" class="footer-nav-link text-center text-decoration-none {% if ep == 'profile_page' %}active{% endif %}">
                 <i class="fas fa-user-circle"></i>
                 <small class="d-block">Profile</small>
             </a>
-            <a href="#" class="footer-nav-link text-center text-decoration-none" data-bs-toggle="modal" data-bs-target="#aboutModal">
-                <i class="fas fa-info-circle"></i>
-                <small class="d-block">About</small>
+            <a href="#" class="footer-nav-link text-center text-decoration-none" data-bs-toggle="offcanvas" data-bs-target="#mobileMoreSheet">
+                <i class="fas fa-ellipsis-h"></i>
+                <small class="d-block">More</small>
             </a>
         </div>
     </div>
 </footer>
+
+<!-- Mobile More Bottom Sheet -->
+<div class="offcanvas offcanvas-bottom" tabindex="-1" id="mobileMoreSheet" style="height: auto; max-height: 70vh; border-radius: 20px 20px 0 0;">
+    <div class="offcanvas-header">
+        <h5 class="offcanvas-title">More Options</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="Close"></button>
+    </div>
+    <div class="offcanvas-body pb-4">
+        <div class="list-group list-group-flush">
+            <a href="{{ url_for('messages_page') }}" class="list-group-item list-group-item-action d-flex align-items-center gap-3 py-3">
+                <i class="fas fa-comments text-primary" style="width: 24px;"></i>
+                <span>Group Messages</span>
+            </a>
+            <a href="{{ url_for('competitions_page') }}" class="list-group-item list-group-item-action d-flex align-items-center gap-3 py-3">
+                <i class="fas fa-trophy text-warning" style="width: 24px;"></i>
+                <span>Competitions</span>
+            </a>
+            <a href="{{ url_for('files_page') }}" class="list-group-item list-group-item-action d-flex align-items-center gap-3 py-3">
+                <i class="fas fa-folder-open text-info" style="width: 24px;"></i>
+                <span>Files</span>
+            </a>
+            <a href="{{ url_for('leaderboard_page') }}" class="list-group-item list-group-item-action d-flex align-items-center gap-3 py-3">
+                <i class="fas fa-medal text-success" style="width: 24px;"></i>
+                <span>Leaderboard</span>
+            </a>
+            <a href="#" class="list-group-item list-group-item-action d-flex align-items-center gap-3 py-3" data-bs-toggle="modal" data-bs-target="#aboutModal" data-bs-dismiss="offcanvas">
+                <i class="fas fa-info-circle text-secondary" style="width: 24px;"></i>
+                <span>About</span>
+            </a>
+            <a href="#" class="list-group-item list-group-item-action d-flex align-items-center gap-3 py-3 text-danger" id="mobileLogoutBtn">
+                <i class="fas fa-sign-out-alt" style="width: 24px;"></i>
+                <span>Logout</span>
+            </a>
+        </div>
+    </div>
+</div>
 
 <!-- About Modal -->
 <div class="modal fade" id="aboutModal" tabindex="-1" aria-labelledby="aboutModalLabel" aria-hidden="true">
@@ -166,9 +245,98 @@
         padding-bottom: 80px !important;
     }
     
+    /* Notification Center Styles */
+    .notification-badge {
+        position: absolute;
+        top: 2px;
+        right: 2px;
+        background: #ef4444;
+        color: white;
+        font-size: 0.65rem;
+        font-weight: 600;
+        padding: 2px 5px;
+        border-radius: 10px;
+        min-width: 18px;
+        text-align: center;
+    }
+    .notification-dropdown {
+        border: none;
+        border-radius: 16px;
+        box-shadow: 0 10px 40px rgba(0,0,0,0.15);
+        padding: 0;
+    }
+    .notification-dropdown .dropdown-header {
+        background: linear-gradient(135deg, rgba(99, 102, 241, 0.1), rgba(139, 92, 246, 0.05));
+        padding: 12px 16px;
+        border-bottom: 1px solid var(--border-color);
+    }
+    .notification-list {
+        max-height: 350px;
+        overflow-y: auto;
+    }
+    .notification-item {
+        display: flex;
+        align-items: flex-start;
+        gap: 12px;
+        padding: 12px 16px;
+        border-bottom: 1px solid var(--border-color);
+        cursor: pointer;
+        transition: background 0.15s ease;
+    }
+    .notification-item:hover {
+        background: rgba(99, 102, 241, 0.05);
+    }
+    .notification-item.unread {
+        background: rgba(99, 102, 241, 0.08);
+    }
+    .notification-item .notif-icon {
+        width: 36px;
+        height: 36px;
+        border-radius: 10px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-shrink: 0;
+    }
+    .notification-item .notif-icon.mention { background: rgba(99, 102, 241, 0.15); color: #6366f1; }
+    .notification-item .notif-icon.message { background: rgba(16, 185, 129, 0.15); color: #10b981; }
+    .notification-item .notif-icon.join { background: rgba(245, 158, 11, 0.15); color: #f59e0b; }
+    .notification-item .notif-icon.announcement { background: rgba(239, 68, 68, 0.15); color: #ef4444; }
+    .notification-item .notif-content {
+        flex: 1;
+        min-width: 0;
+    }
+    .notification-item .notif-content p {
+        margin: 0;
+        font-size: 0.85rem;
+        color: var(--text-dark);
+    }
+    .notification-item .notif-content small {
+        color: var(--text-muted);
+        font-size: 0.75rem;
+    }
+    
+    /* Online Status Indicator */
+    .online-indicator {
+        width: 10px;
+        height: 10px;
+        background: #10b981;
+        border-radius: 50%;
+        border: 2px solid white;
+        position: absolute;
+        bottom: 0;
+        right: 0;
+    }
+    .online-indicator.offline {
+        background: #94a3b8;
+    }
+    
     @media (prefers-color-scheme: dark) {
         footer {
             background: rgba(15, 23, 42, 0.95) !important;
+        }
+        .notification-dropdown {
+            background: var(--card-bg);
         }
     }
 </style>
@@ -324,7 +492,159 @@
         if (navbarToggler) navbarToggler.addEventListener('click', openMenu);
         if (menuClose) menuClose.addEventListener('click', closeMenu);
         if (navbarBackdrop) navbarBackdrop.addEventListener('click', closeMenu);
+
+        // Notification Center
+        initNotificationCenter();
     });
+
+    // Notification Center Manager
+    function initNotificationCenter() {
+        const token = localStorage.getItem('token');
+        if (!token) return;
+
+        // Load notifications on page load
+        loadNotifications();
+
+        // Poll for new notifications every 30 seconds
+        setInterval(loadNotifications, 30000);
+
+        // Mark all read buttons
+        document.querySelectorAll('.mark-all-read').forEach(btn => {
+            btn.addEventListener('click', markAllAsRead);
+        });
+    }
+
+    async function loadNotifications() {
+        const token = localStorage.getItem('token');
+        if (!token) return;
+
+        try {
+            const res = await fetch('/api/notifications', {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            const data = await res.json();
+
+            if (data.success && data.data) {
+                renderNotifications(data.data.notifications || []);
+                updateNotificationBadge(data.data.unread_count || 0);
+            }
+        } catch (err) {
+            console.warn('Failed to load notifications:', err);
+        }
+    }
+
+    function renderNotifications(notifications) {
+        const listMobile = document.getElementById('notificationListMobile');
+        const listDesktop = document.getElementById('notificationListDesktop');
+
+        const html = notifications.length === 0 
+            ? '<div class="text-center text-muted py-4"><i class="fas fa-bell-slash fa-2x mb-2"></i><p class="mb-0">No notifications yet</p></div>'
+            : notifications.map(n => `
+                <div class="notification-item ${n.read ? '' : 'unread'}" data-id="${n._id}" onclick="handleNotificationClick('${n._id}', '${n.link || ''}')">
+                    <div class="d-flex align-items-start gap-2">
+                        <i class="fas ${getNotificationIcon(n.type)} text-primary mt-1"></i>
+                        <div class="flex-grow-1">
+                            <div class="notification-text">${escapeHtml(n.message)}</div>
+                            <small class="text-muted">${formatTimeAgo(n.created_at)}</small>
+                        </div>
+                        ${!n.read ? '<span class="badge bg-primary">New</span>' : ''}
+                    </div>
+                </div>
+            `).join('');
+
+        if (listMobile) listMobile.innerHTML = html;
+        if (listDesktop) listDesktop.innerHTML = html;
+    }
+
+    function updateNotificationBadge(count) {
+        document.querySelectorAll('.notification-badge').forEach(badge => {
+            if (count > 0) {
+                badge.textContent = count > 99 ? '99+' : count;
+                badge.style.display = 'flex';
+            } else {
+                badge.style.display = 'none';
+            }
+        });
+    }
+
+    function getNotificationIcon(type) {
+        const icons = {
+            'mention': 'fa-at',
+            'message': 'fa-comment',
+            'join_request': 'fa-user-plus',
+            'announcement': 'fa-bullhorn',
+            'reaction': 'fa-heart',
+            'group_invite': 'fa-users',
+            'dm': 'fa-envelope'
+        };
+        return icons[type] || 'fa-bell';
+    }
+
+    function formatTimeAgo(dateStr) {
+        const date = new Date(dateStr);
+        const now = new Date();
+        const seconds = Math.floor((now - date) / 1000);
+
+        if (seconds < 60) return 'Just now';
+        if (seconds < 3600) return `${Math.floor(seconds / 60)}m ago`;
+        if (seconds < 86400) return `${Math.floor(seconds / 3600)}h ago`;
+        if (seconds < 604800) return `${Math.floor(seconds / 86400)}d ago`;
+        return date.toLocaleDateString();
+    }
+
+    function escapeHtml(text) {
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+    }
+
+    async function handleNotificationClick(id, link) {
+        const token = localStorage.getItem('token');
+        if (!token) return;
+
+        // Mark as read
+        try {
+            await fetch(`/api/notifications/${id}/read`, {
+                method: 'POST',
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+        } catch (err) {
+            console.warn('Failed to mark notification as read:', err);
+        }
+
+        // Navigate if link provided
+        if (link) {
+            window.location.href = link;
+        } else {
+            loadNotifications();
+        }
+    }
+
+    async function markAllAsRead() {
+        const token = localStorage.getItem('token');
+        if (!token) return;
+
+        try {
+            await fetch('/api/notifications/read-all', {
+                method: 'POST',
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            loadNotifications();
+        } catch (err) {
+            console.warn('Failed to mark all as read:', err);
+        }
+    }
+    
+    // Mobile logout button
+    const mobileLogoutBtn = document.getElementById('mobileLogoutBtn');
+    if (mobileLogoutBtn) {
+        mobileLogoutBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            localStorage.removeItem('token');
+            localStorage.removeItem('userId');
+            window.location.href = "{{ url_for('auth_page') }}";
+        });
+    }
 </script>
 
 {% block scripts %}{% endblock %}

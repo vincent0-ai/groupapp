@@ -160,6 +160,7 @@ def send_message():
     group_id = data.get('group_id')
     attachments = data.get('attachments', [])
     reply_to = data.get('reply_to')
+    is_announcement = data.get('is_announcement', False)
     
     if not content:
         return error_response('Message content cannot be empty', 400)
@@ -180,10 +181,21 @@ def send_message():
     if user_id_obj not in group['members']:
         return error_response('You are not a member of this group', 403)
     
+    # Only moderators and owners can post announcements
+    if is_announcement:
+        is_owner = str(group.get('owner_id', '')) == g.user_id
+        is_mod = user_id_obj in group.get('moderators', [])
+        if not is_owner and not is_mod:
+            return error_response('Only moderators and owners can post announcements', 403)
+    
     # Create a message without channel_id
     message_doc = Message.create_message_doc(
         content, g.user_id, None, group_id, attachments, reply_to
     )
+    
+    # Add announcement flag if applicable
+    if is_announcement:
+        message_doc['is_announcement'] = True
     
     message_id = db.insert_one('messages', message_doc)
     
@@ -325,6 +337,46 @@ def react_to_message(message_id):
     # Attach display name
     _attach_user_first_name(db, updated_message)
     return success_response(serialize_document(updated_message), 'Reaction added successfully', 200)
+
+
+@messages_bp.route('/<message_id>/unreact', methods=['POST'])
+@require_auth
+def unreact_to_message(message_id):
+    """Remove a reaction from a message"""
+    try:
+        message_id_obj = ObjectId(message_id)
+    except:
+        return error_response('Invalid message ID', 400)
+    
+    data = request.get_json()
+    
+    if not data or 'emoji' not in data:
+        return error_response('Emoji is required', 400)
+    
+    emoji = data.get('emoji')
+    
+    db = Database()
+    message = db.find_one('messages', {'_id': message_id_obj})
+    
+    if not message:
+        return error_response('Message not found', 404)
+    
+    # Remove reaction
+    reactions = message.get('reactions', {})
+    user_id = g.user_id
+    
+    if emoji in reactions and user_id in reactions[emoji]:
+        reactions[emoji].remove(user_id)
+        # Clean up empty reaction lists
+        if len(reactions[emoji]) == 0:
+            del reactions[emoji]
+    
+    db.update_one('messages', {'_id': message_id_obj}, {'reactions': reactions})
+    
+    updated_message = db.find_one('messages', {'_id': message_id_obj})
+    _attach_user_first_name(db, updated_message)
+    return success_response(serialize_document(updated_message), 'Reaction removed successfully', 200)
+
 
 @messages_bp.route('/<message_id>/pin', methods=['POST'])
 @require_auth

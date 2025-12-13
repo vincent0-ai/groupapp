@@ -76,6 +76,18 @@ class Database:
         self.db.files.create_index('uploaded_by')
         self.db.files.create_index('group_id')
         self.db.files.create_index([('created_at', DESCENDING)])
+        
+        # Notifications indexes
+        self.db.notifications.create_index('user_id')
+        self.db.notifications.create_index([('created_at', DESCENDING)])
+        self.db.notifications.create_index([('user_id', ASCENDING), ('read', ASCENDING)])
+        
+        # DM (Direct Messages) indexes
+        self.db.dm_threads.create_index('participants')
+        self.db.dm_threads.create_index([('last_message_at', DESCENDING)])
+        self.db.dm_messages.create_index('thread_id')
+        self.db.dm_messages.create_index([('created_at', DESCENDING)])
+        self.db.dm_messages.create_index([('thread_id', ASCENDING), ('read', ASCENDING)])
     
     def insert_one(self, collection_name: str, document: Dict) -> Optional[str]:
         """Insert a single document"""
