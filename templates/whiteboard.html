@@ -73,6 +73,35 @@
             display: none !important;
         }
     }
+
+    /* Mobile Controls Bar */
+    @media (max-width: 991px) {
+        #sessionControls {
+            position: fixed;
+            top: 56px; /* Approximate navbar height */
+            left: 0;
+            width: 100%;
+            z-index: 1020;
+            background: white;
+            padding: 10px 15px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            border-bottom: 1px solid var(--border-color);
+            flex-wrap: nowrap !important;
+            overflow-x: auto;
+            justify-content: flex-start;
+            border-radius: 0 !important;
+            border: none !important;
+            border-bottom: 1px solid var(--border-color) !important;
+        }
+        
+        #sessionControls::-webkit-scrollbar {
+            display: none;
+        }
+        
+        #sessionView {
+            margin-top: 60px !important;
+        }
+    }
 </style>
 {% endblock %}
 
@@ -125,6 +154,11 @@
 
 <!-- Session View -->
 <div id="sessionView" class="row mt-4" style="display:none;">
+    <!-- Top Controls Bar -->
+    <div class="col-12 mb-3">
+        <div id="sessionControls" class="d-flex flex-wrap gap-2 align-items-center p-3 bg-white rounded shadow-sm border"></div>
+    </div>
+
     <div class="col-lg-2">
         <div class="card shadow-sm border-0 mb-3" style="overflow: hidden;">
             <div class="card-body">
@@ -172,7 +206,6 @@
                 <div id="participantsList">
                     <small class="text-body-secondary">Connecting...</small>
                 </div>
-                <div id="sessionControls" class="mt-3 border-top pt-2 d-flex flex-wrap gap-2"></div>
                 <div id="inviteLinkContainer" class="mt-3 border-top pt-2"></div>
                 <div id="audioFilesContainer" class="mt-3 border-top pt-2"></div>
             </div>
