@@ -183,6 +183,28 @@
             order: unset;
         }
     }
+
+    @media (max-width: 576px) {
+        .leaderboard-header {
+            padding: 1rem;
+        }
+        .leaderboard-header h1 {
+            font-size: 1.5rem;
+        }
+        .table th, .table td {
+            padding: 0.5rem 0.25rem;
+            font-size: 0.8rem;
+        }
+        /* Hide Badges and Groups columns on mobile */
+        .table th:nth-child(5), .table td:nth-child(5),
+        .table th:nth-child(6), .table td:nth-child(6) {
+            display: none;
+        }
+        .table img {
+            width: 32px;
+            height: 32px;
+        }
+    }
 </style>
 {% endblock %}
 
