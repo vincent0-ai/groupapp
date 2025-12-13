@@ -1514,3 +1514,8 @@ a:hover {
 .offline-indicator {
     background: var(--text-muted);
 }
+/* In /home/vinny/Desktop/Projects/groupapp/static/css/style.css */
+
+.notif-msg {
+  color: #fff;
+}
