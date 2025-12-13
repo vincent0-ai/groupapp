@@ -141,6 +141,13 @@ def get_dm_messages(thread_id):
             {'$set': {'read': True, 'read_at': datetime.utcnow()}}
         )
         
+        # Clear notifications for this thread
+        db.db.notifications.delete_many({
+            'user_id': ObjectId(g.user_id),
+            'type': 'dm',
+            'link': f'/dm?dm={other_user_id}'
+        })
+        
         # Format messages
         result = []
         for msg in messages:

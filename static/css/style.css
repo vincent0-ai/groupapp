@@ -1517,5 +1517,5 @@ a:hover {
 /* In /home/vinny/Desktop/Projects/groupapp/static/css/style.css */
 
 .notif-msg {
-  color: #fff;
+  color: var(--text-dark);
 }
