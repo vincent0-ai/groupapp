@@ -1073,18 +1073,22 @@
                 peers[remoteUserId].close();
             }
             
-            // Create peer connection
+            // Create peer connection - always create it even if we have no stream
             const peer = createPeerConnection(remoteUserId);
             peers[remoteUserId] = peer;
             
-            // Add local tracks
+            // Add local tracks if we have them (speaker)
             if (localStream) {
                 localStream.getTracks().forEach(track => peer.addTrack(track, localStream));
             }
             
-            // Create offer
+            // Always create and send offer - even listen-only users need to establish connection
+            // to receive audio from the other peer
             try {
-                const offer = await peer.createOffer();
+                const offer = await peer.createOffer({
+                    offerToReceiveAudio: true,  // We want to receive audio
+                    offerToReceiveVideo: false
+                });
                 await peer.setLocalDescription(offer);
                 socket.emit('webrtc_offer', {
                     room: sessionId ? `whiteboard:${sessionId}` : 'whiteboard',
@@ -1132,11 +1136,13 @@
             try {
                 await peer.setRemoteDescription(new RTCSessionDescription(offer));
                 
-                // Add local tracks if we are in the call and have a stream
+                // Add local tracks if we have a stream (speaker mode)
                 if (localStream) {
                     localStream.getTracks().forEach(track => peer.addTrack(track, localStream));
                 }
                 
+                // Create answer - always do this to complete the connection
+                // This allows us to receive audio even if we're not sending
                 const answer = await peer.createAnswer();
                 await peer.setLocalDescription(answer);
                 
