@@ -658,13 +658,12 @@
             }
 
             try {
-                const res = await fetch(`/api/dm/thread`, {
-                    method: 'POST',
+                const res = await fetch(`/api/dm/thread/${otherUserId}`, {
+                    method: 'GET',
                     headers: { 
                         'Authorization': `Bearer ${token}`,
                         'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({ recipient_id: otherUserId })
+                    }
                 });
                 
                 const contentType = res.headers.get("content-type");
@@ -677,7 +676,8 @@
                     
                     if (data.status === 'success' && data.data) {
                         await loadThreads();
-                        await selectThread(data.data.thread_id || data.data.id || data.data._id, otherUserId, null);
+                        const tId = data.data.thread_id || data.data.id || data.data._id || (data.data.thread ? data.data.thread._id : null);
+                        await selectThread(tId, otherUserId, null);
                         
                         const modal = bootstrap.Modal.getInstance(document.getElementById('newDmModal'));
                         if (modal) modal.hide();
