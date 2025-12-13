@@ -1376,7 +1376,7 @@
 
                 // Create answer - always do this to complete the connection
                 // This allows us to receive audio even if we're not sending
-                const answer = await peer.createAnswer();
+                const answer = await peer.createAnswer({ offerToReceiveAudio: true, offerToReceiveVideo: true });
                 await peer.setLocalDescription(answer);
                 
                 socket.emit('webrtc_answer', {
@@ -1466,7 +1466,14 @@
                     const video = document.getElementById('remoteVideo');
                     const label = document.getElementById('remoteVideoLabel');
                     if (container && video) {
-                        video.srcObject = event.streams[0];
+                        if (event.streams && event.streams[0]) {
+                            video.srcObject = event.streams[0];
+                        } else {
+                            video.srcObject = new MediaStream([event.track]);
+                        }
+                        
+                        video.play().catch(e => console.error('Error playing remote video:', e));
+                        
                         container.style.display = 'flex';
                         const name = participants[remoteUserId]?.name || 'User';
                         if (label) label.textContent = `${name}'s Screen`;
