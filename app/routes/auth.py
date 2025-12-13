@@ -1,5 +1,4 @@
 from flask import Blueprint, request, redirect, url_for, session, current_app
-from authlib.integrations.flask_client import OAuth
 from app.utils import (
     hash_password, verify_password, generate_token, 
     success_response, error_response, validate_email, serialize_document
@@ -10,20 +9,6 @@ from bson import ObjectId
 
 auth_bp = Blueprint('auth', __name__, url_prefix='/api/auth')
 
-# Google OAuth setup
-oauth = OAuth(current_app)
-google = oauth.register(
-    name='google',
-    client_id=current_app.config.get('GOOGLE_CLIENT_ID', ''),
-    client_secret=current_app.config.get('GOOGLE_CLIENT_SECRET', ''),
-    access_token_url='https://oauth2.googleapis.com/token',
-    access_token_params=None,
-    authorize_url='https://accounts.google.com/o/oauth2/auth',
-    authorize_params=None,
-    api_base_url='https://www.googleapis.com/oauth2/v2/',
-    userinfo_endpoint='https://www.googleapis.com/oauth2/v2/userinfo',
-    client_kwargs={'scope': 'openid email profile'},
-)
 
 @auth_bp.route('/signup', methods=['POST'])
 def signup():
