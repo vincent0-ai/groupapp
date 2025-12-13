@@ -1,4 +1,8 @@
 from flask import Blueprint, request, redirect, url_for, session, current_app
+import os
+from dotenv import load_dotenv
+load_dotenv()
+
 from app.utils import (
     hash_password, verify_password, generate_token, 
     success_response, error_response, validate_email, serialize_document
@@ -134,8 +138,8 @@ def google_login():
     except ImportError:
         return error_response('Google Auth libraries are not installed on the server.', 500)
 
-    client_id = current_app.config.get('GOOGLE_CLIENT_ID')
-    client_secret = current_app.config.get('GOOGLE_CLIENT_SECRET')
+    client_id = current_app.config.get('GOOGLE_CLIENT_ID') or os.environ.get('GOOGLE_CLIENT_ID')
+    client_secret = current_app.config.get('GOOGLE_CLIENT_SECRET') or os.environ.get('GOOGLE_CLIENT_SECRET')
 
     if not client_id or not client_secret:
         return error_response('Google Client configuration is missing.', 500)
@@ -181,8 +185,11 @@ def google_callback():
     if not state:
         return error_response('State missing from session', 400)
         
-    client_id = current_app.config.get('GOOGLE_CLIENT_ID')
-    client_secret = current_app.config.get('GOOGLE_CLIENT_SECRET')
+    client_id = current_app.config.get('GOOGLE_CLIENT_ID') or os.environ.get('GOOGLE_CLIENT_ID')
+    client_secret = current_app.config.get('GOOGLE_CLIENT_SECRET') or os.environ.get('GOOGLE_CLIENT_SECRET')
+    
+    if not client_id or not client_secret:
+        return error_response('Google Client configuration is missing.', 500)
     
     # Ensure credentials are strings and stripped of whitespace
     client_id = str(client_id).strip()
