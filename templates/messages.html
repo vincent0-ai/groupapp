@@ -505,14 +505,67 @@
         let filteredMembers = [];
 
         async function initPage() {
+            // If no group selected, try to find one
             if (!currentGroupId) {
-                window.location.href = "{{ url_for('groups_page') }}";
-                return;
+                const hasGroups = await attemptToSelectDefaultGroup();
+                if (!hasGroups) {
+                    showNoGroupsState();
+                    return;
+                }
             }
             
-            await loadGroupDetails();
+            const success = await loadGroupDetails();
+            if (!success) {
+                // If loading failed (e.g. invalid ID), try to find a default group again
+                localStorage.removeItem('selectedGroupId');
+                currentGroupId = null;
+                const hasGroups = await attemptToSelectDefaultGroup();
+                if (hasGroups) {
+                    await loadGroupDetails();
+                } else {
+                    showNoGroupsState();
+                    return;
+                }
+            }
+            
             setupMentionAutocomplete();
             setupReplyUI();
+        }
+
+        async function attemptToSelectDefaultGroup() {
+            try {
+                const res = await fetch('/api/users/groups', {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                const data = await res.json();
+                if (res.ok && data.data && data.data.groups && data.data.groups.length > 0) {
+                    currentGroupId = data.data.groups[0].id || data.data.groups[0]._id;
+                    localStorage.setItem('selectedGroupId', currentGroupId);
+                    return true;
+                }
+            } catch (e) {
+                console.error(e);
+            }
+            return false;
+        }
+
+        function showNoGroupsState() {
+            document.getElementById('groupNameTitle').textContent = 'No Group Selected';
+            document.getElementById('messagesArea').innerHTML = `
+                <div class="h-100 d-flex flex-column align-items-center justify-content-center text-center p-4">
+                    <div class="mb-3">
+                        <i class="fas fa-users fa-3x text-muted"></i>
+                    </div>
+                    <h4>No Group Selected</h4>
+                    <p class="text-muted">Please select a group to start chatting, or join a new group.</p>
+                    <a href="{{ url_for('groups_page') }}" class="btn btn-primary mt-2">
+                        <i class="fas fa-search me-2"></i>Explore Groups
+                    </a>
+                </div>
+            `;
+            document.getElementById('messageInputArea').style.display = 'none';
+            document.getElementById('groupAdminControls').style.display = 'none';
+            document.getElementById('onlineUsersIndicator').style.display = 'none';
         }
         
         // Format message content with links, mentions, and hashtags
@@ -554,13 +607,11 @@
                 if (groupRes.status === 401) {
                     sessionStorage.setItem('redirectAfterLogin', window.location.href);
                     window.location.href = "{{ url_for('auth_page') }}";
-                    return;
+                    return false;
                 }
                 
                 if (!groupRes.ok) {
-                    alert('Group not found or access denied');
-                    window.location.href = "{{ url_for('groups_page') }}";
-                    return;
+                    return false;
                 }
 
                 const groupData = await groupRes.json();
@@ -597,9 +648,11 @@
                 // No per-group channels: load messages for the group directly
                 document.getElementById('messageInputArea').style.display = 'block';
                 await loadMessages();
+                return true;
 
             } catch (error) {
                 console.error('Error loading group details:', error);
+                return false;
             }
         }
 
