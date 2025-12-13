@@ -13,7 +13,8 @@ class PWAManager {
     async registerServiceWorker() {
         if ('serviceWorker' in navigator) {
             try {
-                const registration = await navigator.serviceWorker.register('/static/js/service-worker.js', {
+                // Register service worker from root (served by Flask route)
+                const registration = await navigator.serviceWorker.register('/service-worker.js', {
                     scope: '/'
                 });
                 console.log('Service Worker registered:', registration);

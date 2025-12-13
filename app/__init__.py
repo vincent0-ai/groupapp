@@ -47,6 +47,21 @@ def create_app(config_name='development'):
     app.register_blueprint(notifications_bp)
     app.register_blueprint(dm_bp)
     
+    # Serve service worker from root with proper scope header
+    @app.route('/service-worker.js')
+    def service_worker():
+        """Serve service worker from root to allow full scope"""
+        response = app.send_static_file('js/service-worker.js')
+        response.headers['Service-Worker-Allowed'] = '/'
+        response.headers['Content-Type'] = 'application/javascript'
+        return response
+    
+    # Serve manifest from root for PWA
+    @app.route('/manifest.json')
+    def manifest():
+        """Serve manifest from root"""
+        return app.send_static_file('manifest.json')
+    
     # Page routes (serving templates)
 
     
