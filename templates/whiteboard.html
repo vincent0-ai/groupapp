@@ -541,6 +541,24 @@
             savedCanvasData = null; // Clear saved state when board is cleared
         });
 
+        socket.on('whiteboard_undo', (data) => {
+            if (data.user_id === userId) return;
+            
+            if (!data.image_data) {
+                if (ctx && canvas) ctx.clearRect(0, 0, canvas.width, canvas.height);
+                return;
+            }
+            
+            const img = new Image();
+            img.src = data.image_data;
+            img.onload = () => {
+                if (ctx && canvas) {
+                    ctx.clearRect(0, 0, canvas.width, canvas.height);
+                    ctx.drawImage(img, 0, 0);
+                }
+            };
+        });
+
         const undoBtn = document.getElementById('undoBtn');
         if (undoBtn) {
             undoBtn.addEventListener('click', () => {
@@ -548,6 +566,11 @@
                 history.pop();
                 if (history.length === 0) {
                     if (ctx && canvas) ctx.clearRect(0, 0, canvas.width, canvas.height);
+                    socket.emit('whiteboard_undo', {
+                        room: sessionId ? `whiteboard:${sessionId}` : 'whiteboard',
+                        user_id: userId,
+                        image_data: null
+                    });
                     return;
                 }
 
@@ -557,6 +580,11 @@
                     if (ctx && canvas) {
                         ctx.clearRect(0, 0, canvas.width, canvas.height);
                         ctx.drawImage(img, 0, 0);
+                        socket.emit('whiteboard_undo', {
+                            room: sessionId ? `whiteboard:${sessionId}` : 'whiteboard',
+                            user_id: userId,
+                            image_data: history[history.length - 1]
+                        });
                     }
                 };
             });
@@ -950,6 +978,11 @@
         });
 
         async function startScreenShare() {
+            if (!navigator.mediaDevices || !navigator.mediaDevices.getDisplayMedia) {
+                alert('Screen sharing is not supported in this browser or context (requires HTTPS).');
+                return;
+            }
+
             try {
                 localScreenStream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: true });
                 
@@ -970,9 +1003,18 @@
                 if (!isInCall) {
                     isInCall = true;
                     socket.emit('webrtc_join', { room: sessionId ? `whiteboard:${sessionId}` : 'whiteboard', user_id: userId });
+                    
+                    if (liveBtn) {
+                        liveBtn.classList.remove('btn-outline-success');
+                        liveBtn.classList.add('btn-success');
+                        liveBtn.innerHTML = '<i class="fas fa-phone-slash"></i> Leave (Listen Only)';
+                    }
                 }
             } catch (e) {
                 console.error('Error starting screen share:', e);
+                if (e.name !== 'NotAllowedError') {
+                    alert('Failed to start screen share: ' + e.message);
+                }
             }
         }
 
