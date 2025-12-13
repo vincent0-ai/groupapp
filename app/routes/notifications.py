@@ -8,7 +8,6 @@ from bson import ObjectId
 from datetime import datetime
 
 notifications_bp = Blueprint('notifications', __name__, url_prefix='/api/notifications')
-db = Database()
 
 
 @notifications_bp.route('', methods=['GET'])
@@ -16,6 +15,7 @@ db = Database()
 def get_notifications():
     """Get user's notifications"""
     try:
+        db = Database()
         limit = request.args.get('limit', 50, type=int)
         
         notifications = list(db.db.notifications.find(
@@ -51,6 +51,7 @@ def get_notifications():
 def mark_as_read(notification_id):
     """Mark a notification as read"""
     try:
+        db = Database()
         result = db.db.notifications.update_one(
             {
                 '_id': ObjectId(notification_id),
@@ -72,6 +73,7 @@ def mark_as_read(notification_id):
 def mark_all_as_read():
     """Mark all notifications as read"""
     try:
+        db = Database()
         db.db.notifications.update_many(
             {'user_id': ObjectId(g.user_id), 'read': False},
             {'$set': {'read': True, 'read_at': datetime.utcnow()}}
@@ -87,6 +89,7 @@ def mark_all_as_read():
 def delete_notification(notification_id):
     """Delete a notification"""
     try:
+        db = Database()
         result = db.db.notifications.delete_one({
             '_id': ObjectId(notification_id),
             'user_id': ObjectId(g.user_id)
@@ -114,6 +117,7 @@ def create_notification(user_id, notification_type, message, link=None, data=Non
     - dm: Direct message received
     """
     try:
+        db = Database()
         notification = {
             'user_id': ObjectId(user_id) if isinstance(user_id, str) else user_id,
             'type': notification_type,
@@ -134,6 +138,7 @@ def create_notification(user_id, notification_type, message, link=None, data=Non
 def create_bulk_notifications(user_ids, notification_type, message, link=None, data=None):
     """Create notifications for multiple users"""
     try:
+        db = Database()
         notifications = []
         for user_id in user_ids:
             notifications.append({
