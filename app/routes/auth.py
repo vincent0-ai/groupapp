@@ -147,7 +147,12 @@ def google_login():
     # Ensure credentials are strings and stripped of whitespace
     client_id = str(client_id).strip()
     client_secret = str(client_secret).strip()
-    redirect_uri = url_for('auth.google_callback', _external=True)
+    
+    # Allow overriding redirect_uri via env var (useful for proxies/containers)
+    redirect_uri = current_app.config.get('GOOGLE_REDIRECT_URI') or os.environ.get('GOOGLE_REDIRECT_URI')
+    if not redirect_uri:
+        redirect_uri = url_for('auth.google_callback', _external=True)
+    print(f"DEBUG: Google Redirect URI used: {redirect_uri}")
 
     client_config = {
         "web": {
@@ -194,7 +199,10 @@ def google_callback():
     # Ensure credentials are strings and stripped of whitespace
     client_id = str(client_id).strip()
     client_secret = str(client_secret).strip()
-    redirect_uri = url_for('auth.google_callback', _external=True)
+    
+    redirect_uri = current_app.config.get('GOOGLE_REDIRECT_URI') or os.environ.get('GOOGLE_REDIRECT_URI')
+    if not redirect_uri:
+        redirect_uri = url_for('auth.google_callback', _external=True)
 
     client_config = {
         "web": {
