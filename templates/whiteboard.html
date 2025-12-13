@@ -666,22 +666,57 @@
                             audioContainer.innerHTML = ''; // Clear previous
                             const list = document.createElement('div');
                             list.className = 'mt-2';
-                            wb.audio_files.forEach(f => {
+                            // Show only last 3 files, newest first
+                            const recentFiles = wb.audio_files.slice(-3).reverse();
+                            
+                            recentFiles.forEach(f => {
                                 const row = document.createElement('div');
+                                row.className = 'd-flex align-items-center mb-2';
                                 const playBtn = document.createElement('button');
                                 playBtn.className = 'btn btn-sm btn-outline-secondary me-2';
-                                playBtn.textContent = 'Play';
+                                playBtn.innerHTML = '<i class="fas fa-play"></i>';
                                 playBtn.addEventListener('click', async () => {
-                                    const res = await fetch(`/api/files/${f.id}`, { headers: { 'Authorization': `Bearer ${token}` } });
-                                    if (res.ok) {
-                                        const data = await res.json();
-                                        const url = data.data.download_url;
-                                        const audioEl = document.createElement('audio');
-                                        audioEl.src = url; audioEl.controls = true; list.appendChild(audioEl);
+                                    // Stop all other audio elements
+                                    document.querySelectorAll('audio').forEach(a => {
+                                        a.pause();
+                                        a.currentTime = 0;
+                                    });
+                                    
+                                    // Check if audio element already exists in this row
+                                    let audioEl = row.querySelector('audio');
+                                    if (!audioEl) {
+                                        const res = await fetch(`/api/files/${f.id}`, { headers: { 'Authorization': `Bearer ${token}` } });
+                                        if (res.ok) {
+                                            const data = await res.json();
+                                            const url = data.data.download_url;
+                                            audioEl = document.createElement('audio');
+                                            audioEl.src = url; 
+                                            // audioEl.controls = true; 
+                                            audioEl.style.display = 'none';
+                                            audioEl.onended = () => { playBtn.innerHTML = '<i class="fas fa-play"></i>'; };
+                                            row.appendChild(audioEl);
+                                            audioEl.play();
+                                            playBtn.innerHTML = '<i class="fas fa-stop"></i>';
+                                        }
+                                    } else {
+                                        if (audioEl.paused) {
+                                            audioEl.play();
+                                            playBtn.innerHTML = '<i class="fas fa-stop"></i>';
+                                        } else {
+                                            audioEl.pause();
+                                            audioEl.currentTime = 0;
+                                            playBtn.innerHTML = '<i class="fas fa-play"></i>';
+                                        }
                                     }
                                 });
                                 row.appendChild(playBtn);
-                                row.appendChild(document.createTextNode(f.filename || f.filename || 'Audio'));
+                                
+                                const nameSpan = document.createElement('span');
+                                nameSpan.className = 'text-truncate small';
+                                nameSpan.style.maxWidth = '180px';
+                                nameSpan.textContent = f.filename || 'Audio Clip';
+                                row.appendChild(nameSpan);
+                                
                                 list.appendChild(row);
                             });
                             audioContainer.appendChild(list);
@@ -817,11 +852,17 @@
             // If user just got speak permission and is in a call, enable their microphone
             if (!hadSpeakPermission && canSpeak && isInCall && typeof enableMicrophone === 'function') {
                 enableMicrophone();
+                if (muteBtn) {
+                    muteBtn.classList.remove('d-none');
+                    muteBtn.innerHTML = '<i class="fas fa-microphone"></i> Mute';
+                    muteBtn.className = 'btn btn-sm btn-outline-warning';
+                }
             }
             
             // If user lost speak permission while in call, disable their microphone
             if (hadSpeakPermission && !canSpeak && isInCall && localStream) {
                 disableMicrophone();
+                if (muteBtn) muteBtn.classList.add('d-none');
             }
             
             // Update button text if in call (liveBtn may not exist yet)
@@ -869,6 +910,23 @@
         liveBtn.className = 'btn btn-sm btn-outline-success';
         liveBtn.innerHTML = '<i class="fas fa-phone"></i> Join Call';
         if (controlsContainer) controlsContainer.appendChild(liveBtn);
+        
+        // Mute button for live call
+        const muteBtn = document.createElement('button');
+        muteBtn.className = 'btn btn-sm btn-outline-warning d-none';
+        muteBtn.innerHTML = '<i class="fas fa-microphone"></i> Mute';
+        if (controlsContainer) controlsContainer.appendChild(muteBtn);
+        
+        muteBtn.addEventListener('click', () => {
+            if (localStream) {
+                const audioTrack = localStream.getAudioTracks()[0];
+                if (audioTrack) {
+                    audioTrack.enabled = !audioTrack.enabled;
+                    muteBtn.innerHTML = audioTrack.enabled ? '<i class="fas fa-microphone"></i> Mute' : '<i class="fas fa-microphone-slash"></i> Unmute';
+                    muteBtn.className = audioTrack.enabled ? 'btn btn-sm btn-outline-warning' : 'btn btn-sm btn-warning';
+                }
+            }
+        });
         
         const raiseBtn = document.createElement('button');
         raiseBtn.className = 'btn btn-sm btn-outline-secondary';
@@ -920,7 +978,10 @@
                     const form = new FormData();
                     form.append('file', blob, `whiteboard-${Date.now()}.webm`);
                     fetch(`/api/whiteboards/${sessionId}/upload_audio`, { method: 'POST', headers: { 'Authorization': `Bearer ${token}` }, body: form })
-                        .then(r => r.json()).then(d => console.log('Uploaded audio clip', d)).catch(e => console.error('Upload failed', e));
+                        .then(r => r.json()).then(d => {
+                            console.log('Uploaded audio clip', d);
+                            loadSessionInfo(); // Refresh list to show new clip
+                        }).catch(e => console.error('Upload failed', e));
                 }
                 audioChunks = [];
             }
@@ -949,6 +1010,10 @@
                     localAudio.muted = true;
                     
                     liveBtn.innerHTML = '<i class="fas fa-phone-slash"></i> Leave Call';
+                    
+                    // Show mute button
+                    if (muteBtn) muteBtn.classList.remove('d-none');
+                    
                 } else {
                     // Join as listen-only
                     localStream = null;
@@ -1047,6 +1112,9 @@
             liveBtn.classList.remove('btn-success');
             liveBtn.classList.add('btn-outline-success');
             liveBtn.innerHTML = '<i class="fas fa-phone"></i> Join Call';
+            
+            // Hide mute button
+            if (muteBtn) muteBtn.classList.add('d-none');
         }
 
         liveBtn.addEventListener('click', () => {
