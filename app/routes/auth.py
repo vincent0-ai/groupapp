@@ -120,7 +120,7 @@ def login():
 # =========================
 # GOOGLE LOGIN (CORRECT WAY)
 # =========================
-@auth_bp.route("/google", methods=["POST"])
+@auth_bp.route("/google", methods=["GET", "POST"])
 def google_login():
     data = request.get_json() or {}
     google_token = data.get("id_token")
@@ -193,7 +193,7 @@ def google_login():
 # =========================
 # LOGOUT (JWT CLIENT-SIDE)
 # =========================
-@auth_bp.route("/logout", methods=["POST"])
+@auth_bp.route("/logout", methods=["GET", "POST"])
 def logout():
     return success_response(None, "Logout successful")
 # Note: Actual logout is handled client-side by deleting the JWT token.
