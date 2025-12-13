@@ -667,30 +667,28 @@
                     body: JSON.stringify({ recipient_id: otherUserId })
                 });
                 
-                if (!res.ok) {
-                    const text = await res.text();
-                    console.error('Start conversation failed:', res.status, text);
-                    throw new Error(`Failed to start conversation (Status: ${res.status})`);
-                }
-
-                const data = await res.json();
-                console.log('Start conversation response:', data);
-                
-                if (data.status === 'success' && data.data) {
-                    // Reload threads and select this one
-                    await loadThreads();
-                    await selectThread(data.data.thread_id, otherUserId, null);
+                const contentType = res.headers.get("content-type");
+                if (contentType && contentType.indexOf("application/json") !== -1) {
+                    const data = await res.json();
+                    if (!res.ok) {
+                        throw new Error(data.message || `Server error: ${res.status}`);
+                    }
+                    console.log('Start conversation response:', data);
                     
-                    // Close modal if open
-                    const modal = bootstrap.Modal.getInstance(document.getElementById('newDmModal'));
-                    if (modal) modal.hide();
+                    if (data.status === 'success' && data.data) {
+                        await loadThreads();
+                        await selectThread(data.data.thread_id, otherUserId, null);
+                        
+                        const modal = bootstrap.Modal.getInstance(document.getElementById('newDmModal'));
+                        if (modal) modal.hide();
+                    }
                 } else {
-                    console.error('Failed to start conversation:', data.message);
-                    alert('Failed to start conversation: ' + (data.message || 'Unknown error'));
+                    console.error('Received non-JSON response:', res.status, res.statusText);
+                    throw new Error(`API Error: ${res.status} ${res.statusText}`);
                 }
             } catch (err) {
                 console.error('Error starting conversation:', err);
-                alert('Error starting conversation');
+                alert('Failed to start conversation: ' + err.message);
             }
         }
         
