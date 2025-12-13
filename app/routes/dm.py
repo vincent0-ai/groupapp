@@ -6,6 +6,7 @@ from app.services import Database
 from app.utils.decorators import require_auth
 from bson import ObjectId
 from datetime import datetime
+import html
 
 dm_bp = Blueprint('dm', __name__, url_prefix='/api/dm')
 
@@ -203,13 +204,13 @@ def send_dm_message(thread_id):
         # Create notification for recipient
         other_user_id = [p for p in thread['participants'] if p != g.user_id][0]
         sender = db.find_one('users', {'_id': ObjectId(g.user_id)})
-        sender_name = sender.get('full_name', sender.get('username', 'Someone')) if sender else 'Someone'
+        sender_name = (sender.get('full_name') or sender.get('username') or 'Someone') if sender else 'Someone'
         
         from app.routes.notifications import create_notification
         create_notification(
             user_id=other_user_id,
             notification_type='dm',
-            message = f'<span style="color: white;">{sender_name} sent you a message</span>',
+            message = f'<span style="color: white;">{html.escape(sender_name)} sent you a message</span>',
             link=f'/dm?dm={g.user_id}'
         )
         

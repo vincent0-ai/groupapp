@@ -708,7 +708,10 @@
                         const ids2 = wb.can_speak.map(x => x.toString());
                         canSpeak = ids2.includes(userId);
                     }
-                    if (isCreator) canSpeak = true;
+                    if (isCreator) {
+                        canDraw = true;
+                        canSpeak = true;
+                    }
 
                     if (liveBtn) {
                         if (isCreator) {
@@ -942,6 +945,11 @@
             const hadSpeakPermission = canSpeak;
             canDraw = can_draw.includes(userId);
             canSpeak = can_speak.includes(userId);
+            
+            if (isCreator) {
+                canDraw = true;
+                canSpeak = true;
+            }
             
             // If user just got speak permission and is in a call, enable their microphone
             if (!hadSpeakPermission && canSpeak && isInCall && typeof enableMicrophone === 'function') {
