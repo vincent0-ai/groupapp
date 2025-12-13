@@ -12,7 +12,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
     <script>
-        if (localStorage.getItem('token')) {
+        if (localStorage.getItem('token') || sessionStorage.getItem('token')) {
             window.location.href = '/dashboard';
         }
     </script>
@@ -262,11 +262,17 @@
                                             <input type="password" class="form-control border-start-0 ps-0" id="loginPassword" placeholder="Enter your password" required>
                                         </div>
                                     </div>
+                                    <div class="d-flex justify-content-between align-items-center mb-3">
+                                        <div class="form-check">
+                                            <input class="form-check-input" type="checkbox" id="rememberMe" checked>
+                                            <label class="form-check-label small" for="rememberMe">Remember me</label>
+                                        </div>
+                                        <a href="#" class="text-decoration-none small">Forgot password?</a>
+                                    </div>
                                     <button type="submit" class="btn btn-primary w-100 py-2 mb-3" id="loginBtn">
                                         <i class="fas fa-sign-in-alt me-2"></i>Login
                                     </button>
                                 </form>
-                                <a href="#" class="text-center d-block text-muted small">Forgot password?</a>
                             </div>
 
                             <!-- Signup Panel -->
@@ -364,8 +370,13 @@
                        socialContainer.innerHTML = '<div class="text-center w-100 py-2 text-success"><i class="fas fa-check-circle me-2"></i>Login successful! Redirecting...</div>';
                   }
                   // Save token and redirect
-                  localStorage.setItem('token', data.data.token);
-                  localStorage.setItem('user', JSON.stringify(data.data.user));
+                  const rememberMe = document.getElementById('rememberMe').checked;
+                  const storage = rememberMe ? localStorage : sessionStorage;
+                  
+                  storage.setItem('token', data.data.token);
+                  storage.setItem('user', JSON.stringify(data.data.user));
+                  storage.setItem('userId', data.data.user._id || data.data.user.id);
+
                   setTimeout(() => {
                       window.location.href = '/dashboard';
                   }, 500);

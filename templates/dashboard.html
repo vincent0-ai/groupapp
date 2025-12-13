@@ -380,8 +380,8 @@
 
 {% block scripts %}
     <script>
-        const token = localStorage.getItem('token');
-        const userId = localStorage.getItem('userId');
+        const token = localStorage.getItem('token') || sessionStorage.getItem('token');
+        const userId = localStorage.getItem('userId') || sessionStorage.getItem('userId');
         let questionCount = 0;
 
         function viewGroup(groupId) {
@@ -419,7 +419,7 @@
         // Load dashboard data
         async function loadDashboard() {
             try {
-                const token = localStorage.getItem('token');
+                const token = localStorage.getItem('token') || sessionStorage.getItem('token');
                 if (!token) {
                     sessionStorage.setItem('redirectAfterLogin', window.location.href);
                     window.location.href = "{{ url_for('auth_page') }}";
@@ -432,6 +432,7 @@
                 });
                 if (userRes.status === 401) {
                     localStorage.removeItem('token');
+                    sessionStorage.removeItem('token');
                     sessionStorage.setItem('redirectAfterLogin', window.location.href);
                     window.location.href = "{{ url_for('auth_page') }}";
                     return;
@@ -524,7 +525,7 @@
         document.getElementById('createGroupForm').addEventListener('submit', async (e) => {
             e.preventDefault();
             try {
-                const token = localStorage.getItem('token');
+                const token = localStorage.getItem('token') || sessionStorage.getItem('token');
                 const res = await fetch('/api/groups', {
                     method: 'POST',
                     headers: {
@@ -539,6 +540,7 @@
                 });
                 if (res.status === 401) {
                     localStorage.removeItem('token');
+                    sessionStorage.removeItem('token');
                     window.location.href = "{{ url_for('auth_page') }}";
                     return;
                 }
@@ -638,6 +640,7 @@
                     loadDashboard();
                 } else if (res.status === 401) {
                     localStorage.removeItem('token');
+                    sessionStorage.removeItem('token');
                     sessionStorage.setItem('redirectAfterLogin', window.location.href);
                     window.location.href = "{{ url_for('auth_page') }}";
                 } else {
