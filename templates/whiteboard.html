@@ -198,6 +198,15 @@
         </div>
     </div>
 </div>
+
+<!-- Remote Video Container (Screen Share) -->
+<div id="remoteVideoContainer" style="display:none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.9); z-index: 10000; align-items: center; justify-content: center; flex-direction: column;">
+    <div class="d-flex w-100 justify-content-end p-3" style="position: absolute; top: 0;">
+        <button class="btn btn-outline-light rounded-circle" onclick="document.getElementById('remoteVideoContainer').style.display='none'"><i class="fas fa-times"></i></button>
+    </div>
+    <video id="remoteVideo" autoplay playsinline controls style="max-width: 95%; max-height: 90%; border-radius: 8px; box-shadow: 0 0 20px rgba(0,0,0,0.5);"></video>
+    <div id="remoteVideoLabel" class="text-white mt-2 fw-bold fs-5"></div>
+</div>
 {% endblock %}
 
 {% block modals %}
@@ -571,6 +580,8 @@
         // WebRTC state (declared early for access in socket handlers)
         let isInCall = false;
         let localStream = null;
+        let localScreenStream = null;
+        let currentScreenSharerId = null;
         const peers = {}; // Map of userId -> RTCPeerConnection
         let liveBtn = null; // Will be created later
 
@@ -666,6 +677,18 @@
                             audioContainer.innerHTML = ''; // Clear previous
                             const list = document.createElement('div');
                             list.className = 'mt-2';
+                            
+                            // Delete older files if there are more than 3
+                            if (isCreator && wb.audio_files.length > 3) {
+                                const filesToDelete = wb.audio_files.slice(0, -3);
+                                filesToDelete.forEach(f => {
+                                    fetch(`/api/files/${f.id}`, {
+                                        method: 'DELETE',
+                                        headers: { 'Authorization': `Bearer ${token}` }
+                                    }).catch(e => console.error('Failed to delete old file', e));
+                                });
+                            }
+
                             // Show only last 3 files, newest first
                             const recentFiles = wb.audio_files.slice(-3).reverse();
                             
@@ -911,6 +934,83 @@
         liveBtn.innerHTML = '<i class="fas fa-phone"></i> Join Call';
         if (controlsContainer) controlsContainer.appendChild(liveBtn);
         
+        // Screen share button
+        const screenShareBtn = document.createElement('button');
+        screenShareBtn.className = 'btn btn-sm btn-outline-info';
+        screenShareBtn.innerHTML = '<i class="fas fa-desktop"></i> Share Screen';
+        if (controlsContainer) controlsContainer.appendChild(screenShareBtn);
+
+        screenShareBtn.addEventListener('click', async () => {
+            if (localScreenStream) {
+                stopScreenShare();
+            } else {
+                await startScreenShare();
+            }
+        });
+
+        async function startScreenShare() {
+            try {
+                localScreenStream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: true });
+                
+                localScreenStream.getVideoTracks()[0].onended = () => {
+                    stopScreenShare();
+                };
+
+                screenShareBtn.className = 'btn btn-sm btn-info text-white';
+                screenShareBtn.innerHTML = '<i class="fas fa-desktop"></i> Stop Sharing';
+
+                // Add tracks to peers and renegotiate
+                for (const [peerId, peer] of Object.entries(peers)) {
+                    localScreenStream.getTracks().forEach(track => peer.addTrack(track, localScreenStream));
+                    renegotiate(peerId, peer);
+                }
+                
+                // If not in call, join it to establish connections
+                if (!isInCall) {
+                    isInCall = true;
+                    socket.emit('webrtc_join', { room: sessionId ? `whiteboard:${sessionId}` : 'whiteboard', user_id: userId });
+                }
+            } catch (e) {
+                console.error('Error starting screen share:', e);
+            }
+        }
+
+        function stopScreenShare() {
+            if (!localScreenStream) return;
+            
+            localScreenStream.getTracks().forEach(track => track.stop());
+            localScreenStream = null;
+            
+            screenShareBtn.className = 'btn btn-sm btn-outline-info';
+            screenShareBtn.innerHTML = '<i class="fas fa-desktop"></i> Share Screen';
+            
+            // Remove video tracks from peers
+            for (const [peerId, peer] of Object.entries(peers)) {
+                const senders = peer.getSenders();
+                senders.forEach(sender => {
+                    if (sender.track && sender.track.kind === 'video') {
+                        peer.removeTrack(sender);
+                    }
+                });
+                renegotiate(peerId, peer);
+            }
+        }
+        
+        async function renegotiate(peerId, peer) {
+            try {
+                const offer = await peer.createOffer({ offerToReceiveAudio: true, offerToReceiveVideo: true });
+                await peer.setLocalDescription(offer);
+                socket.emit('webrtc_offer', {
+                    room: sessionId ? `whiteboard:${sessionId}` : 'whiteboard',
+                    target: peerId,
+                    sender: userId,
+                    offer: offer
+                });
+            } catch (e) {
+                console.error('Error renegotiating:', e);
+            }
+        }
+        
         // Mute button for live call
         const muteBtn = document.createElement('button');
         muteBtn.className = 'btn btn-sm btn-outline-warning d-none';
@@ -1055,18 +1155,7 @@
                 
                 // Renegotiate with all peers
                 for (const [peerId, peer] of Object.entries(peers)) {
-                    try {
-                        const offer = await peer.createOffer();
-                        await peer.setLocalDescription(offer);
-                        socket.emit('webrtc_offer', {
-                            room: sessionId ? `whiteboard:${sessionId}` : 'whiteboard',
-                            target: peerId,
-                            sender: userId,
-                            offer: offer
-                        });
-                    } catch (e) {
-                        console.error('Error renegotiating with peer:', peerId, e);
-                    }
+                    renegotiate(peerId, peer);
                 }
                 
                 liveBtn.innerHTML = '<i class="fas fa-phone-slash"></i> Leave Call';
@@ -1133,37 +1222,9 @@
             
             console.log('User joined call:', remoteUserId);
             
-            // Close existing peer connection if any
-            if (peers[remoteUserId]) {
-                peers[remoteUserId].close();
-            }
-            
-            // Create peer connection - always create it even if we have no stream
-            const peer = createPeerConnection(remoteUserId);
-            peers[remoteUserId] = peer;
-            
-            // Add local tracks if we have them (speaker)
-            if (localStream) {
-                localStream.getTracks().forEach(track => peer.addTrack(track, localStream));
-            }
-            
-            // Always create and send offer - even listen-only users need to establish connection
-            // to receive audio from the other peer
-            try {
-                const offer = await peer.createOffer({
-                    offerToReceiveAudio: true,  // We want to receive audio
-                    offerToReceiveVideo: false
-                });
-                await peer.setLocalDescription(offer);
-                socket.emit('webrtc_offer', {
-                    room: sessionId ? `whiteboard:${sessionId}` : 'whiteboard',
-                    target: remoteUserId,
-                    sender: userId,
-                    offer: offer
-                });
-            } catch (e) {
-                console.error('Error creating offer:', e);
-            }
+            // We do NOT initiate connection here to avoid glare (collision).
+            // The new user will receive 'webrtc_existing_users' and initiate the offer.
+            // We just wait for 'webrtc_offer'.
         });
 
         // Handle list of existing users when we join a call
@@ -1191,12 +1252,16 @@
                 if (localStream) {
                     localStream.getTracks().forEach(track => peer.addTrack(track, localStream));
                 }
+                // Add screen share tracks if we have them
+                if (localScreenStream) {
+                    localScreenStream.getTracks().forEach(track => peer.addTrack(track, localScreenStream));
+                }
                 
                 // Send offer to this existing user
                 try {
                     const offer = await peer.createOffer({
                         offerToReceiveAudio: true,
-                        offerToReceiveVideo: false
+                        offerToReceiveVideo: true
                     });
                     await peer.setLocalDescription(offer);
                     socket.emit('webrtc_offer', {
@@ -1222,6 +1287,13 @@
                 // Remove audio element
                 const audioEl = document.getElementById(`audio-${remoteUserId}`);
                 if (audioEl) audioEl.remove();
+                
+                // Remove video if active
+                if (currentScreenSharerId === remoteUserId) {
+                    document.getElementById('remoteVideoContainer').style.display = 'none';
+                    document.getElementById('remoteVideo').srcObject = null;
+                    currentScreenSharerId = null;
+                }
             }
         });
 
@@ -1239,6 +1311,11 @@
             // Close existing peer connection if any (renegotiation)
             if (peers[sender]) {
                 peers[sender].close();
+                if (currentScreenSharerId === sender) {
+                    document.getElementById('remoteVideoContainer').style.display = 'none';
+                    document.getElementById('remoteVideo').srcObject = null;
+                    currentScreenSharerId = null;
+                }
             }
             
             const peer = createPeerConnection(sender);
@@ -1250,6 +1327,9 @@
                 // Add local tracks if we have a stream (speaker mode)
                 if (localStream) {
                     localStream.getTracks().forEach(track => peer.addTrack(track, localStream));
+                }
+                if (localScreenStream) {
+                    localScreenStream.getTracks().forEach(track => peer.addTrack(track, localScreenStream));
                 }
                 
                 // Create answer - always do this to complete the connection
@@ -1330,14 +1410,27 @@
             
             peer.ontrack = (event) => {
                 console.log('Received track from:', remoteUserId);
-                let audioEl = document.getElementById(`audio-${remoteUserId}`);
-                if (!audioEl) {
-                    audioEl = document.createElement('audio');
-                    audioEl.id = `audio-${remoteUserId}`;
-                    audioEl.autoplay = true;
-                    participantsEl.appendChild(audioEl);
+                if (event.track.kind === 'audio') {
+                    let audioEl = document.getElementById(`audio-${remoteUserId}`);
+                    if (!audioEl) {
+                        audioEl = document.createElement('audio');
+                        audioEl.id = `audio-${remoteUserId}`;
+                        audioEl.autoplay = true;
+                        participantsEl.appendChild(audioEl);
+                    }
+                    audioEl.srcObject = event.streams[0];
+                } else if (event.track.kind === 'video') {
+                    const container = document.getElementById('remoteVideoContainer');
+                    const video = document.getElementById('remoteVideo');
+                    const label = document.getElementById('remoteVideoLabel');
+                    if (container && video) {
+                        video.srcObject = event.streams[0];
+                        container.style.display = 'flex';
+                        const name = participants[remoteUserId]?.name || 'User';
+                        if (label) label.textContent = `${name}'s Screen`;
+                        currentScreenSharerId = remoteUserId;
+                    }
                 }
-                audioEl.srcObject = event.streams[0];
             };
             
             return peer;
