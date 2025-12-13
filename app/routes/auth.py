@@ -6,6 +6,9 @@ from app.utils import (
 from app.services import Database
 from app.models import User
 from bson import ObjectId
+from google_auth_oauthlib.flow import Flow
+from google.oauth2 import id_token
+from google.auth.transport import requests as google_requests
 
 auth_bp = Blueprint('auth', __name__, url_prefix='/api/auth')
 
@@ -129,28 +132,76 @@ def logout():
 
 @auth_bp.route('/google')
 def google_login():
-    if not current_app.config.get('GOOGLE_CLIENT_ID'):
-        return error_response('Google Client ID is not configured.', 500)
-    redirect_uri = url_for('auth.google_callback', _external=True)
-    return current_app.google.authorize_redirect(redirect_uri)
+    if not current_app.config.get('GOOGLE_CLIENT_ID') or not current_app.config.get('GOOGLE_CLIENT_SECRET'):
+        return error_response('Google Client configuration is missing.', 500)
+    
+    client_config = {
+        "web": {
+            "client_id": current_app.config['GOOGLE_CLIENT_ID'],
+            "client_secret": current_app.config['GOOGLE_CLIENT_SECRET'],
+            "auth_uri": "https://accounts.google.com/o/oauth2/auth",
+            "token_uri": "https://oauth2.googleapis.com/token",
+        }
+    }
+    
+    flow = Flow.from_client_config(
+        client_config,
+        scopes=['openid', 'https://www.googleapis.com/auth/userinfo.email', 'https://www.googleapis.com/auth/userinfo.profile']
+    )
+    flow.redirect_uri = url_for('auth.google_callback', _external=True)
+    
+    authorization_url, state = flow.authorization_url(
+        access_type='offline',
+        include_granted_scopes='true'
+    )
+    session['state'] = state
+    return redirect(authorization_url)
 
 @auth_bp.route('/google/callback')
 def google_callback():
-    token = current_app.google.authorize_access_token()
-    resp = current_app.google.get('userinfo')
-    userinfo = resp.json()
-    if not userinfo.get('email'):
+    state = session.get('state')
+    if not state:
+        return error_response('State missing from session', 400)
+        
+    client_config = {
+        "web": {
+            "client_id": current_app.config['GOOGLE_CLIENT_ID'],
+            "client_secret": current_app.config['GOOGLE_CLIENT_SECRET'],
+            "auth_uri": "https://accounts.google.com/o/oauth2/auth",
+            "token_uri": "https://oauth2.googleapis.com/token",
+        }
+    }
+    
+    flow = Flow.from_client_config(
+        client_config,
+        scopes=['openid', 'https://www.googleapis.com/auth/userinfo.email', 'https://www.googleapis.com/auth/userinfo.profile'],
+        state=state
+    )
+    flow.redirect_uri = url_for('auth.google_callback', _external=True)
+    
+    try:
+        flow.fetch_token(authorization_response=request.url)
+        credentials = flow.credentials
+        request_adapter = google_requests.Request()
+        id_info = id_token.verify_oauth2_token(
+            credentials.id_token, request_adapter, current_app.config['GOOGLE_CLIENT_ID']
+        )
+    except Exception as e:
+        return error_response(f'Authentication failed: {str(e)}', 400)
+
+    email = id_info.get('email')
+    if not email:
         return redirect(url_for('auth_page', error='Google login failed'))
     # Find or create user
     db = Database()
-    user = db.find_one('users', {'email': userinfo['email']})
+    user = db.find_one('users', {'email': email})
     if not user:
         user_doc = User.create_user_doc(
-            userinfo['email'],
-            userinfo.get('name', userinfo['email'].split('@')[0]),
+            email,
+            id_info.get('name', email.split('@')[0]),
             '',
-            userinfo.get('name', ''),
-            userinfo.get('picture', '')
+            id_info.get('name', ''),
+            id_info.get('picture', '')
         )
         user_id = db.insert_one('users', user_doc)
         user = db.find_one('users', {'_id': user_id})
