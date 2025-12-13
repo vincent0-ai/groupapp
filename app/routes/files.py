@@ -67,11 +67,12 @@ def get_all_files():
         user_groups = list(db.find('groups', {'members': user_id_obj}))
         group_ids = [grp['_id'] for grp in user_groups]
         
-        # Get files from user's groups or uploaded by user
+        # Get files from user's groups, uploaded by user, OR public files
         files = list(db.find('files', {
             '$or': [
                 {'group_id': {'$in': group_ids}},
-                {'uploaded_by': user_id_obj}
+                {'uploaded_by': user_id_obj},
+                {'is_public': True}
             ]
         }))
     
@@ -167,6 +168,10 @@ def upload_file():
     )
     file_doc['file_size'] = file_size
     file_doc['mime_type'] = content_type
+    
+    # Handle is_public flag from form
+    is_public = request.form.get('is_public', 'false').lower() in ('true', '1', 'on')
+    file_doc['is_public'] = is_public
     
     file_id = db.insert_one('files', file_doc)
     

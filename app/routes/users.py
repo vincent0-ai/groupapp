@@ -43,21 +43,26 @@ def search_users():
     """Search users"""
     query = request.args.get('q', '').strip()
     
-    if not query:
-        return error_response('Search query is required', 400)
-    
-    if len(query) < 2:
-        return success_response([], 'Query too short', 200)
-    
     db = Database()
     
-    # Simple regex search on username and full_name only (not email for privacy)
-    users = list(db.find('users', {
-        '$or': [
-            {'username': {'$regex': query, '$options': 'i'}},
-            {'full_name': {'$regex': query, '$options': 'i'}}
-        ]
-    }, limit=20))
+    if not query or len(query) < 2:
+        # Return some suggested users (most active users, excluding current user)
+        users = list(db.find('users', 
+            {'_id': {'$ne': ObjectId(g.user_id)}},
+            limit=10, 
+            sort=('points', -1)
+        ))
+    else:
+        # Search by username and full_name
+        users = list(db.find('users', {
+            '$and': [
+                {'_id': {'$ne': ObjectId(g.user_id)}},
+                {'$or': [
+                    {'username': {'$regex': query, '$options': 'i'}},
+                    {'full_name': {'$regex': query, '$options': 'i'}}
+                ]}
+            ]
+        }, limit=20))
     
     # Return only public fields
     public_users = []
