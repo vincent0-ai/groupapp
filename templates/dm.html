@@ -551,13 +551,13 @@
                 }
                 
                 const data = await res.json();
-                console.log('Leaderboard full response:', JSON.stringify(data, null, 2));
+                console.log('Leaderboard full response:', data);
                 
-                if (data.success && data.data) {
+                // Check for status: 'success' (not success: true)
+                if (data.status === 'success' && data.data) {
                     // Use leaderboard array (same as dashboard)
                     const users = data.data.leaderboard || data.data.users || [];
                     console.log('Total users from API:', users.length);
-                    console.log('Users:', users.map(u => ({ id: u._id || u.id, username: u.username })));
                     
                     if (users.length > 0) {
                         renderUserResults(users);
@@ -567,7 +567,7 @@
                         return;
                     }
                 } else {
-                    console.error('API returned success=false or no data:', data);
+                    console.error('API returned error or no data:', data);
                 }
             } catch (err) {
                 console.error('Leaderboard fetch error:', err);
@@ -631,7 +631,8 @@
                 });
                 const data = await res.json();
                 
-                if (data.success && data.data) {
+                // Check for status: 'success' (not success: true)
+                if (data.status === 'success' && data.data) {
                     const allUsers = data.data.leaderboard || data.data.users || [];
                     const queryLower = query.toLowerCase();
                     const matchedUsers = allUsers.filter(u => 
