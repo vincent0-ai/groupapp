@@ -111,9 +111,17 @@ def signup():
 
     send_verification_email(email, user_doc["verification_token"])
 
+    response_data = None
+    message = "Signup successful. Please check your email to verify your account."
+
+    # If SMTP is not configured, return the link in the response for development
+    if not os.environ.get("SMTP_USER") or not os.environ.get("SMTP_PASSWORD"):
+        verify_url = url_for('auth.verify_email', token=user_doc["verification_token"], _external=True)
+        response_data = {"verification_link": verify_url}
+
     return success_response(
-        None,
-        "Signup successful. Please check your email to verify your account.",
+        response_data,
+        message,
         201
     )
 
