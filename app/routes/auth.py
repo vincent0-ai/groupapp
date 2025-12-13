@@ -1,4 +1,5 @@
-from flask import Blueprint, request
+from flask import Blueprint, request, redirect, url_for, session, current_app
+from flask_oauthlib.client import OAuth
 from app.utils import (
     hash_password, verify_password, generate_token, 
     success_response, error_response, validate_email, serialize_document
@@ -8,6 +9,23 @@ from app.models import User
 from bson import ObjectId
 
 auth_bp = Blueprint('auth', __name__, url_prefix='/api/auth')
+
+# Google OAuth setup
+oauth = OAuth()
+google = oauth.remote_app(
+    'google',
+    consumer_key=current_app.config.get('GOOGLE_CLIENT_ID', ''),
+    consumer_secret=current_app.config.get('GOOGLE_CLIENT_SECRET', ''),
+    request_token_params={
+        'scope': 'email profile'
+    },
+    base_url='https://www.googleapis.com/oauth2/v1/',
+    request_token_url=None,
+    access_token_method='POST',
+    access_token_url='https://accounts.google.com/o/oauth2/token',
+    authorize_url='https://accounts.google.com/o/oauth2/auth',
+)
+oauth.init_app(current_app)
 
 @auth_bp.route('/signup', methods=['POST'])
 def signup():
@@ -125,3 +143,37 @@ def logout():
     """User logout endpoint"""
     # In production, invalidate token in Redis
     return success_response(None, 'Logged out successfully', 200)
+
+@auth_bp.route('/google')
+def google_login():
+    callback=url_for('auth.google_authorized', _external=True)
+    return google.authorize(callback=callback)
+
+@auth_bp.route('/google/callback')
+def google_authorized():
+    resp = google.authorized_response()
+    if resp is None or resp.get('access_token') is None:
+        return redirect(url_for('auth_page', error='Google login failed'))
+    session['google_token'] = (resp['access_token'], '')
+    userinfo = google.get('userinfo')
+    if not userinfo.data.get('email'):
+        return redirect(url_for('auth_page', error='Google login failed'))
+    # Find or create user
+    db = Database()
+    user = db.find_one('users', {'email': userinfo.data['email']})
+    if not user:
+        user_doc = User.create_user_doc(
+            userinfo.data['email'],
+            userinfo.data.get('name', userinfo.data['email'].split('@')[0]),
+            '',
+            userinfo.data.get('name', ''),
+            userinfo.data.get('picture', '')
+        )
+        user_id = db.insert_one('users', user_doc)
+        user = db.find_one('users', {'_id': user_id})
+    # Generate token
+    token = generate_token(str(user['_id']))
+    # Log in user (set session or return token)
+    return redirect(url_for('auth_page', token=token))
+
+google.tokengetter(lambda: session.get('google_token'))
