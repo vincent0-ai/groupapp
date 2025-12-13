@@ -799,12 +799,13 @@
                 el.className = 'd-flex align-items-center justify-content-between mb-2';
                 const left = document.createElement('div');
                 left.className = 'd-flex align-items-center';
+                left.style.minWidth = '0';
                 const avatarSrc = meta.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(meta.name || meta.username || uid)}`;
-                const avatarHtml = `<img src="${avatarSrc}" class="rounded-circle me-2" width="24" height="24"/>`;
-                left.innerHTML = avatarHtml + `<span class="small fw-medium" style="color: var(--text-dark);">${meta.name || uid}</span>`;
+                const avatarHtml = `<img src="${avatarSrc}" class="rounded-circle me-2 flex-shrink-0" width="24" height="24"/>`;
+                left.innerHTML = avatarHtml + `<span class="small fw-medium text-truncate" style="color: var(--text-dark);" title="${meta.name || uid}">${meta.name || uid}</span>`;
                 el.appendChild(left);
                 const right = document.createElement('div');
-                right.className = 'd-flex gap-1';
+                right.className = 'd-flex gap-1 flex-shrink-0 ms-1';
                 if (isCreator && uid !== userId) {
                     const grantDraw = document.createElement('button');
                     grantDraw.className = 'btn btn-xs ' + (meta.can_draw ? 'btn-primary' : 'btn-outline-primary');
@@ -903,7 +904,7 @@
         socket.on('hand_raised', (data) => {
             const uid = data.user_id;
             const profile = data.profile;
-            if (!participants[uid]) participants[uid] = { name: profile?.full_name || profile?.username || 'User ' + uid.substr(-4), avatar_url: profile?.avatar_url || '', can_draw: false, can_speak: false };
+            if (!participants[uid]) participants[uid] = { name: profile?.username || profile?.full_name || 'User ' + uid.substr(-4), avatar_url: profile?.avatar_url || '', can_draw: false, can_speak: false };
             participants[uid].raised = true;
             renderParticipants();
         });
