@@ -360,19 +360,41 @@ def create_app(config_name='development'):
         except Exception:
             pass
 
-    # WebRTC signaling
+    # WebRTC signaling - track users in each call room
+    webrtc_rooms = {}  # {room_id: set(user_ids)}
+    
     @socketio.on('webrtc_join')
     def handle_webrtc_join(data):
         room = data.get('room')
         user_id = data.get('user_id')
-        if room:
+        if room and user_id:
+            # Initialize room if needed
+            if room not in webrtc_rooms:
+                webrtc_rooms[room] = set()
+            
+            # Get list of existing users BEFORE adding the new user
+            existing_users = list(webrtc_rooms[room])
+            
+            # Add user to the room
+            webrtc_rooms[room].add(user_id)
+            
+            # Send the list of existing users to the joining user
+            emit('webrtc_existing_users', {'users': existing_users})
+            
+            # Notify existing users that a new user joined
             emit('webrtc_user_joined', {'user_id': user_id}, room=room, skip_sid=request.sid)
 
     @socketio.on('webrtc_leave')
     def handle_webrtc_leave(data):
         room = data.get('room')
         user_id = data.get('user_id')
-        if room:
+        if room and user_id:
+            # Remove user from room tracking
+            if room in webrtc_rooms:
+                webrtc_rooms[room].discard(user_id)
+                # Clean up empty rooms
+                if not webrtc_rooms[room]:
+                    del webrtc_rooms[room]
             emit('webrtc_user_left', {'user_id': user_id}, room=room, skip_sid=request.sid)
 
     @socketio.on('webrtc_offer')

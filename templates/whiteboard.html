@@ -80,11 +80,8 @@
 <!-- Page Header -->
 <div class="page-header mb-4" style="background: var(--gradient-primary); border-radius: 20px; padding: 2rem; color: white;">
     <div class="d-flex align-items-center gap-3">
-        <div style="width: 60px; height: 60px; background: rgba(255,255,255,0.2); border-radius: 16px; display: flex; align-items: center; justify-content: center;">
-            <i class="fas fa-chalkboard fa-2x"></i>
-        </div>
         <div>
-            <h1 class="mb-1" style="font-size: 1.75rem; font-weight: 700;">Collaborative Whiteboard</h1>
+            <h1 class="mb-1" style="font-size: 1.75rem; font-weight: 700;">Collaborate</h1>
             <p class="mb-0 opacity-75">Draw and collaborate in real-time with your group</p>
         </div>
     </div>
@@ -1098,6 +1095,52 @@
                 });
             } catch (e) {
                 console.error('Error creating offer:', e);
+            }
+        });
+
+        // Handle list of existing users when we join a call
+        // This ensures we connect to ALL users already in the call
+        socket.on('webrtc_existing_users', async (data) => {
+            const existingUsers = data.users || [];
+            if (!isInCall) return;
+            
+            console.log('Existing users in call:', existingUsers);
+            
+            // Create peer connections to all existing users
+            for (const remoteUserId of existingUsers) {
+                if (remoteUserId === userId) continue;
+                
+                // Close existing peer connection if any
+                if (peers[remoteUserId]) {
+                    peers[remoteUserId].close();
+                }
+                
+                // Create peer connection
+                const peer = createPeerConnection(remoteUserId);
+                peers[remoteUserId] = peer;
+                
+                // Add local tracks if we have them
+                if (localStream) {
+                    localStream.getTracks().forEach(track => peer.addTrack(track, localStream));
+                }
+                
+                // Send offer to this existing user
+                try {
+                    const offer = await peer.createOffer({
+                        offerToReceiveAudio: true,
+                        offerToReceiveVideo: false
+                    });
+                    await peer.setLocalDescription(offer);
+                    socket.emit('webrtc_offer', {
+                        room: sessionId ? `whiteboard:${sessionId}` : 'whiteboard',
+                        target: remoteUserId,
+                        sender: userId,
+                        offer: offer
+                    });
+                    console.log('Sent offer to existing user:', remoteUserId);
+                } catch (e) {
+                    console.error('Error creating offer for existing user:', remoteUserId, e);
+                }
             }
         });
 
