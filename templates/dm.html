@@ -529,6 +529,20 @@
                 document.getElementById('chatUserHandle').textContent = '@' + thread.other_user.username;
             }
             
+            // Handle new/temp thread
+            if (threadId.startsWith('new_')) {
+                document.getElementById('dmMessages').innerHTML = `
+                    <div class="dm-empty-state">
+                        <i class="fas fa-envelope-open-text"></i>
+                        <p>This is the start of your conversation.</p>
+                    </div>
+                `;
+                if (window.innerWidth < 768) {
+                    document.getElementById('dmSidebar').classList.add('hidden-mobile');
+                }
+                return;
+            }
+            
             // Join socket room for real-time updates
             socket.emit('join_room', { room: `dm:${threadId}`, user_id: userId });
             
@@ -618,25 +632,57 @@
             input.value = '';
             
             try {
-                const res = await fetch(`/api/dm/thread/${currentThreadId}/messages`, {
-                    method: 'POST',
-                    headers: {
-                        'Authorization': `Bearer ${token}`,
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({ content })
-                });
+                let res;
+                if (currentThreadId.startsWith('new_')) {
+                    // Try generic messages endpoint with recipient_id first
+                    res = await fetch(`/api/messages`, {
+                        method: 'POST',
+                        headers: {
+                            'Authorization': `Bearer ${token}`,
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({ recipient_id: currentOtherUserId, content: content })
+                    });
+                    
+                    // Fallback to DM specific create if generic fails
+                    if (!res.ok) {
+                         res = await fetch(`/api/dm/threads`, {
+                            method: 'POST',
+                            headers: {
+                                'Authorization': `Bearer ${token}`,
+                                'Content-Type': 'application/json'
+                            },
+                            body: JSON.stringify({ recipient_id: currentOtherUserId, content: content })
+                        });
+                    }
+                } else {
+                    res = await fetch(`/api/dm/thread/${currentThreadId}/messages`, {
+                        method: 'POST',
+                        headers: {
+                            'Authorization': `Bearer ${token}`,
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({ content })
+                    });
+                }
                 
                 if (res.ok) {
-                    await loadMessages();
-                    await loadThreads();
-                    
-                    // Notify via socket
-                    socket.emit('message', {
-                        room: `dm:${currentThreadId}`,
-                        user_id: userId,
-                        message: content
-                    });
+                    if (currentThreadId.startsWith('new_')) {
+                        await loadThreads();
+                        const newThread = threads.find(t => t.other_user.id === currentOtherUserId || t.other_user._id === currentOtherUserId);
+                        if (newThread) {
+                            selectThread(newThread._id, currentOtherUserId, null);
+                        }
+                    } else {
+                        await loadMessages();
+                        await loadThreads();
+                        
+                        socket.emit('message', {
+                            room: `dm:${currentThreadId}`,
+                            user_id: userId,
+                            message: content
+                        });
+                    }
                 }
             } catch (err) {
                 console.error('Error sending message:', err);
@@ -644,7 +690,7 @@
         }
         
         async function startConversation(otherUserId) {
-            // Check if thread already exists locally to avoid unnecessary API calls
+            // Check if thread already exists locally
             const existingThread = threads.find(t => 
                 (t.other_user.id === otherUserId) || 
                 (t.other_user._id === otherUserId)
@@ -658,7 +704,8 @@
             }
 
             try {
-                let res = await fetch(`/api/dm/thread/${otherUserId}`, {
+                // Try to get existing thread from server
+                const res = await fetch(`/api/dm/thread/${otherUserId}`, {
                     method: 'GET',
                     headers: { 
                         'Authorization': `Bearer ${token}`,
@@ -666,26 +713,8 @@
                     }
                 });
                 
-                // If thread doesn't exist (404), try to create it
-                if (res.status === 404) {
-                    res = await fetch(`/api/dm/threads`, {
-                        method: 'POST',
-                        headers: { 
-                            'Authorization': `Bearer ${token}`,
-                            'Content-Type': 'application/json'
-                        },
-                        body: JSON.stringify({ recipient_id: otherUserId })
-                    });
-                }
-                
-                const contentType = res.headers.get("content-type");
-                if (contentType && contentType.indexOf("application/json") !== -1) {
+                if (res.ok) {
                     const data = await res.json();
-                    if (!res.ok) {
-                        throw new Error(data.message || `Server error: ${res.status}`);
-                    }
-                    console.log('Start conversation response:', data);
-                    
                     if (data.status === 'success' && data.data) {
                         await loadThreads();
                         const tId = data.data.thread_id || data.data.id || data.data._id || (data.data.thread ? data.data.thread._id : null);
@@ -693,14 +722,39 @@
                         
                         const modal = bootstrap.Modal.getInstance(document.getElementById('newDmModal'));
                         if (modal) modal.hide();
+                        return;
                     }
-                } else {
-                    console.error('Received non-JSON response:', res.status, res.statusText);
-                    throw new Error(`API Error: ${res.status} ${res.statusText}`);
+                }
+                
+                // If not found (404), prepare a new conversation state locally
+                const userRes = await fetch(`/api/users/${otherUserId}`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                
+                if (userRes.ok) {
+                    const userData = await userRes.json();
+                    const user = userData.data;
+                    
+                    // Create temp thread
+                    const tempId = 'new_' + otherUserId;
+                    const tempThread = {
+                        _id: tempId,
+                        other_user: user,
+                        last_message: 'New conversation',
+                        unread_count: 0,
+                        last_message_at: new Date().toISOString()
+                    };
+                    
+                    threads.unshift(tempThread);
+                    renderThreads();
+                    selectThread(tempId, otherUserId, null);
+                    
+                    const modal = bootstrap.Modal.getInstance(document.getElementById('newDmModal'));
+                    if (modal) modal.hide();
                 }
             } catch (err) {
                 console.error('Error starting conversation:', err);
-                alert('Failed to start conversation: ' + err.message);
+                alert('Failed to start conversation');
             }
         }
         
