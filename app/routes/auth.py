@@ -145,12 +145,12 @@ def logout():
 @auth_bp.route('/google')
 def google_login():
     redirect_uri = url_for('auth.google_callback', _external=True)
-    return google.authorize_redirect(redirect_uri)
+    return current_app.google.authorize_redirect(redirect_uri)
 
 @auth_bp.route('/google/callback')
 def google_callback():
-    token = google.authorize_access_token()
-    resp = google.get('userinfo')
+    token = current_app.google.authorize_access_token()
+    resp = current_app.google.get('userinfo')
     userinfo = resp.json()
     if not userinfo.get('email'):
         return redirect(url_for('auth_page', error='Google login failed'))
