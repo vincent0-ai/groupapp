@@ -232,7 +232,13 @@ def google_callback():
     flow.redirect_uri = redirect_uri
     
     try:
-        flow.fetch_token(authorization_response=request.url)
+        # Fix for "InsecureTransportError" when running behind a proxy (e.g. Nginx/Heroku)
+        # Flask sees http:// but Google sent https://. We must pass https:// to oauthlib.
+        authorization_response = request.url
+        if not current_app.debug and authorization_response.startswith('http://'):
+            authorization_response = authorization_response.replace('http:', 'https:', 1)
+
+        flow.fetch_token(authorization_response=authorization_response)
         credentials = flow.credentials
         request_adapter = google_requests.Request()
         id_info = id_token.verify_oauth2_token(
