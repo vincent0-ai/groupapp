@@ -55,21 +55,45 @@ def get_all_files():
     db = Database()
     user_id_obj = ObjectId(g.user_id)
     
-    # Get user's groups
-    user_groups = list(db.find('groups', {'members': user_id_obj}))
-    group_ids = [grp['_id'] for grp in user_groups]
+    # Get current user info to check admin status
+    current_user = db.find_one('users', {'_id': user_id_obj})
+    is_admin = current_user.get('is_admin', False) if current_user else False
     
-    # Get files from user's groups or uploaded by user
-    files = list(db.find('files', {
-        '$or': [
-            {'group_id': {'$in': group_ids}},
-            {'uploaded_by': user_id_obj}
-        ]
-    }))
+    if is_admin:
+        # Admins can see all files
+        files = list(db.find('files', {}))
+    else:
+        # Get user's groups
+        user_groups = list(db.find('groups', {'members': user_id_obj}))
+        group_ids = [grp['_id'] for grp in user_groups]
+        
+        # Get files from user's groups or uploaded by user
+        files = list(db.find('files', {
+            '$or': [
+                {'group_id': {'$in': group_ids}},
+                {'uploaded_by': user_id_obj}
+            ]
+        }))
     
-    # Add id field for frontend
+    # Add id field and owner info for frontend
     for f in files:
         f['id'] = str(f['_id'])
+        # Get uploader info
+        uploader_id = f.get('uploaded_by')
+        if uploader_id:
+            uploader = db.find_one('users', {'_id': ObjectId(uploader_id) if isinstance(uploader_id, str) else uploader_id})
+            if uploader:
+                f['uploader_name'] = uploader.get('full_name') or uploader.get('username', 'Unknown')
+                f['uploader_username'] = uploader.get('username', '')
+            else:
+                f['uploader_name'] = 'Unknown'
+                f['uploader_username'] = ''
+        else:
+            f['uploader_name'] = 'Unknown'
+            f['uploader_username'] = ''
+        
+        # Check if current user can delete this file (owner or admin)
+        f['can_delete'] = str(f.get('uploaded_by', '')) == g.user_id or is_admin
     
     return success_response({'files': [serialize_document(f) for f in files]}, 'Files retrieved successfully', 200)
 
@@ -209,12 +233,15 @@ def delete_file(file_id):
     if not file_doc:
         return error_response('File not found', 404)
     
-    # Check if user is uploader or group moderator
-    if str(file_doc['uploaded_by']) != g.user_id:
+    user_id_obj = ObjectId(g.user_id)
+    current_user = db.find_one('users', {'_id': user_id_obj})
+    is_admin = current_user.get('is_admin', False) if current_user else False
+    
+    # Check if user is uploader, admin, or group moderator
+    if str(file_doc['uploaded_by']) != g.user_id and not is_admin:
         group = db.find_one('groups', {'_id': file_doc['group_id']})
-        user_id_obj = ObjectId(g.user_id)
-        if user_id_obj not in group['moderators']:
-            return error_response('You can only delete your own files', 403)
+        if not group or user_id_obj not in group.get('moderators', []):
+            return error_response('You can only delete your own files or must be an admin', 403)
     
     # Delete from MinIO
     minio_client = MinioClient()
