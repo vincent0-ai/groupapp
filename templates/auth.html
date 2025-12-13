@@ -489,10 +489,6 @@
                             <p class="small">Please verify your account to log in.</p>
                     `;
 
-                    if (data.data && data.data.verification_link) {
-                        successHtml += `<div class="alert alert-warning my-3"><small><strong>Dev Mode:</strong> <a href="${data.data.verification_link}">Verify Link</a></small></div>`;
-                    }
-
                     successHtml += `
                             <button class="btn btn-outline-primary mt-3" onclick="window.location.reload()">Back to Login</button>
                         </div>

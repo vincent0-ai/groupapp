@@ -1,6 +1,9 @@
 from flask import Blueprint, request, url_for, redirect
 import os
 import secrets
+from dotenv import load_dotenv
+load_dotenv()
+
 import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
@@ -35,7 +38,7 @@ def send_verification_email(to_email, token):
         print(f"EMAIL VERIFICATION for {to_email}")
         print(f"Link: {verify_url}")
         print(f"============================================")
-        return
+        return False
 
     msg = MIMEMultipart()
     msg["From"] = smtp_user
@@ -51,13 +54,19 @@ def send_verification_email(to_email, token):
     msg.attach(MIMEText(body, "html"))
 
     try:
-        server = smtplib.SMTP(smtp_server, smtp_port)
-        server.starttls()
+        if smtp_port == 465:
+            server = smtplib.SMTP_SSL(smtp_server, smtp_port)
+        else:
+            server = smtplib.SMTP(smtp_server, smtp_port)
+            server.starttls()
+            
         server.login(smtp_user, smtp_password)
         server.send_message(msg)
         server.quit()
+        return True
     except Exception as e:
         print(f"Failed to send email: {e}")
+        return False
 
 
 # =========================
@@ -111,17 +120,9 @@ def signup():
 
     send_verification_email(email, user_doc["verification_token"])
 
-    response_data = None
-    message = "Signup successful. Please check your email to verify your account."
-
-    # If SMTP is not configured, return the link in the response for development
-    if not os.environ.get("SMTP_USER") or not os.environ.get("SMTP_PASSWORD"):
-        verify_url = url_for('auth.verify_email', token=user_doc["verification_token"], _external=True)
-        response_data = {"verification_link": verify_url}
-
     return success_response(
-        response_data,
-        message,
+        None,
+        "Signup successful. Please check your email to verify your account.",
         201
     )
 
