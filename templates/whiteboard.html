@@ -1351,21 +1351,16 @@
             
             console.log('Received offer from:', sender);
             
-            // Close existing peer connection if any (renegotiation)
-            if (peers[sender]) {
-                peers[sender].close();
-                if (currentScreenSharerId === sender) {
-                    document.getElementById('remoteVideoContainer').style.display = 'none';
-                    document.getElementById('remoteVideo').srcObject = null;
-                    currentScreenSharerId = null;
-                }
+            let peer = peers[sender];
+            
+            // If peer exists but is closed/failed, recreate it
+            if (peer && (peer.connectionState === 'closed' || peer.connectionState === 'failed')) {
+                peer = null;
             }
             
-            const peer = createPeerConnection(sender);
-            peers[sender] = peer;
-            
-            try {
-                await peer.setRemoteDescription(new RTCSessionDescription(offer));
+            if (!peer) {
+                peer = createPeerConnection(sender);
+                peers[sender] = peer;
                 
                 // Add local tracks if we have a stream (speaker mode)
                 if (localStream) {
@@ -1374,7 +1369,11 @@
                 if (localScreenStream) {
                     localScreenStream.getTracks().forEach(track => peer.addTrack(track, localScreenStream));
                 }
-                
+            }
+            
+            try {
+                await peer.setRemoteDescription(new RTCSessionDescription(offer));
+
                 // Create answer - always do this to complete the connection
                 // This allows us to receive audio even if we're not sending
                 const answer = await peer.createAnswer();
@@ -1472,6 +1471,14 @@
                         const name = participants[remoteUserId]?.name || 'User';
                         if (label) label.textContent = `${name}'s Screen`;
                         currentScreenSharerId = remoteUserId;
+                        
+                        event.track.onended = () => {
+                            if (currentScreenSharerId === remoteUserId) {
+                                container.style.display = 'none';
+                                video.srcObject = null;
+                                currentScreenSharerId = null;
+                            }
+                        };
                     }
                 }
             };
