@@ -4,68 +4,235 @@
 
 {% block head %}
 <style>
-    .dashboard-card {
-        background: linear-gradient(to bottom, #e3f2fd 0%, #ffffff 70%);
-        border: 1px solid rgba(0,0,0,0.1);
+    .welcome-section {
+        background: linear-gradient(135deg, rgba(99, 102, 241, 0.08) 0%, rgba(139, 92, 246, 0.05) 100%);
+        border-radius: 20px;
+        padding: 2rem;
+        margin-bottom: 2rem;
+        border: 1px solid rgba(99, 102, 241, 0.1);
     }
-    .dashboard-card .card-header {
-        background-color: transparent;
-        border-bottom: 1px solid rgba(0,0,0,0.05);
-        color: #333;
+    
+    .welcome-section h1 {
+        font-weight: 800;
+        background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
     }
-    .dashboard-card .card-title {
-        color: #333;
+    
+    .stat-card {
+        background: var(--card-bg);
+        border-radius: 16px;
+        padding: 1.5rem;
+        height: 100%;
+        border: 1px solid var(--border-color);
+        transition: all 0.3s ease;
+        position: relative;
+        overflow: hidden;
     }
-    .dashboard-card .card-text {
-        color: #333;
+    
+    .stat-card::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        height: 4px;
+        background: var(--gradient-primary);
+        opacity: 0;
+        transition: opacity 0.3s ease;
     }
+    
+    .stat-card:hover {
+        transform: translateY(-6px);
+        box-shadow: 0 20px 40px rgba(99, 102, 241, 0.15);
+    }
+    
+    .stat-card:hover::before {
+        opacity: 1;
+    }
+    
+    .stat-card.groups::before { background: linear-gradient(135deg, #6366f1, #8b5cf6); }
+    .stat-card.points::before { background: linear-gradient(135deg, #f59e0b, #fbbf24); }
+    .stat-card.competitions::before { background: linear-gradient(135deg, #10b981, #34d399); }
+    .stat-card.messages::before { background: linear-gradient(135deg, #06b6d4, #22d3ee); }
+    
+    .stat-icon {
+        width: 56px;
+        height: 56px;
+        border-radius: 14px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.5rem;
+        margin-bottom: 1rem;
+    }
+    
+    .stat-icon.primary { background: rgba(99, 102, 241, 0.12); color: #6366f1; }
+    .stat-icon.warning { background: rgba(245, 158, 11, 0.12); color: #f59e0b; }
+    .stat-icon.success { background: rgba(16, 185, 129, 0.12); color: #10b981; }
+    .stat-icon.info { background: rgba(6, 182, 212, 0.12); color: #06b6d4; }
+    
+    .stat-value {
+        font-size: 2.5rem;
+        font-weight: 800;
+        line-height: 1;
+        margin-bottom: 0.25rem;
+        color: var(--text-dark);
+    }
+    
+    .stat-label {
+        color: var(--text-muted);
+        font-weight: 500;
+        font-size: 0.9rem;
+    }
+    
+    .activity-card {
+        border: none;
+        box-shadow: none;
+    }
+    
+    .activity-card .card-header {
+        background: transparent !important;
+        border-bottom: 1px solid var(--border-color);
+        color: var(--text-dark) !important;
+        padding: 1rem 1.5rem;
+    }
+    
+    .activity-card .card-header h5 {
+        color: var(--text-dark) !important;
+        font-weight: 700;
+    }
+    
+    .activity-card .card-header i {
+        color: var(--primary-color) !important;
+    }
+    
+    .quick-actions-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+        gap: 1rem;
+    }
+    
+    .quick-action-item {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        padding: 1.25rem 1rem;
+        border-radius: 14px;
+        background: var(--card-bg);
+        border: 1px solid var(--border-color);
+        transition: all 0.3s ease;
+        text-decoration: none;
+        color: var(--text-dark);
+        cursor: pointer;
+    }
+    
+    .quick-action-item:hover {
+        background: rgba(99, 102, 241, 0.08);
+        border-color: rgba(99, 102, 241, 0.3);
+        transform: translateY(-4px);
+        color: var(--primary-color);
+    }
+    
+    .quick-action-item i {
+        font-size: 1.5rem;
+        margin-bottom: 0.5rem;
+        color: var(--primary-color);
+    }
+    
+    .quick-action-item span {
+        font-size: 0.85rem;
+        font-weight: 600;
+    }
+    
+    .group-item, .performer-item {
+        display: flex;
+        align-items: center;
+        padding: 0.875rem 0;
+        border-bottom: 1px solid var(--border-color);
+    }
+    
+    .group-item:last-child, .performer-item:last-child {
+        border-bottom: none;
+    }
+    
+    .performer-rank {
+        width: 32px;
+        height: 32px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: 700;
+        font-size: 0.85rem;
+        margin-right: 0.75rem;
+    }
+    
+    .performer-rank.gold { background: linear-gradient(135deg, #fbbf24, #f59e0b); color: white; }
+    .performer-rank.silver { background: linear-gradient(135deg, #94a3b8, #64748b); color: white; }
+    .performer-rank.bronze { background: linear-gradient(135deg, #d97706, #b45309); color: white; }
+    .performer-rank.default { background: var(--cream-bg); color: var(--text-muted); }
 </style>
 {% endblock %}
 
 {% block content %}
-        <div class="row mb-4">
-            <div class="col-lg-12">
-                <h1>Welcome to Discussio Dashboard</h1>
-                <p class="text-muted">Your collaborative learning platform</p>
+        <!-- Welcome Section -->
+        <div class="welcome-section">
+            <div class="row align-items-center">
+                <div class="col-lg-8">
+                    <h1 class="mb-2">Welcome to Discussio</h1>
+                    <p class="text-muted mb-0">Your collaborative learning platform for groups, discussions, and competitions.</p>
+                </div>
+                <div class="col-lg-4 text-lg-end mt-3 mt-lg-0">
+                    <a href="{{ url_for('groups_page') }}" class="btn btn-primary">
+                        <i class="fas fa-users me-2"></i>Explore Channels
+                    </a>
+                </div>
             </div>
         </div>
 
         <!-- Quick Stats -->
         <div class="row g-4 mb-4">
-            <div class="col-md-3 mb-3">
-                <div class="card dashboard-card h-100 shadow-sm border-0">
-                    <div class="card-body">
-                        <h5 class="card-title">My Groups</h5>
-                        <p class="card-text display-6" id="groupsCount">0</p>
-                        <a href="/groups" class="btn btn-primary btn-sm">View Groups</a>
+            <div class="col-6 col-lg-3">
+                <div class="stat-card groups">
+                    <div class="stat-icon primary">
+                        <i class="fas fa-users"></i>
                     </div>
+                    <div class="stat-value" id="groupsCount">0</div>
+                    <div class="stat-label">My Groups</div>
+                    <a href="/groups" class="btn btn-sm btn-outline-primary mt-3">View All</a>
                 </div>
             </div>
-            <div class="col-md-3 mb-3">
-                <div class="card dashboard-card h-100 shadow-sm border-0">
-                    <div class="card-body">
-                        <h5 class="card-title">Points</h5>
-                        <p class="card-text display-6" id="pointsCount">0</p>
-                        <a href="/leaderboard" class="btn btn-primary btn-sm">View Leaderboard</a>
+            <div class="col-6 col-lg-3">
+                <div class="stat-card points">
+                    <div class="stat-icon warning">
+                        <i class="fas fa-star"></i>
                     </div>
+                    <div class="stat-value" id="pointsCount">0</div>
+                    <div class="stat-label">Total Points</div>
+                    <a href="/leaderboard" class="btn btn-sm btn-outline-primary mt-3">Leaderboard</a>
                 </div>
             </div>
-            <div class="col-md-3 mb-3">
-                <div class="card dashboard-card h-100 shadow-sm border-0">
-                    <div class="card-body">
-                        <h5 class="card-title">Competitions</h5>
-                        <p class="card-text display-6" id="competitionsCount">0</p>
-                        <a href="/competitions" class="btn btn-primary btn-sm">Join Competitions</a>
+            <div class="col-6 col-lg-3">
+                <div class="stat-card competitions">
+                    <div class="stat-icon success">
+                        <i class="fas fa-trophy"></i>
                     </div>
+                    <div class="stat-value" id="competitionsCount">0</div>
+                    <div class="stat-label">Competitions</div>
+                    <a href="/competitions" class="btn btn-sm btn-outline-primary mt-3">Join Now</a>
                 </div>
             </div>
-            <div class="col-md-3 mb-3">
-                <div class="card dashboard-card h-100 shadow-sm border-0">
-                    <div class="card-body">
-                        <h5 class="card-title">Unread Messages</h5>
-                        <p class="card-text display-6" id="messagesCount">0</p>
-                        <a href="/messages" class="btn btn-primary btn-sm">View Messages</a>
+            <div class="col-6 col-lg-3">
+                <div class="stat-card messages">
+                    <div class="stat-icon info">
+                        <i class="fas fa-envelope"></i>
                     </div>
+                    <div class="stat-value" id="messagesCount">0</div>
+                    <div class="stat-label">Unread Messages</div>
+                    <a href="/messages" class="btn btn-sm btn-outline-primary mt-3">View All</a>
                 </div>
             </div>
         </div>
@@ -73,22 +240,30 @@
         <!-- Recent Activity -->
         <div class="row g-4">
             <div class="col-lg-6 mb-4">
-                <div class="card dashboard-card h-100 shadow-sm border-0">
-                    <div class="card-header">
-                        <h5><i class="fas fa-history"></i> Recent Groups</h5>
+                <div class="card activity-card h-100">
+                    <div class="card-header d-flex align-items-center">
+                        <i class="fas fa-layer-group me-2"></i>
+                        <h5 class="mb-0">Recent Groups</h5>
                     </div>
                     <div class="card-body" id="recentGroups">
-                        <p class="text-muted">Loading groups...</p>
+                        <div class="text-center py-4">
+                            <div class="spinner-border spinner-border-sm text-primary" role="status"></div>
+                            <p class="text-muted mt-2 mb-0">Loading groups...</p>
+                        </div>
                     </div>
                 </div>
             </div>
             <div class="col-lg-6 mb-4">
-                <div class="card dashboard-card h-100 shadow-sm border-0">
-                    <div class="card-header">
-                        <h5><i class="fas fa-star"></i> Top Performers</h5>
+                <div class="card activity-card h-100">
+                    <div class="card-header d-flex align-items-center">
+                        <i class="fas fa-medal me-2"></i>
+                        <h5 class="mb-0">Top Performers</h5>
                     </div>
                     <div class="card-body" id="topPerformers">
-                        <p class="text-secondary">Loading top performers...</p>
+                        <div class="text-center py-4">
+                            <div class="spinner-border spinner-border-sm text-primary" role="status"></div>
+                            <p class="text-muted mt-2 mb-0">Loading top performers...</p>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -97,26 +272,42 @@
         <!-- Quick Actions -->
         <div class="row">
             <div class="col-lg-12 mb-4">
-                <div class="card dashboard-card shadow-sm border-0">
-                    <div class="card-header">
-                        <h5><i class="fas fa-flash"></i> Quick Actions</h5>
+                <div class="card activity-card">
+                    <div class="card-header d-flex align-items-center">
+                        <i class="fas fa-bolt me-2"></i>
+                        <h5 class="mb-0">Quick Actions</h5>
                     </div>
                     <div class="card-body">
-                        <button class="btn btn-primary me-2 mb-2" data-bs-toggle="modal" data-bs-target="#createGroupModal">
-                            <i class="fas fa-plus"></i> Create Group
-                        </button>
-                        <button class="btn btn-primary me-2 mb-2" data-bs-toggle="modal" data-bs-target="#createCompModal">
-                            <i class="fas fa-plus"></i> Create Competition
-                        </button>
-                        <a href="{{ url_for('messages_page') }}" class="btn btn-primary me-2 mb-2">
-                            <i class="fas fa-comments"></i> Start Chat
-                        </a>
-                        <a href="{{ url_for('whiteboard_page') }}" class="btn btn-primary mb-2">
-                            <i class="fas fa-chalkboard"></i> Open Whiteboard
-                        </a>
+                        <div class="quick-actions-grid">
+                            <div class="quick-action-item" data-bs-toggle="modal" data-bs-target="#createGroupModal">
+                                <i class="fas fa-plus-circle"></i>
+                                <span>Create Group</span>
+                            </div>
+                            <div class="quick-action-item" data-bs-toggle="modal" data-bs-target="#createCompModal">
+                                <i class="fas fa-trophy"></i>
+                                <span>New Competition</span>
+                            </div>
+                            <a href="{{ url_for('messages_page') }}" class="quick-action-item">
+                                <i class="fas fa-comments"></i>
+                                <span>Start Chat</span>
+                            </a>
+                            <a href="{{ url_for('whiteboard_page') }}" class="quick-action-item">
+                                <i class="fas fa-chalkboard"></i>
+                                <span>Whiteboard</span>
+                            </a>
+                            <a href="{{ url_for('files_page') }}" class="quick-action-item">
+                                <i class="fas fa-cloud-upload-alt"></i>
+                                <span>Upload Files</span>
+                            </a>
+                            <a href="{{ url_for('profile_page') }}" class="quick-action-item">
+                                <i class="fas fa-user-cog"></i>
+                                <span>Edit Profile</span>
+                            </a>
+                        </div>
                     </div>
                 </div>
             </div>
+        </div>
 {% endblock %}
 
 {% block modals %}

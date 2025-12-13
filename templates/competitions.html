@@ -2,14 +2,148 @@
 
 {% block title %}Competitions - Discussio{% endblock %}
 
+{% block head %}
+<style>
+    .page-header {
+        background: linear-gradient(135deg, rgba(99, 102, 241, 0.08) 0%, rgba(139, 92, 246, 0.05) 100%);
+        border-radius: 20px;
+        padding: 1.5rem 2rem;
+        margin-bottom: 2rem;
+        border: 1px solid rgba(99, 102, 241, 0.1);
+    }
+    
+    .page-header h1 {
+        font-weight: 800;
+        margin-bottom: 0;
+    }
+    
+    .page-header h1 i {
+        background: linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+    }
+    
+    .nav-tabs {
+        border: none;
+        background: var(--cream-bg);
+        border-radius: 12px;
+        padding: 6px;
+        gap: 4px;
+        display: inline-flex;
+    }
+    
+    .nav-tabs .nav-link {
+        border: none;
+        border-radius: 8px;
+        padding: 10px 20px;
+        font-weight: 600;
+        color: var(--text-muted);
+        transition: all 0.25s ease;
+    }
+    
+    .nav-tabs .nav-link:hover {
+        background: rgba(99, 102, 241, 0.1);
+        color: var(--primary-color);
+    }
+    
+    .nav-tabs .nav-link.active {
+        background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+        color: white;
+        box-shadow: 0 4px 12px rgba(99, 102, 241, 0.35);
+    }
+    
+    .competition-card {
+        border: 1px solid var(--border-color);
+        border-left: 4px solid var(--primary-color);
+        transition: all 0.3s ease;
+        height: 100%;
+    }
+    
+    .competition-card:hover {
+        transform: translateY(-6px);
+        box-shadow: 0 20px 40px rgba(99, 102, 241, 0.15);
+    }
+    
+    .competition-card.active {
+        border-left-color: #10b981;
+    }
+    
+    .competition-card.ended {
+        border-left-color: var(--secondary-color);
+        opacity: 0.8;
+    }
+    
+    .competition-card .card-header {
+        background: transparent !important;
+        border-bottom: 1px solid var(--border-color);
+        color: var(--text-dark) !important;
+    }
+    
+    .competition-card .card-header h5 {
+        color: var(--text-dark) !important;
+    }
+    
+    .status-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 4px 12px;
+        border-radius: 50px;
+        font-size: 0.8rem;
+        font-weight: 600;
+    }
+    
+    .status-badge.live {
+        background: var(--success-light);
+        color: var(--success-color);
+    }
+    
+    .status-badge.live::before {
+        content: '';
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        background: var(--success-color);
+        animation: pulse 1.5s infinite;
+    }
+    
+    .status-badge.upcoming {
+        background: var(--warning-light);
+        color: #b45309;
+    }
+    
+    .status-badge.ended {
+        background: var(--cream-bg);
+        color: var(--text-muted);
+    }
+    
+    @keyframes pulse {
+        0%, 100% { opacity: 1; }
+        50% { opacity: 0.5; }
+    }
+    
+    .empty-state {
+        text-align: center;
+        padding: 3rem 1.5rem;
+    }
+    
+    .empty-state i {
+        font-size: 4rem;
+        color: var(--text-light);
+        margin-bottom: 1rem;
+    }
+</style>
+{% endblock %}
+
 {% block content %}
-        <div class="row mb-4">
-            <div class="col-lg-8">
-                <h1><i class="fas fa-trophy"></i> Competitions</h1>
+        <div class="page-header d-flex flex-wrap justify-content-between align-items-center">
+            <div>
+                <h1><i class="fas fa-trophy me-2"></i>Competitions</h1>
             </div>
-            <div class="col-lg-4 text-end">
+            <div class="mt-2 mt-md-0">
                 <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#createCompModal">
-                    <i class="fas fa-plus"></i> Create Competition
+                    <i class="fas fa-plus me-2"></i>Create Competition
                 </button>
             </div>
         </div>
@@ -31,27 +165,37 @@
         <div class="tab-content">
             <div class="tab-pane fade show active" id="activeComps">
                 <div class="row g-4" id="activeCompsList">
-                    <div class="col-12 text-center text-secondary py-5">
-                        <p><i class="fas fa-spinner fa-spin"></i> Loading competitions...</p>
+                    <div class="col-12">
+                        <div class="empty-state">
+                            <div class="spinner-border text-primary" role="status"></div>
+                            <p class="text-muted mt-3 mb-0">Loading competitions...</p>
+                        </div>
                     </div>
                 </div>
             </div>
 
             <div class="tab-pane fade" id="myComps">
                 <div class="row g-4" id="myCompsList">
-                    <div class="col-12 text-center text-secondary py-5">
-                        <p><i class="fas fa-spinner fa-spin"></i> Loading competitions...</p>
+                    <div class="col-12">
+                        <div class="empty-state">
+                            <div class="spinner-border text-primary" role="status"></div>
+                            <p class="text-muted mt-3 mb-0">Loading competitions...</p>
+                        </div>
                     </div>
                 </div>
             </div>
 
             <div class="tab-pane fade" id="completedComps">
                 <div class="row g-4" id="completedCompsList">
-                    <div class="col-12 text-center text-secondary py-5">
-                        <p><i class="fas fa-spinner fa-spin"></i> Loading competitions...</p>
+                    <div class="col-12">
+                        <div class="empty-state">
+                            <div class="spinner-border text-primary" role="status"></div>
+                            <p class="text-muted mt-3 mb-0">Loading competitions...</p>
+                        </div>
                     </div>
                 </div>
             </div>
+        </div>
 {% endblock %}
 
 {% block modals %}

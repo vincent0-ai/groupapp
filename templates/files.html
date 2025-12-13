@@ -2,34 +2,141 @@
 
 {% block title %}Files - Discussio{% endblock %}
 
+{% block head %}
+<style>
+    .page-header {
+        background: linear-gradient(135deg, rgba(99, 102, 241, 0.08) 0%, rgba(139, 92, 246, 0.05) 100%);
+        border-radius: 20px;
+        padding: 1.5rem 2rem;
+        margin-bottom: 2rem;
+        border: 1px solid rgba(99, 102, 241, 0.1);
+    }
+    
+    .page-header h1 {
+        font-weight: 800;
+        margin-bottom: 0;
+    }
+    
+    .page-header h1 i {
+        background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+    }
+    
+    .filter-container {
+        display: flex;
+        gap: 1rem;
+        flex-wrap: wrap;
+        margin-bottom: 1.5rem;
+    }
+    
+    .file-card {
+        border: 1px solid var(--border-color);
+        transition: all 0.3s ease;
+        height: 100%;
+    }
+    
+    .file-card:hover {
+        transform: translateY(-6px);
+        box-shadow: 0 20px 40px rgba(99, 102, 241, 0.15);
+        border-color: rgba(99, 102, 241, 0.3);
+    }
+    
+    .file-icon {
+        width: 56px;
+        height: 56px;
+        border-radius: 14px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.5rem;
+        margin-bottom: 1rem;
+    }
+    
+    .file-icon.image { background: rgba(236, 72, 153, 0.12); color: #ec4899; }
+    .file-icon.document { background: rgba(59, 130, 246, 0.12); color: #3b82f6; }
+    .file-icon.video { background: rgba(239, 68, 68, 0.12); color: #ef4444; }
+    .file-icon.audio { background: rgba(16, 185, 129, 0.12); color: #10b981; }
+    .file-icon.archive { background: rgba(245, 158, 11, 0.12); color: #f59e0b; }
+    .file-icon.default { background: rgba(99, 102, 241, 0.12); color: #6366f1; }
+    
+    .file-name {
+        font-weight: 600;
+        margin-bottom: 0.25rem;
+        word-break: break-word;
+    }
+    
+    .file-meta {
+        font-size: 0.85rem;
+        color: var(--text-muted);
+    }
+    
+    .file-upload-area {
+        border: 2px dashed var(--border-color);
+        border-radius: 16px;
+        padding: 2.5rem 1.5rem;
+        text-align: center;
+        transition: all 0.3s ease;
+        cursor: pointer;
+        background: var(--cream-bg);
+    }
+    
+    .file-upload-area:hover,
+    .file-upload-area.dragover {
+        border-color: var(--primary-color);
+        background: var(--primary-ultra-light);
+    }
+    
+    .file-upload-area i {
+        font-size: 2.5rem;
+        color: var(--primary-color);
+        margin-bottom: 1rem;
+    }
+    
+    .empty-state {
+        text-align: center;
+        padding: 3rem 1.5rem;
+    }
+    
+    .empty-state i {
+        font-size: 4rem;
+        color: var(--text-light);
+        margin-bottom: 1rem;
+    }
+</style>
+{% endblock %}
+
 {% block content %}
-        <div class="row mb-4">
-            <div class="col-lg-8">
-                <h1><i class="fas fa-file"></i> Files</h1>
+        <div class="page-header d-flex flex-wrap justify-content-between align-items-center">
+            <div>
+                <h1><i class="fas fa-folder-open me-2"></i>Files</h1>
             </div>
-            <div class="col-lg-4 text-end">
+            <div class="mt-2 mt-md-0">
                 <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#uploadModal">
-                    <i class="fas fa-upload"></i> Upload File
+                    <i class="fas fa-cloud-upload-alt me-2"></i>Upload File
                 </button>
             </div>
         </div>
 
         <!-- File Filter -->
-        <div class="row mb-3">
-            <div class="col-lg-3">
+        <div class="filter-container">
+            <div class="search-input-wrapper flex-grow-1" style="max-width: 300px;">
+                <i class="fas fa-search"></i>
                 <input type="text" class="form-control" id="searchFiles" placeholder="Search files...">
             </div>
-            <div class="col-lg-3">
-                <select class="form-control" id="filterGroup">
-                    <option value="">All Groups</option>
-                </select>
-            </div>
+            <select class="form-select" id="filterGroup" style="max-width: 200px;">
+                <option value="">All Groups</option>
+            </select>
         </div>
 
         <!-- Files List -->
         <div class="row g-4" id="filesList">
-            <div class="col-12 text-center text-muted py-5">
-                <p><i class="fas fa-spinner fa-spin"></i> Loading files...</p>
+            <div class="col-12">
+                <div class="empty-state">
+                    <div class="spinner-border text-primary" role="status"></div>
+                    <p class="text-muted mt-3 mb-0">Loading files...</p>
+                </div>
             </div>
         </div>
 {% endblock %}

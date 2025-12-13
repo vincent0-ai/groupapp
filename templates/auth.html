@@ -3,27 +3,228 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="theme-color" content="#ffffff">
+    <meta name="theme-color" content="#6366f1">
     
     <title>Login - Discussio</title>
+    
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
     
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
     <link rel="stylesheet" href="/static/css/style.css">
     <link rel="manifest" href="/static/manifest.json">
+    
+    <style>
+        .auth-page {
+            min-height: 100vh;
+            background: linear-gradient(135deg, #f8fafc 0%, #e0e7ff 50%, #f8fafc 100%);
+            background-image: 
+                radial-gradient(at 40% 20%, rgba(99, 102, 241, 0.12) 0px, transparent 50%),
+                radial-gradient(at 80% 0%, rgba(139, 92, 246, 0.1) 0px, transparent 50%),
+                radial-gradient(at 0% 50%, rgba(236, 72, 153, 0.08) 0px, transparent 50%),
+                radial-gradient(at 100% 100%, rgba(6, 182, 212, 0.08) 0px, transparent 50%);
+        }
+        
+        @media (prefers-color-scheme: dark) {
+            .auth-page {
+                background: linear-gradient(135deg, #0f172a 0%, #1e1b4b 50%, #0f172a 100%);
+                background-image: 
+                    radial-gradient(at 40% 20%, rgba(99, 102, 241, 0.2) 0px, transparent 50%),
+                    radial-gradient(at 80% 0%, rgba(139, 92, 246, 0.15) 0px, transparent 50%),
+                    radial-gradient(at 0% 50%, rgba(236, 72, 153, 0.1) 0px, transparent 50%);
+            }
+        }
+        
+        .auth-card {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            box-shadow: 
+                0 25px 50px -12px rgba(0, 0, 0, 0.15),
+                0 0 0 1px rgba(255, 255, 255, 0.1);
+        }
+        
+        @media (prefers-color-scheme: dark) {
+            .auth-card {
+                background: rgba(30, 41, 59, 0.9);
+                border: 1px solid rgba(255, 255, 255, 0.1);
+            }
+        }
+        
+        .auth-logo {
+            width: 80px;
+            height: 80px;
+            background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+            border-radius: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto 1.5rem;
+            box-shadow: 0 10px 30px rgba(99, 102, 241, 0.3);
+        }
+        
+        .auth-logo i {
+            font-size: 2rem;
+            color: white;
+        }
+        
+        .auth-title {
+            font-weight: 800;
+            background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        
+        .nav-tabs {
+            border: none;
+            background: var(--cream-bg);
+            border-radius: 12px;
+            padding: 6px;
+            gap: 4px;
+        }
+        
+        .nav-tabs .nav-link {
+            border: none;
+            border-radius: 8px;
+            padding: 10px 24px;
+            font-weight: 600;
+            color: var(--text-muted);
+            transition: all 0.25s ease;
+        }
+        
+        .nav-tabs .nav-link:hover {
+            background: rgba(99, 102, 241, 0.1);
+            color: var(--primary-color);
+        }
+        
+        .nav-tabs .nav-link.active {
+            background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+            color: white;
+            box-shadow: 0 4px 12px rgba(99, 102, 241, 0.35);
+        }
+        
+        .social-btn {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            padding: 10px 20px;
+            border-radius: 10px;
+            font-weight: 500;
+            transition: all 0.25s ease;
+            border: 1px solid var(--border-color);
+            background: var(--card-bg);
+        }
+        
+        .social-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+        }
+        
+        .social-btn.google:hover {
+            border-color: #ea4335;
+            color: #ea4335;
+        }
+        
+        .social-btn.github:hover {
+            border-color: #333;
+            background: #333;
+            color: white;
+        }
+        
+        .divider {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            color: var(--text-muted);
+            font-size: 0.875rem;
+        }
+        
+        .divider::before,
+        .divider::after {
+            content: '';
+            flex: 1;
+            height: 1px;
+            background: var(--border-color);
+        }
+        
+        .floating-shapes {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            overflow: hidden;
+            z-index: 0;
+        }
+        
+        .floating-shapes .shape {
+            position: absolute;
+            border-radius: 50%;
+            opacity: 0.5;
+            animation: float 20s infinite ease-in-out;
+        }
+        
+        .floating-shapes .shape:nth-child(1) {
+            width: 300px;
+            height: 300px;
+            background: linear-gradient(135deg, rgba(99, 102, 241, 0.1), transparent);
+            top: -100px;
+            right: -100px;
+            animation-delay: 0s;
+        }
+        
+        .floating-shapes .shape:nth-child(2) {
+            width: 200px;
+            height: 200px;
+            background: linear-gradient(135deg, rgba(139, 92, 246, 0.1), transparent);
+            bottom: -50px;
+            left: -50px;
+            animation-delay: -5s;
+        }
+        
+        .floating-shapes .shape:nth-child(3) {
+            width: 150px;
+            height: 150px;
+            background: linear-gradient(135deg, rgba(236, 72, 153, 0.1), transparent);
+            top: 50%;
+            left: 10%;
+            animation-delay: -10s;
+        }
+        
+        @keyframes float {
+            0%, 100% { transform: translateY(0) rotate(0deg); }
+            50% { transform: translateY(-30px) rotate(180deg); }
+        }
+    </style>
 </head>
-<body class="bg-light">
-    <div class="container">
-        <div class="row justify-content-center align-items-center min-vh-100">
-            <div class="col-md-6">
-                <div class="card shadow-lg border-0 rounded-4">
-                    <div class="card-body p-5">
+<body class="auth-page">
+    <div class="floating-shapes">
+        <div class="shape"></div>
+        <div class="shape"></div>
+        <div class="shape"></div>
+    </div>
+    
+    <div class="container position-relative" style="z-index: 1;">
+        <div class="row justify-content-center align-items-center min-vh-100 py-5">
+            <div class="col-11 col-sm-10 col-md-8 col-lg-5 col-xl-4">
+                <div class="card auth-card border-0 rounded-4 overflow-hidden">
+                    <div class="card-body p-4 p-md-5">
                         <div class="text-center mb-4">
-                            <h2><i class="fas fa-graduation-cap text-primary"></i> Discussio</h2>
-                            <p class="text-body-secondary">Collaborative Learning Platform</p>
+                            <div class="auth-logo">
+                                <i class="fas fa-graduation-cap"></i>
+                            </div>
+                            <h2 class="auth-title mb-2">Discussio</h2>
+                            <p class="text-muted mb-0">Your collaborative learning platform</p>
                         </div>
 
-                        <ul class="nav nav-tabs mb-4" role="tablist">
+                        <ul class="nav nav-tabs nav-justified mb-4" role="tablist">
                             <li class="nav-item" role="presentation">
                                 <button class="nav-link active" id="loginTab" data-bs-toggle="tab" data-bs-target="#loginPanel" type="button">Login</button>
                             </li>
@@ -38,15 +239,23 @@
                                 <form id="loginForm">
                                     <div class="mb-3">
                                         <label for="loginEmail" class="form-label">Email Address</label>
-                                        <input type="email" class="form-control" id="loginEmail" required>
+                                        <div class="input-group">
+                                            <span class="input-group-text bg-transparent border-end-0"><i class="fas fa-envelope text-muted"></i></span>
+                                            <input type="email" class="form-control border-start-0 ps-0" id="loginEmail" placeholder="Enter your email" required>
+                                        </div>
                                     </div>
-                                    <div class="mb-3">
+                                    <div class="mb-4">
                                         <label for="loginPassword" class="form-label">Password</label>
-                                        <input type="password" class="form-control" id="loginPassword" required>
+                                        <div class="input-group">
+                                            <span class="input-group-text bg-transparent border-end-0"><i class="fas fa-lock text-muted"></i></span>
+                                            <input type="password" class="form-control border-start-0 ps-0" id="loginPassword" placeholder="Enter your password" required>
+                                        </div>
                                     </div>
-                                    <button type="submit" class="btn btn-primary w-100 mb-3">Login</button>
+                                    <button type="submit" class="btn btn-primary w-100 py-2 mb-3">
+                                        <i class="fas fa-sign-in-alt me-2"></i>Login
+                                    </button>
                                 </form>
-                                <a href="#" class="text-center d-block">Forgot password?</a>
+                                <a href="#" class="text-center d-block text-muted small">Forgot password?</a>
                             </div>
 
                             <!-- Signup Panel -->
@@ -54,37 +263,62 @@
                                 <form id="signupForm">
                                     <div class="mb-3">
                                         <label for="signupEmail" class="form-label">Email Address</label>
-                                        <input type="email" class="form-control" id="signupEmail" required>
+                                        <div class="input-group">
+                                            <span class="input-group-text bg-transparent border-end-0"><i class="fas fa-envelope text-muted"></i></span>
+                                            <input type="email" class="form-control border-start-0 ps-0" id="signupEmail" placeholder="Enter your email" required>
+                                        </div>
                                     </div>
                                     <div class="mb-3">
                                         <label for="signupUsername" class="form-label">Username</label>
-                                        <input type="text" class="form-control" id="signupUsername" required>
+                                        <div class="input-group">
+                                            <span class="input-group-text bg-transparent border-end-0"><i class="fas fa-at text-muted"></i></span>
+                                            <input type="text" class="form-control border-start-0 ps-0" id="signupUsername" placeholder="Choose a username" required>
+                                        </div>
                                     </div>
                                     <div class="mb-3">
                                         <label for="signupFullName" class="form-label">Full Name</label>
-                                        <input type="text" class="form-control" id="signupFullName">
+                                        <div class="input-group">
+                                            <span class="input-group-text bg-transparent border-end-0"><i class="fas fa-user text-muted"></i></span>
+                                            <input type="text" class="form-control border-start-0 ps-0" id="signupFullName" placeholder="Enter your full name">
+                                        </div>
                                     </div>
                                     <div class="mb-3">
                                         <label for="signupPassword" class="form-label">Password</label>
-                                        <input type="password" class="form-control" id="signupPassword" required>
+                                        <div class="input-group">
+                                            <span class="input-group-text bg-transparent border-end-0"><i class="fas fa-lock text-muted"></i></span>
+                                            <input type="password" class="form-control border-start-0 ps-0" id="signupPassword" placeholder="Create a password" required>
+                                        </div>
                                     </div>
-                                    <div class="mb-3">
+                                    <div class="mb-4">
                                         <label for="signupConfirmPassword" class="form-label">Confirm Password</label>
-                                        <input type="password" class="form-control" id="signupConfirmPassword" required>
+                                        <div class="input-group">
+                                            <span class="input-group-text bg-transparent border-end-0"><i class="fas fa-check-circle text-muted"></i></span>
+                                            <input type="password" class="form-control border-start-0 ps-0" id="signupConfirmPassword" placeholder="Confirm your password" required>
+                                        </div>
                                     </div>
-                                    <button type="submit" class="btn btn-primary w-100">Sign Up</button>
+                                    <button type="submit" class="btn btn-primary w-100 py-2">
+                                        <i class="fas fa-user-plus me-2"></i>Create Account
+                                    </button>
                                 </form>
                             </div>
                         </div>
 
-                        <hr>
-                        <div class="text-center">
-                            <p class="text-body-secondary">Or continue with</p>
-                            <button class="btn btn-light btn-sm me-2"><i class="fab fa-google"></i> Google</button>
-                            <button class="btn btn-light btn-sm"><i class="fab fa-github"></i> GitHub</button>
+                        <div class="divider my-4">or continue with</div>
+                        
+                        <div class="d-flex gap-3">
+                            <button class="social-btn google flex-fill">
+                                <i class="fab fa-google"></i> Google
+                            </button>
+                            <button class="social-btn github flex-fill">
+                                <i class="fab fa-github"></i> GitHub
+                            </button>
                         </div>
                     </div>
                 </div>
+                
+                <p class="text-center text-muted small mt-4">
+                    &copy; 2025 Discussio. All rights reserved.
+                </p>
             </div>
         </div>
     </div>

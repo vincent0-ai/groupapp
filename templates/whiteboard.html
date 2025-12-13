@@ -77,9 +77,16 @@
 {% endblock %}
 
 {% block content %}
-<div class="row">
-    <div class="col-12">
-        <h1><i class="fas fa-chalkboard"></i> Collaborative Whiteboard</h1>
+<!-- Page Header -->
+<div class="page-header mb-4" style="background: var(--gradient-primary); border-radius: 20px; padding: 2rem; color: white;">
+    <div class="d-flex align-items-center gap-3">
+        <div style="width: 60px; height: 60px; background: rgba(255,255,255,0.2); border-radius: 16px; display: flex; align-items: center; justify-content: center;">
+            <i class="fas fa-chalkboard fa-2x"></i>
+        </div>
+        <div>
+            <h1 class="mb-1" style="font-size: 1.75rem; font-weight: 700;">Collaborative Whiteboard</h1>
+            <p class="mb-0 opacity-75">Draw and collaborate in real-time with your group</p>
+        </div>
     </div>
 </div>
 
@@ -87,23 +94,27 @@
 <div id="landingView" style="display:none;">
     <div class="row mt-4">
         <div class="col-md-8 offset-md-2">
-            <div class="card shadow-sm border-0 mb-4">
-                <div class="card-body text-center p-5">
-                    <h3 class="mb-4">Start Collaborating</h3>
-                    <div class="d-flex justify-content-center gap-3">
-                        <button id="createSessionBtnLanding" class="btn btn-primary btn-lg">
-                            <i class="fas fa-plus-circle"></i> Create Session
+            <div class="card shadow-sm border-0 mb-4" style="overflow: hidden;">
+                <div class="card-body text-center p-5" style="background: linear-gradient(135deg, rgba(99, 102, 241, 0.05) 0%, rgba(139, 92, 246, 0.05) 100%);">
+                    <div style="width: 80px; height: 80px; background: var(--gradient-primary); border-radius: 20px; display: flex; align-items: center; justify-content: center; margin: 0 auto 1.5rem;">
+                        <i class="fas fa-palette fa-2x text-white"></i>
+                    </div>
+                    <h3 class="mb-2 fw-bold">Start Collaborating</h3>
+                    <p class="text-muted mb-4">Create a new whiteboard session or join an existing one</p>
+                    <div class="d-flex justify-content-center gap-3 flex-wrap">
+                        <button id="createSessionBtnLanding" class="btn btn-primary btn-lg px-4">
+                            <i class="fas fa-plus-circle me-2"></i> Create Session
                         </button>
-                        <button id="joinSessionBtnLanding" class="btn btn-secondary btn-lg">
-                            <i class="fas fa-sign-in-alt"></i> Join Session
+                        <button id="joinSessionBtnLanding" class="btn btn-outline-primary btn-lg px-4">
+                            <i class="fas fa-sign-in-alt me-2"></i> Join Session
                         </button>
                     </div>
                 </div>
             </div>
             
             <div class="card shadow-sm border-0" id="mySessionsCardLanding" style="display:none;">
-                <div class="card-header">
-                    <h5 class="mb-0"><i class="fas fa-list"></i> My Active Sessions</h5>
+                <div class="card-header" style="background: transparent; border-bottom: 1px solid var(--border-color);">
+                    <h5 class="mb-0"><i class="fas fa-list text-primary me-2"></i> My Active Sessions</h5>
                 </div>
                 <div class="card-body p-0">
                     <div class="list-group list-group-flush" id="mySessionsListLanding">
@@ -118,47 +129,47 @@
 <!-- Session View -->
 <div id="sessionView" class="row mt-4" style="display:none;">
     <div class="col-lg-2">
-        <div class="card shadow-sm border-0 mb-3">
+        <div class="card shadow-sm border-0 mb-3" style="overflow: hidden;">
             <div class="card-body">
                     <div class="d-flex justify-content-between align-items-center">
-                        <h6 class="card-title mb-0">Drawing Tools</h6>
-                        <button class="btn btn-sm btn-outline-secondary" data-bs-toggle="collapse" data-bs-target="#drawingToolsCollapse" aria-expanded="false" aria-controls="drawingToolsCollapse" id="toggleDrawingTools">Show Tools</button>
+                        <h6 class="card-title mb-0 fw-semibold"><i class="fas fa-paint-brush text-primary me-2"></i>Tools</h6>
+                        <button class="btn btn-sm btn-outline-primary" data-bs-toggle="collapse" data-bs-target="#drawingToolsCollapse" aria-expanded="false" aria-controls="drawingToolsCollapse" id="toggleDrawingTools" style="font-size: 0.75rem;">Show</button>
                     </div>
                     <div id="permissionStatus" class="mb-2 text-muted small mt-2"></div>
                     <div class="collapse" id="drawingToolsCollapse">
-                        <div class="controls mb-3">
-                            <label for="colorPicker" class="form-label">Color</label>
-                            <input type="color" class="form-control form-control-color" id="colorPicker" value="#000000">
+                        <div class="controls mb-3 mt-3">
+                            <label for="colorPicker" class="form-label small fw-medium">Color</label>
+                            <input type="color" class="form-control form-control-color w-100" id="colorPicker" value="#000000" style="height: 40px; border-radius: 10px;">
                         </div>
                         <div class="controls mb-3">
-                            <label for="brushSize" class="form-label">Brush Size: <span id="sizeValue">3</span>px</label>
+                            <label for="brushSize" class="form-label small fw-medium">Brush Size: <span id="sizeValue" class="badge bg-primary">3</span>px</label>
                             <input type="range" class="form-range" id="brushSize" min="1" max="20" value="3">
                         </div>
                         <div class="controls mb-3">
-                            <label for="opacity" class="form-label">Opacity</label>
+                            <label for="opacity" class="form-label small fw-medium">Opacity</label>
                             <input type="range" class="form-range" id="opacity" min="0" max="1" step="0.1" value="1">
                         </div>
-                        <div class="btn-group-vertical w-100">
-                            <button id="clearBtn" class="btn btn-warning mb-2">
-                                <i class="fas fa-trash"></i> Clear Canvas
+                        <div class="btn-group-vertical w-100 gap-2">
+                            <button id="clearBtn" class="btn btn-warning">
+                                <i class="fas fa-trash me-1"></i> Clear
                             </button>
-                            <button id="undoBtn" class="btn btn-secondary mb-2">
-                                <i class="fas fa-undo"></i> Undo
+                            <button id="undoBtn" class="btn btn-outline-secondary">
+                                <i class="fas fa-undo me-1"></i> Undo
                             </button>
-                            <button id="downloadBtn" class="btn btn-info">
-                                <i class="fas fa-download"></i> Download
+                            <button id="downloadBtn" class="btn btn-info text-white">
+                                <i class="fas fa-download me-1"></i> Save
                             </button>
                         </div>
                     </div>
                     <div class="d-grid mt-3" id="leaveSessionContainer">
-                        <a href="/whiteboard" class="btn btn-sm btn-outline-danger">Leave Session</a>
+                        <a href="/whiteboard" class="btn btn-sm btn-outline-danger"><i class="fas fa-sign-out-alt me-1"></i>Leave</a>
                     </div>
             </div>
         </div>
 
-        <div class="card mt-3 shadow-sm border-0">
-            <div class="card-header">
-                <h6 class="mb-0"><i class="fas fa-users"></i> Participants</h6>
+        <div class="card mt-3 shadow-sm border-0" style="overflow: hidden;">
+            <div class="card-header" style="background: linear-gradient(135deg, rgba(99, 102, 241, 0.1) 0%, rgba(139, 92, 246, 0.1) 100%); border-bottom: none;">
+                <h6 class="mb-0 fw-semibold"><i class="fas fa-users text-primary me-2"></i> Participants</h6>
             </div>
             <div class="card-body">
                 <div id="participantsList">
@@ -172,18 +183,18 @@
     </div>
 
     <div class="col-lg-10">
-        <div class="card shadow-sm border-0">
-            <div class="card-header d-flex justify-content-between align-items-center d-lg-none">
-                <span class="fw-semibold">Whiteboard</span>
-                <button id="fullscreenToggleBtn" class="btn btn-sm btn-outline-secondary fullscreen-toggle-btn">
-                    <i class="fas fa-expand"></i> Fullscreen
+        <div class="card shadow-sm border-0" style="overflow: hidden;">
+            <div class="card-header d-flex justify-content-between align-items-center d-lg-none" style="background: linear-gradient(135deg, rgba(99, 102, 241, 0.1) 0%, rgba(139, 92, 246, 0.1) 100%); border-bottom: none;">
+                <span class="fw-semibold"><i class="fas fa-chalkboard text-primary me-2"></i>Whiteboard</span>
+                <button id="fullscreenToggleBtn" class="btn btn-sm btn-primary fullscreen-toggle-btn">
+                    <i class="fas fa-expand me-1"></i> Fullscreen
                 </button>
             </div>
-            <div class="card-body overflow-auto text-center bg-light" id="canvasContainer">
-                <div style="position:relative;">
-                    <canvas id="whiteboard" style="width:100%;height:50vh;display:block;" width="1200" height="600"></canvas>
-                    <div id="canvasOverlay" style="position:absolute;inset:0;display:none;align-items:center;justify-content:center;background:rgba(255,255,255,0.6);">
-                        <div class="text-muted">You don't have permission to draw in this session</div>
+            <div class="card-body overflow-auto text-center" id="canvasContainer" style="background: linear-gradient(180deg, #f8f9fa 0%, #e9ecef 100%); padding: 1rem;">
+                <div style="position:relative; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 20px rgba(0,0,0,0.1);">
+                    <canvas id="whiteboard" style="width:100%;height:50vh;display:block; background: white;" width="1200" height="600"></canvas>
+                    <div id="canvasOverlay" style="position:absolute;inset:0;display:none;align-items:center;justify-content:center;background:rgba(255,255,255,0.85); backdrop-filter: blur(4px);">
+                        <div class="text-muted"><i class="fas fa-lock me-2"></i>You don't have permission to draw in this session</div>
                     </div>
                 </div>
             </div>
@@ -196,25 +207,25 @@
 <!-- Create/Join Session Modals -->
 <!-- Create Session Modal -->
 <div class="modal fade" id="createSessionModal" tabindex="-1">
-    <div class="modal-dialog">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title">Select Group for Session</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0" style="border-radius: 20px; overflow: hidden;">
+            <div class="modal-header" style="background: var(--gradient-primary); border-bottom: none;">
+                <h5 class="modal-title text-white fw-semibold"><i class="fas fa-plus-circle me-2"></i>Create Session</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
             </div>
-            <div class="modal-body">
-                <p class="text-muted">Select which group this session is for:</p>
+            <div class="modal-body p-4">
+                <p class="text-muted mb-3">Select which group this session is for:</p>
                 <div class="mb-3">
-                    <label for="sessionGroupSelect" class="form-label">Group</label>
-                    <select id="sessionGroupSelect" class="form-select"></select>
+                    <label for="sessionGroupSelect" class="form-label fw-medium">Group</label>
+                    <select id="sessionGroupSelect" class="form-select" style="border-radius: 10px;"></select>
                 </div>
                 <div class="mb-3">
-                    <label for="sessionNameInput" class="form-label">Session Name</label>
-                    <input type="text" class="form-control" id="sessionNameInput" placeholder="Enter session name (optional)">
+                    <label for="sessionNameInput" class="form-label fw-medium">Session Name</label>
+                    <input type="text" class="form-control" id="sessionNameInput" placeholder="Enter session name (optional)" style="border-radius: 10px;">
                 </div>
             </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+            <div class="modal-footer border-0 pt-0">
+                <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
                 <button id="createSessionSubmit" type="button" class="btn btn-primary">Create Session</button>
             </div>
         </div>
@@ -223,22 +234,22 @@
 
 <!-- Session Created Modal -->
 <div class="modal fade" id="sessionCreatedModal" tabindex="-1">
-    <div class="modal-dialog">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title">Session Created</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0" style="border-radius: 20px; overflow: hidden;">
+            <div class="modal-header" style="background: var(--gradient-success); border-bottom: none;">
+                <h5 class="modal-title text-white fw-semibold"><i class="fas fa-check-circle me-2"></i>Session Created</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
             </div>
-            <div class="modal-body">
-                <p>Share this link with your group members:</p>
-                <div class="input-group mb-3">
-                    <input type="text" class="form-control" id="createdSessionLink" readonly>
-                    <button class="btn btn-outline-secondary" type="button" onclick="navigator.clipboard.writeText(document.getElementById('createdSessionLink').value); this.textContent='Copied!'; setTimeout(()=>this.textContent='Copy', 2000);">Copy</button>
+            <div class="modal-body p-4">
+                <p class="mb-3">Share this link with your group members:</p>
+                <div class="input-group">
+                    <input type="text" class="form-control" id="createdSessionLink" readonly style="border-radius: 10px 0 0 10px;">
+                    <button class="btn btn-primary" type="button" onclick="navigator.clipboard.writeText(document.getElementById('createdSessionLink').value); this.innerHTML='<i class=\'fas fa-check\'></i>'; setTimeout(()=>this.innerHTML='<i class=\'fas fa-copy\'></i>', 2000);" style="border-radius: 0 10px 10px 0;"><i class="fas fa-copy"></i></button>
                 </div>
             </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
-                <button id="goToSessionBtn" type="button" class="btn btn-primary">Go to Session</button>
+            <div class="modal-footer border-0 pt-0">
+                <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Close</button>
+                <button id="goToSessionBtn" type="button" class="btn btn-primary"><i class="fas fa-arrow-right me-1"></i>Go to Session</button>
             </div>
         </div>
     </div>
@@ -246,21 +257,21 @@
 
 <!-- Join Session Modal -->
 <div class="modal fade" id="joinSessionModal" tabindex="-1">
-    <div class="modal-dialog">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title">Join Whiteboard Session</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0" style="border-radius: 20px; overflow: hidden;">
+            <div class="modal-header" style="background: var(--gradient-primary); border-bottom: none;">
+                <h5 class="modal-title text-white fw-semibold"><i class="fas fa-sign-in-alt me-2"></i>Join Session</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
             </div>
-            <div class="modal-body">
+            <div class="modal-body p-4">
                 <div class="mb-3">
-                    <label class="form-label">Session ID</label>
-                    <input id="joinSessionId" class="form-control" placeholder="Enter session ID or paste invite link">
+                    <label class="form-label fw-medium">Session ID</label>
+                    <input id="joinSessionId" class="form-control" placeholder="Enter session ID or paste invite link" style="border-radius: 10px;">
                 </div>
             </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                <button id="joinSessionSubmit" type="button" class="btn btn-primary">Join</button>
+            <div class="modal-footer border-0 pt-0">
+                <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button id="joinSessionSubmit" type="button" class="btn btn-primary"><i class="fas fa-sign-in-alt me-1"></i>Join</button>
             </div>
         </div>
     </div>

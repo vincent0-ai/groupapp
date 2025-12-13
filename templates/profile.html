@@ -2,92 +2,276 @@
 
 {% block title %}Profile - Discussio{% endblock %}
 
+{% block head %}
+<style>
+    .profile-header-card {
+        background: linear-gradient(135deg, rgba(99, 102, 241, 0.08) 0%, rgba(139, 92, 246, 0.05) 100%);
+        border: 1px solid rgba(99, 102, 241, 0.15);
+        position: relative;
+        overflow: hidden;
+    }
+    
+    .profile-header-card::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        height: 80px;
+        background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+    }
+    
+    .profile-avatar-wrapper {
+        position: relative;
+        z-index: 1;
+        margin-top: 30px;
+    }
+    
+    .profile-avatar {
+        width: 120px;
+        height: 120px;
+        border: 4px solid white;
+        box-shadow: 0 8px 24px rgba(99, 102, 241, 0.25);
+        transition: transform 0.3s ease;
+    }
+    
+    .profile-avatar:hover {
+        transform: scale(1.05);
+    }
+    
+    .points-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        background: linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%);
+        padding: 8px 16px;
+        border-radius: 50px;
+        color: white;
+        font-weight: 700;
+        box-shadow: 0 4px 12px rgba(245, 158, 11, 0.35);
+    }
+    
+    .stat-mini {
+        text-align: center;
+        padding: 1rem;
+        border-radius: 12px;
+        background: var(--cream-bg);
+        transition: all 0.3s ease;
+    }
+    
+    .stat-mini:hover {
+        background: rgba(99, 102, 241, 0.1);
+    }
+    
+    .stat-mini .value {
+        font-size: 1.5rem;
+        font-weight: 800;
+        color: var(--primary-color);
+    }
+    
+    .stat-mini .label {
+        font-size: 0.8rem;
+        color: var(--text-muted);
+        font-weight: 500;
+    }
+    
+    .info-card {
+        border: none;
+        box-shadow: none;
+    }
+    
+    .info-card .card-header {
+        background: transparent !important;
+        border-bottom: 1px solid var(--border-color);
+        color: var(--text-dark) !important;
+    }
+    
+    .info-card .card-header h5 {
+        color: var(--text-dark) !important;
+        font-weight: 700;
+    }
+    
+    .info-card .card-header i {
+        color: var(--primary-color) !important;
+    }
+    
+    .info-row {
+        padding: 0.75rem 0;
+        border-bottom: 1px solid var(--border-color);
+    }
+    
+    .info-row:last-child {
+        border-bottom: none;
+    }
+    
+    .info-row h6 {
+        font-weight: 600;
+        font-size: 0.85rem;
+        color: var(--text-muted);
+        margin-bottom: 0.25rem;
+    }
+    
+    .info-row p {
+        margin: 0;
+        font-weight: 500;
+    }
+    
+    .badge-item {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 8px 14px;
+        border-radius: 50px;
+        font-size: 0.85rem;
+        font-weight: 600;
+    }
+    
+    .activity-timeline {
+        position: relative;
+        padding-left: 24px;
+    }
+    
+    .activity-timeline::before {
+        content: '';
+        position: absolute;
+        left: 8px;
+        top: 0;
+        bottom: 0;
+        width: 2px;
+        background: var(--border-color);
+    }
+    
+    .activity-item {
+        position: relative;
+        padding: 12px 0;
+    }
+    
+    .activity-item::before {
+        content: '';
+        position: absolute;
+        left: -20px;
+        top: 18px;
+        width: 10px;
+        height: 10px;
+        border-radius: 50%;
+        background: var(--primary-color);
+        border: 2px solid white;
+    }
+</style>
+{% endblock %}
+
 {% block content %}
         <div class="row">
             <!-- Profile Card -->
             <div class="col-lg-4 mb-4">
-                <div class="card text-center shadow-sm border-0">
-                    <div class="card-body">
-                        <img id="avatar" src="" alt="Avatar" class="rounded-circle mb-3" width="100" height="100">
-                        <h3 id="userName">Loading...</h3>
-                        <p class="text-muted" id="userEmail">-</p>
-                        <div class="mb-3">
-                            <h5 id="userPoints">0 <small class="text-muted">Points</small></h5>
+                <div class="card profile-header-card text-center">
+                    <div class="card-body pt-0">
+                        <div class="profile-avatar-wrapper">
+                            <img id="avatar" src="" alt="Avatar" class="profile-avatar rounded-circle mb-3">
                         </div>
-                        <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#editProfileModal">
-                            <i class="fas fa-edit"></i> Edit Profile
+                        <h3 class="mb-1 fw-bold" id="userName">Loading...</h3>
+                        <p class="text-muted mb-3" id="userEmail">-</p>
+                        <div class="points-badge mb-3">
+                            <i class="fas fa-star"></i>
+                            <span id="userPoints">0 Points</span>
+                        </div>
+                        <button class="btn btn-primary w-100" data-bs-toggle="modal" data-bs-target="#editProfileModal">
+                            <i class="fas fa-edit me-2"></i>Edit Profile
                         </button>
                     </div>
                 </div>
 
                 <!-- Stats Card -->
-                <div class="card mt-3 shadow-sm border-0">
+                <div class="card info-card mt-3">
                     <div class="card-header">
-                        <h5><i class="fas fa-chart-line"></i> Statistics</h5>
+                        <h5 class="mb-0"><i class="fas fa-chart-line me-2"></i>Statistics</h5>
                     </div>
                     <div class="card-body">
-                        <p><strong>Groups:</strong> <span id="groupsCount">0</span></p>
-                        <p><strong>Competitions:</strong> <span id="competitionsCount">0</span></p>
-                        <p><strong>Badges:</strong> <span id="badgesCount">0</span></p>
-                        <p><strong>Member Since:</strong> <span id="joinDate">-</span></p>
+                        <div class="row g-2">
+                            <div class="col-4">
+                                <div class="stat-mini">
+                                    <div class="value" id="groupsCount">0</div>
+                                    <div class="label">Groups</div>
+                                </div>
+                            </div>
+                            <div class="col-4">
+                                <div class="stat-mini">
+                                    <div class="value" id="competitionsCount">0</div>
+                                    <div class="label">Comps</div>
+                                </div>
+                            </div>
+                            <div class="col-4">
+                                <div class="stat-mini">
+                                    <div class="value" id="badgesCount">0</div>
+                                    <div class="label">Badges</div>
+                                </div>
+                            </div>
+                        </div>
+                        <hr>
+                        <div class="d-flex align-items-center">
+                            <i class="fas fa-calendar-alt text-muted me-2"></i>
+                            <small class="text-muted">Member since <span id="joinDate">-</span></small>
+                        </div>
                     </div>
                 </div>
             </div>
 
             <!-- Profile Details -->
             <div class="col-lg-8">
-                <div class="card mb-4 shadow-sm border-0">
+                <div class="card info-card mb-4">
                     <div class="card-header">
-                        <h5><i class="fas fa-info-circle"></i> Profile Information</h5>
+                        <h5 class="mb-0"><i class="fas fa-user me-2"></i>Profile Information</h5>
                     </div>
                     <div class="card-body">
-                        <div class="row mb-3">
-                            <div class="col-md-6">
-                                <h6>Full Name</h6>
-                                <p id="fullName">-</p>
-                            </div>
-                            <div class="col-md-6">
-                                <h6>Username</h6>
-                                <p id="username">-</p>
-                            </div>
-                        </div>
-                        <div class="row mb-3">
-                            <div class="col-md-12">
-                                <h6>Bio</h6>
-                                <p id="bio">No bio yet</p>
-                            </div>
-                        </div>
                         <div class="row">
-                            <div class="col-md-12">
-                                <h6>Preferences</h6>
-                                <div id="preferences">
-                                    <small class="text-body-secondary">Loading...</small>
+                            <div class="col-md-6">
+                                <div class="info-row">
+                                    <h6>Full Name</h6>
+                                    <p id="fullName">-</p>
                                 </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="info-row">
+                                    <h6>Username</h6>
+                                    <p id="username">-</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="info-row">
+                            <h6>Bio</h6>
+                            <p id="bio" class="text-muted">No bio yet</p>
+                        </div>
+                        <div class="info-row">
+                            <h6>Preferences</h6>
+                            <div id="preferences">
+                                <span class="badge bg-primary me-1">English</span>
+                                <span class="badge bg-success me-1">Dark Mode</span>
                             </div>
                         </div>
                     </div>
                 </div>
 
                 <!-- Badges -->
-                <div class="card mb-4 shadow-sm border-0">
+                <div class="card info-card mb-4">
                     <div class="card-header">
-                        <h5 class="mb-0"><i class="fas fa-award"></i> Badges</h5>
+                        <h5 class="mb-0"><i class="fas fa-award me-2"></i>Badges</h5>
                     </div>
                     <div class="card-body" id="badgesContainer">
-                        <p class="text-secondary">No badges yet</p>
+                        <p class="text-muted mb-0">No badges yet. Start participating to earn badges!</p>
                     </div>
                 </div>
 
                 <!-- Recent Activity -->
-                <div class="card shadow-sm border-0">
+                <div class="card info-card">
                     <div class="card-header">
-                        <h5><i class="fas fa-history"></i> Recent Activity</h5>
+                        <h5 class="mb-0"><i class="fas fa-history me-2"></i>Recent Activity</h5>
                     </div>
                     <div class="card-body" id="activityContainer">
-                        <p class="text-secondary">No recent activity</p>
+                        <p class="text-muted mb-0">No recent activity</p>
                     </div>
                 </div>
             </div>
+        </div>
     <!-- Edit Profile Modal -->
     <div class="modal fade" id="editProfileModal" tabindex="-1">
         <div class="modal-dialog">

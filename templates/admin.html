@@ -3,46 +3,73 @@
 {% block title %}Admin Dashboard - Discussio{% endblock %}
 
 {% block content %}
-<div class="d-flex justify-content-between align-items-center mb-4">
-    <h2><i class="fas fa-shield-alt me-2"></i>Admin Dashboard</h2>
-    <div id="adminStats" class="d-flex gap-3 text-muted small">
-        <!-- Stats will be loaded here -->
+<!-- Page Header -->
+<div class="page-header mb-4" style="background: linear-gradient(135deg, #dc3545 0%, #6f42c1 100%); border-radius: 20px; padding: 2rem; color: white;">
+    <div class="d-flex justify-content-between align-items-center flex-wrap gap-3">
+        <div class="d-flex align-items-center gap-3">
+            <div style="width: 60px; height: 60px; background: rgba(255,255,255,0.2); border-radius: 16px; display: flex; align-items: center; justify-content: center;">
+                <i class="fas fa-shield-alt fa-2x"></i>
+            </div>
+            <div>
+                <h1 class="mb-1" style="font-size: 1.75rem; font-weight: 700;">Admin Dashboard</h1>
+                <p class="mb-0 opacity-75">Manage users, groups, and channels</p>
+            </div>
+        </div>
+        <div id="adminStats" class="d-flex gap-3">
+            <!-- Stats will be loaded here -->
+        </div>
     </div>
 </div>
 
-<ul class="nav nav-tabs mb-4" id="adminTabs" role="tablist">
-    <li class="nav-item" role="presentation">
-        <button class="nav-link active" id="users-tab" data-bs-toggle="tab" data-bs-target="#users" type="button" role="tab">Users</button>
-    </li>
-    <li class="nav-item" role="presentation">
-        <button class="nav-link" id="groups-tab" data-bs-toggle="tab" data-bs-target="#groups" type="button" role="tab">Groups</button>
-    </li>
-    <li class="nav-item" role="presentation">
-        <button class="nav-link" id="channels-tab" data-bs-toggle="tab" data-bs-target="#channels" type="button" role="tab">Channels</button>
-    </li>
-</ul>
+<div class="nav-tabs-container mb-4" style="background: #f8f5f0; border-radius: 12px; padding: 6px;">
+    <ul class="nav nav-tabs border-0" id="adminTabs" role="tablist" style="gap: 4px;">
+        <li class="nav-item" role="presentation">
+            <button class="nav-link active" id="users-tab" data-bs-toggle="tab" data-bs-target="#users" type="button" role="tab" style="border: none; border-radius: 8px; padding: 10px 20px; font-weight: 500;">
+                <i class="fas fa-users me-2"></i>Users
+            </button>
+        </li>
+        <li class="nav-item" role="presentation">
+            <button class="nav-link" id="groups-tab" data-bs-toggle="tab" data-bs-target="#groups" type="button" role="tab" style="border: none; border-radius: 8px; padding: 10px 20px; font-weight: 500;">
+                <i class="fas fa-layer-group me-2"></i>Groups
+            </button>
+        </li>
+        <li class="nav-item" role="presentation">
+            <button class="nav-link" id="channels-tab" data-bs-toggle="tab" data-bs-target="#channels" type="button" role="tab" style="border: none; border-radius: 8px; padding: 10px 20px; font-weight: 500;">
+                <i class="fas fa-hashtag me-2"></i>Channels
+            </button>
+        </li>
+    </ul>
+</div>
 
 <div class="tab-content" id="adminTabContent">
     <!-- Users Tab -->
     <div class="tab-pane fade show active" id="users" role="tabpanel">
-        <div class="d-flex justify-content-between mb-3">
-            <input type="text" class="form-control w-auto" id="userSearch" placeholder="Search users...">
-        </div>
-        <div class="table-responsive">
-            <table class="table table-hover">
-                <thead>
-                    <tr>
-                        <th>User</th>
-                        <th>Email</th>
-                        <th>Status</th>
-                        <th>Joined</th>
-                        <th>Actions</th>
-                    </tr>
-                </thead>
-                <tbody id="usersTableBody">
-                    <!-- Users will be loaded here -->
-                </tbody>
-            </table>
+        <div class="card border-0 shadow-sm mb-4" style="border-radius: 16px; overflow: hidden;">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <h5 class="mb-0 fw-semibold"><i class="fas fa-users text-primary me-2"></i>User Management</h5>
+                    <div class="search-wrapper position-relative">
+                        <i class="fas fa-search position-absolute" style="left: 12px; top: 50%; transform: translateY(-50%); color: #6c757d;"></i>
+                        <input type="text" class="form-control" id="userSearch" placeholder="Search users..." style="padding-left: 38px; border-radius: 10px; min-width: 250px;">
+                    </div>
+                </div>
+                <div class="table-responsive">
+                    <table class="table table-hover mb-0">
+                        <thead style="background: #f8f9fa;">
+                            <tr>
+                                <th style="border-top: none; font-weight: 600;">User</th>
+                                <th style="border-top: none; font-weight: 600;">Email</th>
+                                <th style="border-top: none; font-weight: 600;">Status</th>
+                                <th style="border-top: none; font-weight: 600;">Joined</th>
+                                <th style="border-top: none; font-weight: 600;">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="usersTableBody">
+                            <!-- Users will be loaded here -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
         </div>
         <nav aria-label="User pagination">
             <ul class="pagination justify-content-center" id="userPagination"></ul>
@@ -51,24 +78,32 @@
 
     <!-- Groups Tab -->
     <div class="tab-pane fade" id="groups" role="tabpanel">
-        <div class="d-flex justify-content-between mb-3">
-            <input type="text" class="form-control w-auto" id="groupSearch" placeholder="Search groups...">
-        </div>
-        <div class="table-responsive">
-            <table class="table table-hover">
-                <thead>
-                    <tr>
-                        <th>Name</th>
-                        <th>Owner</th>
-                        <th>Members</th>
-                        <th>Created</th>
-                        <th>Actions</th>
-                    </tr>
-                </thead>
-                <tbody id="groupsTableBody">
-                    <!-- Groups will be loaded here -->
-                </tbody>
-            </table>
+        <div class="card border-0 shadow-sm mb-4" style="border-radius: 16px; overflow: hidden;">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <h5 class="mb-0 fw-semibold"><i class="fas fa-layer-group text-primary me-2"></i>Group Management</h5>
+                    <div class="search-wrapper position-relative">
+                        <i class="fas fa-search position-absolute" style="left: 12px; top: 50%; transform: translateY(-50%); color: #6c757d;"></i>
+                        <input type="text" class="form-control" id="groupSearch" placeholder="Search groups..." style="padding-left: 38px; border-radius: 10px; min-width: 250px;">
+                    </div>
+                </div>
+                <div class="table-responsive">
+                    <table class="table table-hover mb-0">
+                        <thead style="background: #f8f9fa;">
+                            <tr>
+                                <th style="border-top: none; font-weight: 600;">Name</th>
+                                <th style="border-top: none; font-weight: 600;">Owner</th>
+                                <th style="border-top: none; font-weight: 600;">Members</th>
+                                <th style="border-top: none; font-weight: 600;">Created</th>
+                                <th style="border-top: none; font-weight: 600;">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="groupsTableBody">
+                            <!-- Groups will be loaded here -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
         </div>
         <nav aria-label="Group pagination">
             <ul class="pagination justify-content-center" id="groupPagination"></ul>
@@ -77,20 +112,27 @@
 
     <!-- Channels Tab -->
     <div class="tab-pane fade" id="channels" role="tabpanel">
-        <div class="table-responsive">
-            <table class="table table-hover">
-                <thead>
-                    <tr>
-                        <th>Name</th>
-                        <th>Description</th>
-                        <th>Groups</th>
-                        <th>Actions</th>
-                    </tr>
-                </thead>
-                <tbody id="channelsTableBody">
-                    <!-- Channels will be loaded here -->
-                </tbody>
-            </table>
+        <div class="card border-0 shadow-sm mb-4" style="border-radius: 16px; overflow: hidden;">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <h5 class="mb-0 fw-semibold"><i class="fas fa-hashtag text-primary me-2"></i>Channel Management</h5>
+                </div>
+                <div class="table-responsive">
+                    <table class="table table-hover mb-0">
+                        <thead style="background: #f8f9fa;">
+                            <tr>
+                                <th style="border-top: none; font-weight: 600;">Name</th>
+                                <th style="border-top: none; font-weight: 600;">Description</th>
+                                <th style="border-top: none; font-weight: 600;">Groups</th>
+                                <th style="border-top: none; font-weight: 600;">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="channelsTableBody">
+                            <!-- Channels will be loaded here -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
         </div>
     </div>
 </div>

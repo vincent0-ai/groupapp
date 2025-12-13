@@ -3,10 +3,16 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="theme-color" content="#ffffff">
+    <meta name="theme-color" content="#6366f1">
+    <meta name="description" content="Discussio - A collaborative learning platform for groups, discussions, and competitions.">
 
     <title>{% block title %}Discussio{% endblock %}</title>
 
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
@@ -18,9 +24,12 @@
 
 {% block navbar %}
 <nav class="navbar navbar-expand-lg navbar-light sticky-top">
-    <div class="container-fluid">
-        <a class="navbar-brand" href="{{ url_for('dashboard') }}">Discussio</a>
-        <button class="navbar-toggler" type="button" id="navbarToggler" aria-label="Toggle navigation">
+    <div class="container-fluid px-3 px-lg-4">
+        <a class="navbar-brand d-flex align-items-center" href="{{ url_for('dashboard') }}">
+            <i class="fas fa-graduation-cap me-2" style="background: linear-gradient(135deg, #6366f1, #8b5cf6); -webkit-background-clip: text; -webkit-text-fill-color: transparent;"></i>
+            Discussio
+        </a>
+        <button class="navbar-toggler border-0 shadow-none" type="button" id="navbarToggler" aria-label="Toggle navigation">
             <span class="navbar-toggler-icon"></span>
         </button>
         <div class="navbar-collapse" id="navbarNav">
@@ -32,7 +41,7 @@
                     <a class="nav-link {% if ep == 'dashboard' %}active{% endif %}" href="{{ url_for('dashboard') }}"><i class="fas fa-home"></i> Dashboard</a>
                 </li>
                 <li class="nav-item">
-                    <a class="nav-link {% if ep == 'groups_page' %}active{% endif %}" href="{{ url_for('groups_page') }}"><i class="fas fa-users"></i>Channels and Groups</a>
+                    <a class="nav-link {% if ep == 'groups_page' %}active{% endif %}" href="{{ url_for('groups_page') }}"><i class="fas fa-users"></i> Channels</a>
                 </li>
                 <li class="nav-item">
                     <a class="nav-link {% if ep == 'messages_page' %}active{% endif %}" href="{{ url_for('messages_page') }}"><i class="fas fa-comments"></i> Messages</a>
@@ -41,19 +50,19 @@
                     <a class="nav-link {% if ep == 'competitions_page' %}active{% endif %}" href="{{ url_for('competitions_page') }}"><i class="fas fa-trophy"></i> Competitions</a>
                 </li>
                 <li class="nav-item">
-                    <a class="nav-link {% if ep == 'files_page' %}active{% endif %}" href="{{ url_for('files_page') }}"><i class="fas fa-file"></i> Files</a>
+                    <a class="nav-link {% if ep == 'files_page' %}active{% endif %}" href="{{ url_for('files_page') }}"><i class="fas fa-folder-open"></i> Files</a>
                 </li>
                 <li class="nav-item">
-                    <a class="nav-link {% if ep == 'leaderboard_page' %}active{% endif %}" href="{{ url_for('leaderboard_page') }}"><i class="fas fa-chart-bar"></i> Leaderboard</a>
+                    <a class="nav-link {% if ep == 'leaderboard_page' %}active{% endif %}" href="{{ url_for('leaderboard_page') }}"><i class="fas fa-medal"></i> Leaderboard</a>
                 </li>
                 <li class="nav-item">
-                    <a class="nav-link {% if ep == 'profile_page' %}active{% endif %}" href="{{ url_for('profile_page') }}"><i class="fas fa-user"></i> Profile</a>
+                    <a class="nav-link {% if ep == 'profile_page' %}active{% endif %}" href="{{ url_for('profile_page') }}"><i class="fas fa-user-circle"></i> Profile</a>
                 </li>
                 <li class="nav-item">
                     <a class="nav-link {% if ep == 'whiteboard_page' %}active{% endif %}" href="{{ url_for('whiteboard_page') }}"><i class="fas fa-chalkboard"></i> Whiteboard</a>
                 </li>
                 <li class="nav-item">
-                    <a class="nav-link" id="logoutBtn" href="#"><i class="fas fa-sign-out-alt"></i> Logout</a>
+                    <a class="nav-link text-danger" id="logoutBtn" href="#"><i class="fas fa-sign-out-alt"></i> Logout</a>
                 </li>
             </ul>
         </div>
@@ -75,15 +84,19 @@
 {% endblock %}
 
 {% block footer %}
-<footer class="fixed-bottom bg-white border-top shadow-sm py-2">
+<footer class="fixed-bottom border-top py-2" style="background: rgba(255, 255, 255, 0.95); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);">
     <div class="container-fluid">
         <div class="d-flex justify-content-around align-items-center">
             <a href="{{ url_for('dashboard') }}" class="footer-nav-link text-center text-decoration-none {% if ep == 'dashboard' %}active{% endif %}">
                 <i class="fas fa-home"></i>
                 <small class="d-block">Home</small>
             </a>
+            <a href="{{ url_for('messages_page') }}" class="footer-nav-link text-center text-decoration-none {% if ep == 'messages_page' %}active{% endif %}">
+                <i class="fas fa-comments"></i>
+                <small class="d-block">Chat</small>
+            </a>
             <a href="{{ url_for('profile_page') }}" class="footer-nav-link text-center text-decoration-none {% if ep == 'profile_page' %}active{% endif %}">
-                <i class="fas fa-user"></i>
+                <i class="fas fa-user-circle"></i>
                 <small class="d-block">Profile</small>
             </a>
             <a href="#" class="footer-nav-link text-center text-decoration-none" data-bs-toggle="modal" data-bs-target="#aboutModal">
@@ -99,18 +112,26 @@
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title" id="aboutModalLabel"><i class="fas fa-info-circle"></i> About Discussio</h5>
+                <h5 class="modal-title" id="aboutModalLabel"><i class="fas fa-graduation-cap me-2"></i>About Discussio</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
-            <div class="modal-body text-center">
-                <h4 class="mb-3">Discussio</h4>
-                <p class="text-muted">A collaborative learning platform for groups, discussions, and competitions.</p>
+            <div class="modal-body text-center py-4">
+                <div class="mb-4">
+                    <i class="fas fa-graduation-cap fa-3x" style="background: linear-gradient(135deg, #6366f1, #8b5cf6); -webkit-background-clip: text; -webkit-text-fill-color: transparent;"></i>
+                </div>
+                <h4 class="mb-3 fw-bold">Discussio</h4>
+                <p class="text-muted mb-4">A modern collaborative learning platform for groups, discussions, and competitions.</p>
+                <div class="d-flex justify-content-center gap-3 mb-4">
+                    <span class="badge bg-primary"><i class="fas fa-users me-1"></i> Groups</span>
+                    <span class="badge bg-success"><i class="fas fa-comments me-1"></i> Chat</span>
+                    <span class="badge bg-warning"><i class="fas fa-trophy me-1"></i> Compete</span>
+                </div>
                 <hr>
                 <p class="small text-muted mb-1">&copy; {{ now().year if now is defined else '2025' }} Discussio</p>
-                <p class="small text-muted">Version 1.0.0</p>
+                <p class="small text-muted mb-0">Version 1.0.0</p>
             </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-primary" data-bs-dismiss="modal">Close</button>
+            <div class="modal-footer justify-content-center border-0 pt-0">
+                <button type="button" class="btn btn-primary px-4" data-bs-dismiss="modal">Close</button>
             </div>
         </div>
     </div>
@@ -119,24 +140,36 @@
 <style>
     .footer-nav-link {
         color: var(--text-muted);
-        padding: 5px 15px;
-        transition: color 0.2s ease;
+        padding: 8px 20px;
+        transition: all 0.25s ease;
+        border-radius: 12px;
     }
     .footer-nav-link:hover {
         color: var(--primary-color);
+        background: rgba(99, 102, 241, 0.08);
     }
     .footer-nav-link.active {
         color: var(--primary-color);
+        background: rgba(99, 102, 241, 0.1);
     }
     .footer-nav-link i {
-        font-size: 1.2rem;
+        font-size: 1.25rem;
+        display: block;
+        margin-bottom: 2px;
     }
     .footer-nav-link small {
         font-size: 0.7rem;
+        font-weight: 500;
     }
     /* Add padding to main content to prevent footer overlap */
     main {
-        padding-bottom: 70px !important;
+        padding-bottom: 80px !important;
+    }
+    
+    @media (prefers-color-scheme: dark) {
+        footer {
+            background: rgba(15, 23, 42, 0.95) !important;
+        }
     }
 </style>
 {% endblock %}
