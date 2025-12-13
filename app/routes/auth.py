@@ -120,8 +120,13 @@ def login():
 
 @auth_bp.route("/google", methods=["GET", "POST"])
 def google_login():
-    data = request.get_json(silent=True) or request.form or request.args or {}
+    data = request.get_json(silent=True, force=True) or request.form or request.args or {}
     google_token = data.get("id_token") or data.get("credential")
+
+    if not google_token:
+        auth_header = request.headers.get('Authorization')
+        if auth_header and auth_header.startswith('Bearer '):
+            google_token = auth_header.split(' ')[1]
 
     if not google_token:
         return error_response("Missing Google id_token", 400)
