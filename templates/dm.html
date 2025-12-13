@@ -658,13 +658,25 @@
             }
 
             try {
-                const res = await fetch(`/api/dm/thread/${otherUserId}`, {
+                let res = await fetch(`/api/dm/thread/${otherUserId}`, {
                     method: 'GET',
                     headers: { 
                         'Authorization': `Bearer ${token}`,
                         'Content-Type': 'application/json'
                     }
                 });
+                
+                // If thread doesn't exist (404), try to create it
+                if (res.status === 404) {
+                    res = await fetch(`/api/dm/threads`, {
+                        method: 'POST',
+                        headers: { 
+                            'Authorization': `Bearer ${token}`,
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({ recipient_id: otherUserId })
+                    });
+                }
                 
                 const contentType = res.headers.get("content-type");
                 if (contentType && contentType.indexOf("application/json") !== -1) {
