@@ -647,11 +647,19 @@
                         });
                         renderParticipants();
                     }
-                    // Show invite link if creator
+                    // Show share link if creator
                     if (isCreator) {
                         const inviteContainer = document.getElementById('inviteLinkContainer');
                         if (inviteContainer) {
-                            inviteContainer.innerHTML = `<small class="text-muted">Invite: <a href="/whiteboard?session=${wb.id}">Join Session</a></small>`;
+                            const shareUrl = window.location.origin + '/whiteboard?session=' + wb.id;
+                            inviteContainer.innerHTML = `
+                                <div class="d-flex align-items-center gap-2">
+                                    <small class="text-muted"><i class="fas fa-share-alt me-1"></i>Share:</small>
+                                    <button class="btn btn-xs btn-outline-primary" onclick="navigator.clipboard.writeText('${shareUrl}'); this.innerHTML='<i class=\\'fas fa-check\\'></i> Copied'; setTimeout(() => this.innerHTML='<i class=\\'fas fa-copy\\'></i> Copy Link', 2000);" style="padding: 2px 8px; font-size: 0.75rem;">
+                                        <i class="fas fa-copy"></i> Copy Link
+                                    </button>
+                                </div>
+                            `;
                         }
                     }
                     // Render audio files list
