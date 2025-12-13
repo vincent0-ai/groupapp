@@ -271,9 +271,21 @@ def google_callback():
         
         db.update_one('users', {'_id': user['_id']}, update_fields)
     else:
+        # Generate unique username
+        base_name = id_info.get('name', email.split('@')[0])
+        username = "".join(c for c in base_name if c.isalnum())
+        if not username:
+            username = f"user{os.urandom(4).hex()}"
+            
+        original_username = username
+        counter = 1
+        while db.find_one('users', {'username': username}):
+            username = f"{original_username}{counter}"
+            counter += 1
+            
         user_doc = User.create_user_doc(
             email,
-            id_info.get('name', email.split('@')[0]),
+            username,
             '',
             id_info.get('name', ''),
             id_info.get('picture', '')
