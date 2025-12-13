@@ -276,11 +276,13 @@ def delete_message(message_id):
     if not message:
         return error_response('Message not found', 404)
     
-    # Check if user is message author or group moderator
+    # Check if user is message author, group owner, or group moderator
     user_id_obj = ObjectId(g.user_id)
     if str(message['user_id']) != g.user_id:
         group = db.find_one('groups', {'_id': message['group_id']})
-        if user_id_obj not in group['moderators']:
+        is_owner = str(group.get('owner_id', '')) == g.user_id
+        is_mod = user_id_obj in group.get('moderators', [])
+        if not is_owner and not is_mod:
             return error_response('You can only delete your own messages', 403)
     
     db.delete_one('messages', {'_id': message_id_obj})

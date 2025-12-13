@@ -643,7 +643,7 @@
                     if (wb.participants) {
                         wb.participants.forEach(p => {
                             const uid = p.id || p._id || p;
-                            participants[uid] = { name: p.full_name || p.username || 'User ' + String(uid).substr(-4), avatar_url: p.avatar_url || '', can_draw: wb.can_draw ? wb.can_draw.map(x => x.toString()).includes(uid) : false, can_speak: wb.can_speak ? wb.can_speak.map(x => x.toString()).includes(uid) : false };
+                            participants[uid] = { name: p.username || p.full_name || 'User ' + String(uid).substr(-4), avatar_url: p.avatar_url || '', can_draw: wb.can_draw ? wb.can_draw.map(x => x.toString()).includes(uid) : false, can_speak: wb.can_speak ? wb.can_speak.map(x => x.toString()).includes(uid) : false };
                         });
                         renderParticipants();
                     }
@@ -735,21 +735,27 @@
                 const el = document.createElement('div');
                 el.className = 'd-flex align-items-center justify-content-between mb-2';
                 const left = document.createElement('div');
+                left.className = 'd-flex align-items-center';
                 const avatarSrc = meta.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(meta.name || meta.username || uid)}`;
-                const avatarHtml = `<img src="${avatarSrc}" class="rounded-circle me-2" width="28" height="28"/>`;
-                left.innerHTML = avatarHtml + `<strong>${meta.name || uid}</strong>`;
+                const avatarHtml = `<img src="${avatarSrc}" class="rounded-circle me-2" width="24" height="24"/>`;
+                left.innerHTML = avatarHtml + `<span class="small fw-medium" style="color: var(--text-dark);">${meta.name || uid}</span>`;
                 el.appendChild(left);
                 const right = document.createElement('div');
+                right.className = 'd-flex gap-1';
                 if (isCreator && uid !== userId) {
                     const grantDraw = document.createElement('button');
-                    grantDraw.className = 'btn btn-sm btn-outline-primary me-1';
-                    grantDraw.textContent = meta.can_draw ? 'Revoke Draw' : 'Grant Draw';
+                    grantDraw.className = 'btn btn-xs ' + (meta.can_draw ? 'btn-primary' : 'btn-outline-primary');
+                    grantDraw.innerHTML = meta.can_draw ? '<i class="fas fa-pencil-alt"></i>' : '<i class="fas fa-pencil-alt"></i>';
+                    grantDraw.title = meta.can_draw ? 'Revoke Draw' : 'Grant Draw';
+                    grantDraw.style.cssText = 'padding: 2px 6px; font-size: 0.7rem;';
                     grantDraw.addEventListener('click', () => {
                         socket.emit(meta.can_draw ? 'revoke_draw' : 'grant_draw', { room: sessionId ? `whiteboard:${sessionId}` : 'whiteboard', user_id: uid, requester_id: userId });
                     });
                     const grantSpeak = document.createElement('button');
-                    grantSpeak.className = 'btn btn-sm btn-outline-secondary';
-                    grantSpeak.textContent = meta.can_speak ? 'Revoke Speak' : 'Grant Speak';
+                    grantSpeak.className = 'btn btn-xs ' + (meta.can_speak ? 'btn-success' : 'btn-outline-secondary');
+                    grantSpeak.innerHTML = meta.can_speak ? '<i class="fas fa-microphone"></i>' : '<i class="fas fa-microphone-slash"></i>';
+                    grantSpeak.title = meta.can_speak ? 'Revoke Speak' : 'Grant Speak';
+                    grantSpeak.style.cssText = 'padding: 2px 6px; font-size: 0.7rem;';
                     grantSpeak.addEventListener('click', () => {
                         socket.emit(meta.can_speak ? 'revoke_speak' : 'grant_speak', { room: sessionId ? `whiteboard:${sessionId}` : 'whiteboard', user_id: uid, requester_id: userId });
                     });
@@ -757,15 +763,20 @@
                     right.appendChild(grantSpeak);
                     if (meta.raised) {
                         const clearHand = document.createElement('button');
-                        clearHand.className = 'btn btn-sm btn-outline-danger ms-1';
-                        clearHand.textContent = 'Clear Hand';
+                        clearHand.className = 'btn btn-xs btn-outline-danger';
+                        clearHand.innerHTML = '<i class="fas fa-hand-paper"></i>';
+                        clearHand.title = 'Clear Hand';
+                        clearHand.style.cssText = 'padding: 2px 6px; font-size: 0.7rem;';
                         clearHand.addEventListener('click', () => {
                             socket.emit('clear_hand', { room: sessionId ? `whiteboard:${sessionId}` : 'whiteboard', user_id: uid });
                         });
                         right.appendChild(clearHand);
                     }
                 } else {
-                    right.textContent = (meta.can_draw ? 'Can draw' : '') + (meta.raised ? ' • Raised hand' : '');
+                    const statusText = document.createElement('small');
+                    statusText.className = 'text-muted';
+                    statusText.textContent = (meta.can_draw ? '✏️' : '') + (meta.raised ? ' ✋' : '');
+                    right.appendChild(statusText);
                 }
                 el.appendChild(right);
                 participantsEl.appendChild(el);
@@ -775,7 +786,7 @@
         socket.on('user_joined', (data) => {
             const uid = data.user_id;
             const p = data.profile;
-            const name = p?.full_name || p?.username || 'User ' + uid.substr(-4);
+            const name = p?.username || p?.full_name || 'User ' + uid.substr(-4);
             const avatar = p?.avatar_url || '';
             if (!participants[uid]) participants[uid] = { name, avatar_url: avatar, can_draw: false, can_speak: false };
             renderParticipants();
