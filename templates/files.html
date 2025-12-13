@@ -124,6 +124,12 @@
             <select class="form-select" id="filterGroup" style="max-width: 200px;">
                 <option value="">All Groups</option>
             </select>
+            <select class="form-select" id="filterType" style="max-width: 160px;">
+                <option value="">All Types</option>
+                <option value="image">Images</option>
+                <option value="document">Documents</option>
+                <option value="archive">Archives</option>
+            </select>
         </div>
 
         <!-- Files List -->
@@ -191,15 +197,79 @@
             return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
         }
 
+        let allFiles = [];
+        let allGroups = [];
+
         async function loadFiles() {
             try {
                 const res = await fetch('/api/files', {
                     headers: { 'Authorization': `Bearer ${token}` }
                 });
                 const data = await res.json();
-                const files = data.data?.files || [];
+                allFiles = data.data?.files || [];
 
-                const html = files.length ? files.map(f => {
+                renderFiles();
+
+                // Load groups for dropdown
+                const groupRes = await fetch('/api/users/groups', {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                const groupData = await groupRes.json();
+                allGroups = groupData.data?.groups || [];
+                const uploadGroupSelect = document.getElementById('uploadGroup');
+                const filterGroupSelect = document.getElementById('filterGroup');
+                uploadGroupSelect.innerHTML = '';
+                filterGroupSelect.innerHTML = '<option value="">All Groups</option>';
+                allGroups.forEach(g => {
+                    // Add to upload dropdown
+                    const uploadOption = document.createElement('option');
+                    uploadOption.value = g.id || g._id;
+                    uploadOption.textContent = g.name;
+                    uploadGroupSelect.appendChild(uploadOption);
+                    
+                    // Add to filter dropdown
+                    const filterOption = document.createElement('option');
+                    filterOption.value = g.id || g._id;
+                    filterOption.textContent = g.name;
+                    filterGroupSelect.appendChild(filterOption);
+                });
+            } catch (error) {
+                console.error('Error loading files:', error);
+            }
+        }
+
+        function renderFiles() {
+            const filterGroupId = document.getElementById('filterGroup').value;
+            const filterType = document.getElementById('filterType').value;
+            const searchQuery = document.getElementById('searchFiles').value.toLowerCase().trim();
+            
+            let files = allFiles;
+            
+            // Filter by search query
+            if (searchQuery) {
+                files = files.filter(f => f.filename.toLowerCase().includes(searchQuery));
+            }
+            
+            // Filter by group
+            if (filterGroupId) {
+                files = files.filter(f => {
+                    const fileGroupId = f.group_id?.$oid || f.group_id || '';
+                    return fileGroupId === filterGroupId;
+                });
+            }
+            
+            // Filter by type
+            if (filterType) {
+                files = files.filter(f => {
+                    const ext = (f.file_type || f.filename.split('.').pop() || '').toLowerCase();
+                    if (filterType === 'image') return ['jpg', 'jpeg', 'png', 'gif'].includes(ext);
+                    if (filterType === 'document') return ['pdf', 'doc', 'docx', 'txt', 'xls', 'xlsx', 'ppt', 'pptx'].includes(ext);
+                    if (filterType === 'archive') return ['zip', 'rar', '7z'].includes(ext);
+                    return true;
+                });
+            }
+
+            const html = files.length ? files.map(f => {
                     const fileIcon = getFileIcon(f.file_type || f.filename.split('.').pop());
                     const deleteBtn = f.can_delete ? `<button class="btn btn-sm btn-outline-danger" onclick="deleteFile('${f.id}')" title="Delete file"><i class="fas fa-trash"></i></button>` : '';
                     return `
@@ -218,31 +288,9 @@
                         </div>
                     </div>
                 `;
-                }).join('') : '<div class="col-12 text-center text-secondary"><p>No files uploaded yet</p></div>';
+                }).join('') : '<div class="col-12 text-center text-secondary"><p>No files found</p></div>';
 
                 document.getElementById('filesList').innerHTML = html;
-
-                // Load groups for dropdown
-                const groupRes = await fetch('/api/users/groups', {
-                    headers: { 'Authorization': `Bearer ${token}` }
-                });
-                const groupData = await groupRes.json();
-                const groups = groupData.data?.groups || [];
-                const uploadGroupSelect = document.getElementById('uploadGroup');
-                const filterGroupSelect = document.getElementById('filterGroup');
-                uploadGroupSelect.innerHTML = '';
-                filterGroupSelect.innerHTML = '<option value="">All Groups</option>';
-                [uploadGroupSelect, filterGroupSelect].forEach(select => {
-                    groups.forEach(g => {
-                        const option = document.createElement('option');
-                        option.value = g.id;
-                        option.textContent = g.name;
-                        select.appendChild(option);
-                    });
-                });
-            } catch (error) {
-                console.error('Error loading files:', error);
-            }
         }
 
         function getFileIcon(fileType) {
@@ -347,6 +395,23 @@
                 uploadingText.classList.add('d-none');
             }
         });
+        
+        // Filter event listeners
+        document.getElementById('filterGroup').addEventListener('change', () => {
+            renderFiles();
+        });
+        
+        document.getElementById('filterType').addEventListener('change', () => {
+            renderFiles();
+        });
+        
+        // Search input with debounce
+        let searchTimeout;
+        document.getElementById('searchFiles').addEventListener('input', () => {
+            clearTimeout(searchTimeout);
+            searchTimeout = setTimeout(() => renderFiles(), 200);
+        });
+        
         document.addEventListener('DOMContentLoaded', () => {
             if (!token) {
                 sessionStorage.setItem('redirectAfterLogin', window.location.href);

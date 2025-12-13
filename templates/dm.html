@@ -537,25 +537,38 @@
         
         async function loadSuggestedUsers() {
             try {
-                const res = await fetch('/api/users/search', {
+                // Try the search endpoint first
+                let res = await fetch('/api/users/search', {
                     headers: { 'Authorization': `Bearer ${token}` }
                 });
-                const data = await res.json();
+                let data = await res.json();
                 console.log('Suggested users response:', data);
                 
                 if (data.success && data.data && data.data.length > 0) {
                     renderUserResults(data.data);
+                    return;
+                }
+                
+                // Fallback to leaderboard if search returns empty
+                res = await fetch('/api/users/leaderboard?per_page=10', {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                data = await res.json();
+                console.log('Leaderboard fallback response:', data);
+                
+                if (data.success && data.data?.users && data.data.users.length > 0) {
+                    renderUserResults(data.data.users);
                 } else {
-                    document.getElementById('userSearchResults').innerHTML = '<p class="text-muted text-center py-3">Start typing to search for users...</p>';
+                    document.getElementById('userSearchResults').innerHTML = '<p class="text-muted text-center py-3">No users available</p>';
                 }
             } catch (err) {
                 console.error('Error loading suggested users:', err);
-                document.getElementById('userSearchResults').innerHTML = '<p class="text-muted text-center py-3">Start typing to search for users...</p>';
+                document.getElementById('userSearchResults').innerHTML = '<p class="text-muted text-center py-3">Could not load users</p>';
             }
         }
         
         function renderUserResults(users) {
-            const filteredUsers = users.filter(u => u._id !== userId);
+            const filteredUsers = users.filter(u => (u._id || u.id) !== userId);
             
             if (filteredUsers.length === 0) {
                 document.getElementById('userSearchResults').innerHTML = '<p class="text-muted text-center py-3">No users found</p>';
@@ -563,9 +576,10 @@
             }
             
             document.getElementById('userSearchResults').innerHTML = filteredUsers.map(u => {
+                const odId = u._id || u.id;
                 const avatar = u.avatar_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(u.full_name || u.username)}&background=4F46E5&color=fff`;
                 return `
-                    <div class="user-search-result" onclick="startConversation('${u._id}')">
+                    <div class="user-search-result" onclick="startConversation('${odId}')">
                         <img src="${avatar}" alt="">
                         <div>
                             <div class="fw-semibold">${escapeHtml(u.full_name || u.username)}</div>
@@ -584,17 +598,33 @@
             }
             
             try {
-                const res = await fetch(`/api/users/search?q=${encodeURIComponent(query)}`, {
+                // Try search endpoint
+                let res = await fetch(`/api/users/search?q=${encodeURIComponent(query)}`, {
                     headers: { 'Authorization': `Bearer ${token}` }
                 });
-                const data = await res.json();
+                let data = await res.json();
                 console.log('Search response:', data);
                 
-                if (data.success) {
-                    renderUserResults(data.data || []);
+                if (data.success && data.data) {
+                    renderUserResults(data.data);
+                    return;
+                }
+                
+                // Fallback: search in leaderboard results
+                res = await fetch('/api/users/leaderboard?per_page=50', {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                data = await res.json();
+                
+                if (data.success && data.data?.users) {
+                    const queryLower = query.toLowerCase();
+                    const matchedUsers = data.data.users.filter(u => 
+                        (u.username && u.username.toLowerCase().includes(queryLower)) ||
+                        (u.full_name && u.full_name.toLowerCase().includes(queryLower))
+                    );
+                    renderUserResults(matchedUsers);
                 } else {
-                    document.getElementById('userSearchResults').innerHTML = '<p class="text-muted text-center py-3">Search failed. Please try again.</p>';
-                    console.error('Search failed:', data.error);
+                    document.getElementById('userSearchResults').innerHTML = '<p class="text-muted text-center py-3">No users found</p>';
                 }
             } catch (err) {
                 console.error('Error searching users:', err);
