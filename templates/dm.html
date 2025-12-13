@@ -646,7 +646,7 @@
                     
                     // Fallback to DM specific create if generic fails
                     if (!res.ok) {
-                         res = await fetch(`/api/dm/threads`, {
+                         res = await fetch(`/api/dm/thread`, {
                             method: 'POST',
                             headers: {
                                 'Authorization': `Bearer ${token}`,
@@ -683,6 +683,10 @@
                             message: content
                         });
                     }
+                } else {
+                    const errData = await res.json().catch(() => ({}));
+                    console.error('Failed to send message:', res.status, errData);
+                    alert('Failed to send message: ' + (errData.message || 'Unknown error'));
                 }
             } catch (err) {
                 console.error('Error sending message:', err);
