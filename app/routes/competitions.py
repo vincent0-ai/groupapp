@@ -51,7 +51,7 @@ def get_competitions():
     
     if group_id:
         try:
-            query['group_id'] = ObjectId(group_id)
+            query['group_ids'] = ObjectId(group_id)
         except:
             return error_response('Invalid group ID', 400)
             
@@ -80,18 +80,21 @@ def create_competition():
     """Create a new competition"""
     data = request.get_json()
     
-    required_fields = ['title', 'group_id', 'start_time', 'end_time']
+    required_fields = ['title', 'group_ids', 'start_time', 'end_time']
     if not data or not all(k in data for k in required_fields):
         return error_response('Missing required fields', 400)
     
     title = data.get('title', '').strip()
     description = data.get('description', '').strip()
-    group_id = data.get('group_id')
+    group_ids = data.get('group_ids')
     competition_type = data.get('competition_type', 'quiz')
     questions = data.get('questions', [])
     
+    if not isinstance(group_ids, list) or not group_ids:
+        return error_response('group_ids must be a non-empty list', 400)
+
     try:
-        group_id_obj = ObjectId(group_id)
+        group_id_objs = [ObjectId(gid) for gid in group_ids]
         # Handle ISO strings with 'Z' suffix (JavaScript format)
         start_time_str = data.get('start_time').replace('Z', '+00:00')
         end_time_str = data.get('end_time').replace('Z', '+00:00')
@@ -104,17 +107,22 @@ def create_competition():
         return error_response('Competition title is required', 400)
     
     db = Database()
-    
-    # Check if user is group moderator
-    group = db.find_one('groups', {'_id': group_id_obj})
-    if not group:
-        return error_response('Group not found', 404)
-    
     user_id_obj = ObjectId(g.user_id)
-    if user_id_obj not in group['moderators']:
-        return error_response('Only group moderators can create competitions', 403)
+    
+    # Check if user is a moderator of all groups
+    first_group = None
+    for group_id_obj in group_id_objs:
+        group = db.find_one('groups', {'_id': group_id_obj})
+        if not group:
+            return error_response(f'Group with id {group_id_obj} not found', 404)
         
-    channel_id = group.get('channel_id')
+        if user_id_obj not in group['moderators']:
+            return error_response('You must be a moderator of all groups to create an intergroup competition', 403)
+        
+        if not first_group:
+            first_group = group
+
+    channel_id = first_group.get('channel_id')
     channel_name = None
     if channel_id:
         ch = db.find_one('channels', {'_id': channel_id})
@@ -122,7 +130,7 @@ def create_competition():
             channel_name = ch.get('name')
     
     competition_doc = Competition.create_competition_doc(
-        title, description, group_id, g.user_id, start_time, end_time, 
+        title, description, group_ids, g.user_id, start_time, end_time, 
         questions, competition_type, str(channel_id) if channel_id else None, channel_name or 'General'
     )
     
@@ -174,7 +182,7 @@ def get_group_competitions(group_id):
     if not group:
         return error_response('Group not found', 404)
     
-    competitions = db.find('competitions', {'group_id': group_id_obj})
+    competitions = db.find('competitions', {'group_ids': group_id_obj})
     return success_response([serialize_document(c) for c in competitions], 'Competitions retrieved successfully', 200)
 
 @competitions_bp.route('/<comp_id>/join', methods=['POST'])
@@ -197,6 +205,19 @@ def join_competition(comp_id):
     
     user_id_obj = ObjectId(g.user_id)
     
+    # Check if user is in any of the competition's groups
+    user = db.find_one('users', {'_id': user_id_obj})
+    if not user:
+        return error_response('User not found', 404)
+        
+    user_groups = user.get('groups', [])
+    competition_groups = competition.get('group_ids', [])
+    
+    can_join = any(gid in user_groups for gid in competition_groups)
+
+    if not can_join:
+        return error_response('You must be a member of a participating group to join this competition', 403)
+
     # Check if already participating
     for participant in competition.get('participants', []):
         if participant.get('user_id') == user_id_obj:

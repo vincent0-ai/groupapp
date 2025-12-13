@@ -126,17 +126,19 @@ class Competition:
     """Competition/Challenge model"""
     
     @staticmethod
-    def create_competition_doc(title: str, description: str, group_id: str,
+    def create_competition_doc(title: str, description: str, group_ids: List[str],
                               created_by: str, start_time: datetime,
                               end_time: datetime, questions: List = None,
                               competition_type: str = 'quiz',
                               channel_id: Optional[str] = None, category: str = 'General') -> Dict:
         """Create a new competition (optionally tied to a channel/category)"""
+        is_intergroup = len(group_ids) > 1
         return {
             '_id': ObjectId(),
             'title': title,
             'description': description,
-            'group_id': ObjectId(group_id),
+            'group_ids': [ObjectId(gid) for gid in group_ids],
+            'is_intergroup': is_intergroup,
             'channel_id': ObjectId(channel_id) if channel_id else None,
             'category': category,
             'created_by': ObjectId(created_by),

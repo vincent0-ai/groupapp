@@ -216,7 +216,7 @@ def delete_group(group_id):
     # Delete associated messages, whiteboards, competitions, and files
     db.delete_many('messages', {'group_id': group_id_obj})
     db.delete_many('whiteboards', {'group_id': group_id_obj})
-    db.delete_many('competitions', {'group_id': group_id_obj})
+    db.delete_many('competitions', {'group_ids': group_id_obj})
     db.delete_many('files', {'group_id': group_id_obj})
 
     # Decrement channel group count
@@ -297,7 +297,7 @@ def leave_group(group_id):
             # Owner is the only member, delete the group
             db.delete_many('messages', {'group_id': group_id_obj})
             db.delete_many('whiteboards', {'group_id': group_id_obj})
-            db.delete_many('competitions', {'group_id': group_id_obj})
+            db.delete_many('competitions', {'group_ids': group_id_obj})
             db.delete_many('files', {'group_id': group_id_obj})
 
             # Decrement channel group count

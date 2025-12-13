@@ -68,7 +68,7 @@ class Database:
         self.db.channels.create_index('name', unique=True)
 
         # Competitions indexes
-        self.db.competitions.create_index('group_id')
+        self.db.competitions.create_index('group_ids')
         self.db.competitions.create_index('created_by')
         self.db.competitions.create_index('start_time')
         
