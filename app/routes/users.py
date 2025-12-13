@@ -281,4 +281,78 @@ def remove_push_subscription():
     return success_response(None, 'Push subscription removed', 200)
 
 
+@users_bp.route('/activity', methods=['GET'])
+@require_auth
+def get_user_activity():
+    """Get recent activity for the current user"""
+    db = Database()
+    user_id = g.user_id
+    user_id_obj = ObjectId(user_id)
+    
+    activities = []
+    
+    # Get recent groups joined
+    user = db.find_one('users', {'_id': user_id_obj})
+    if user:
+        user_groups = user.get('groups', [])
+        groups = list(db.find('groups', {'members': user_id_obj}, limit=5, sort=('updated_at', -1)))
+        for g_item in groups:
+            activities.append({
+                'type': 'group_join',
+                'message': f"Joined group '{g_item.get('name', 'Unknown')}'",
+                'created_at': g_item.get('updated_at', g_item.get('created_at')).isoformat() if g_item.get('updated_at') or g_item.get('created_at') else None,
+                'related_id': str(g_item['_id'])
+            })
+    
+    # Get recent DM activity
+    dm_messages = list(db.db.dm_messages.find(
+        {'sender_id': user_id_obj}
+    ).sort('created_at', -1).limit(5))
+    
+    for msg in dm_messages:
+        activities.append({
+            'type': 'dm_sent',
+            'message': 'Sent a direct message',
+            'created_at': msg.get('created_at').isoformat() if msg.get('created_at') else None,
+            'related_id': str(msg['_id'])
+        })
+    
+    # Get recent file uploads
+    files = list(db.find('files', {'uploaded_by': user_id_obj}, limit=5, sort=('created_at', -1)))
+    for f in files:
+        activities.append({
+            'type': 'file_upload',
+            'message': f"Uploaded file '{f.get('filename', 'Unknown')}'",
+            'created_at': f.get('created_at').isoformat() if f.get('created_at') else None,
+            'related_id': str(f['_id'])
+        })
+    
+    # Get competition participations
+    competitions = list(db.find('competitions', {'participants': user_id_obj}, limit=5, sort=('updated_at', -1)))
+    for c in competitions:
+        activities.append({
+            'type': 'competition_join',
+            'message': f"Participated in '{c.get('title', 'Unknown')}'",
+            'created_at': c.get('updated_at', c.get('created_at')).isoformat() if c.get('updated_at') or c.get('created_at') else None,
+            'related_id': str(c['_id'])
+        })
+    
+    # Get login activity if last_login exists
+    if user and user.get('last_login'):
+        activities.append({
+            'type': 'login',
+            'message': 'Logged in',
+            'created_at': user.get('last_login').isoformat(),
+            'related_id': None
+        })
+    
+    # Sort all activities by date
+    activities.sort(key=lambda x: x.get('created_at') or '', reverse=True)
+    
+    # Limit to 10 most recent
+    activities = activities[:10]
+    
+    return success_response(activities, 'Activity retrieved successfully', 200)
+
+
 # search_users moved to top of file to avoid route conflict with /<user_id>

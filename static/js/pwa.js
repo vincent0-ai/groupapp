@@ -62,28 +62,38 @@ class PWAManager {
             const permission = await this.requestNotificationPermission();
             if (!permission) {
                 console.log('Notification permission denied');
-                return null;
+                return false;
             }
             
-            const registration = await navigator.serviceWorker.ready;
+            // For now, use browser's native Notification API
+            // This allows local notifications without requiring VAPID/server push
+            // Store subscription status in localStorage
+            localStorage.setItem('notifications_enabled', 'true');
             
-            // VAPID public key (you need to generate this)
-            // For production, this should come from your server
-            const vapidPublicKey = 'BNbX-d6RMhGCE5JcCqQO0TfDfUF4pC2GQhVy4LrHNWBpGJKwPgZ_F8VH9BDqY2xqKe_7h_KKm5N0Y1_r5rJkLzY';
+            // Notify server about preference
+            const token = localStorage.getItem('token');
+            if (token) {
+                try {
+                    await fetch('/api/users/push-subscription', {
+                        method: 'POST',
+                        headers: {
+                            'Authorization': `Bearer ${token}`,
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({
+                            subscription: { type: 'browser', enabled: true }
+                        })
+                    });
+                } catch (err) {
+                    console.log('Server notification update skipped:', err);
+                }
+            }
             
-            const subscription = await registration.pushManager.subscribe({
-                userVisibleOnly: true,
-                applicationServerKey: this.urlBase64ToUint8Array(vapidPublicKey)
-            });
-            
-            // Send subscription to server
-            await this.sendSubscriptionToServer(subscription);
-            
-            console.log('Push subscription successful');
-            return subscription;
+            console.log('Notifications enabled successfully');
+            return true;
         } catch (error) {
-            console.error('Push subscription failed:', error);
-            return null;
+            console.error('Notification setup failed:', error);
+            return false;
         }
     }
     
@@ -99,7 +109,7 @@ class PWAManager {
                     'Content-Type': 'application/json'
                 },
                 body: JSON.stringify({
-                    subscription: subscription.toJSON()
+                    subscription: subscription
                 })
             });
         } catch (error) {
@@ -109,19 +119,18 @@ class PWAManager {
     
     async unsubscribeFromPush() {
         try {
-            const registration = await navigator.serviceWorker.ready;
-            const subscription = await registration.pushManager.getSubscription();
+            localStorage.removeItem('notifications_enabled');
             
-            if (subscription) {
-                await subscription.unsubscribe();
-                
-                // Notify server
-                const token = localStorage.getItem('token');
-                if (token) {
+            // Notify server
+            const token = localStorage.getItem('token');
+            if (token) {
+                try {
                     await fetch('/api/users/push-subscription', {
                         method: 'DELETE',
                         headers: { 'Authorization': `Bearer ${token}` }
                     });
+                } catch (err) {
+                    console.log('Server unsubscribe skipped:', err);
                 }
             }
             
@@ -132,19 +141,9 @@ class PWAManager {
         }
     }
     
-    urlBase64ToUint8Array(base64String) {
-        const padding = '='.repeat((4 - base64String.length % 4) % 4);
-        const base64 = (base64String + padding)
-            .replace(/\-/g, '+')
-            .replace(/_/g, '/');
-
-        const rawData = window.atob(base64);
-        const outputArray = new Uint8Array(rawData.length);
-
-        for (let i = 0; i < rawData.length; ++i) {
-            outputArray[i] = rawData.charCodeAt(i);
-        }
-        return outputArray;
+    isNotificationsEnabled() {
+        return localStorage.getItem('notifications_enabled') === 'true' && 
+               Notification.permission === 'granted';
     }
 
     setupInstallPrompt() {
