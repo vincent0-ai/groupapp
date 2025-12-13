@@ -675,6 +675,15 @@
                         const ids2 = wb.can_speak.map(x => x.toString());
                         canSpeak = ids2.includes(userId);
                     }
+                    if (isCreator) canSpeak = true;
+
+                    if (liveBtn) {
+                        if (isCreator) {
+                            liveBtn.innerHTML = '<i class="fas fa-broadcast-tower"></i> Start Broadcast';
+                        } else if (!canSpeak) {
+                            liveBtn.innerHTML = '<i class="fas fa-headphones"></i> Join Broadcast';
+                        }
+                    }
                     // Setup participants initial state
                     if (wb.participants) {
                         wb.participants.forEach(p => {
@@ -968,6 +977,16 @@
         screenShareBtn.className = 'btn btn-sm btn-outline-info';
         screenShareBtn.innerHTML = '<i class="fas fa-desktop"></i> Share Screen';
         if (controlsContainer) controlsContainer.appendChild(screenShareBtn);
+        
+        // View Screen button (hidden by default, shown when screen share is active but closed)
+        const viewScreenBtn = document.createElement('button');
+        viewScreenBtn.className = 'btn btn-sm btn-outline-info d-none';
+        viewScreenBtn.innerHTML = '<i class="fas fa-eye"></i> View Screen';
+        if (controlsContainer) controlsContainer.appendChild(viewScreenBtn);
+        
+        viewScreenBtn.addEventListener('click', () => {
+            document.getElementById('remoteVideoContainer').style.display = 'flex';
+        });
 
         screenShareBtn.addEventListener('click', async () => {
             if (localScreenStream) {
@@ -1152,7 +1171,7 @@
                     localAudio.srcObject = localStream;
                     localAudio.muted = true;
                     
-                    liveBtn.innerHTML = '<i class="fas fa-phone-slash"></i> Leave Call';
+                    liveBtn.innerHTML = isCreator ? '<i class="fas fa-stop-circle"></i> Stop Broadcast' : '<i class="fas fa-phone-slash"></i> Leave Call';
                     
                     // Show mute button
                     if (muteBtn) muteBtn.classList.remove('d-none');
@@ -1160,7 +1179,7 @@
                 } else {
                     // Join as listen-only
                     localStream = null;
-                    liveBtn.innerHTML = '<i class="fas fa-phone-slash"></i> Leave (Listen Only)';
+                    liveBtn.innerHTML = '<i class="fas fa-volume-mute"></i> Leave Broadcast';
                 }
                 
                 isInCall = true;
@@ -1178,7 +1197,7 @@
                 socket.emit('webrtc_join', { room: sessionId ? `whiteboard:${sessionId}` : 'whiteboard', user_id: userId });
                 liveBtn.classList.remove('btn-outline-success');
                 liveBtn.classList.add('btn-success');
-                liveBtn.innerHTML = '<i class="fas fa-phone-slash"></i> Leave (Listen Only)';
+                liveBtn.innerHTML = '<i class="fas fa-volume-mute"></i> Leave Broadcast';
             }
         }
 
@@ -1201,7 +1220,7 @@
                     renegotiate(peerId, peer);
                 }
                 
-                liveBtn.innerHTML = '<i class="fas fa-phone-slash"></i> Leave Call';
+                liveBtn.innerHTML = isCreator ? '<i class="fas fa-stop-circle"></i> Stop Broadcast' : '<i class="fas fa-phone-slash"></i> Leave Call';
                 console.log('Microphone enabled after permission grant');
             } catch (err) {
                 console.error('Error enabling microphone:', err);
@@ -1220,7 +1239,7 @@
             // The connection stays open so user can still listen
             
             if (liveBtn) {
-                liveBtn.innerHTML = '<i class="fas fa-phone-slash"></i> Leave (Listen Only)';
+                liveBtn.innerHTML = '<i class="fas fa-volume-mute"></i> Leave Broadcast';
             }
             console.log('Microphone disabled due to permission revocation');
         }
@@ -1243,7 +1262,7 @@
             
             liveBtn.classList.remove('btn-success');
             liveBtn.classList.add('btn-outline-success');
-            liveBtn.innerHTML = '<i class="fas fa-phone"></i> Join Call';
+            liveBtn.innerHTML = isCreator ? '<i class="fas fa-broadcast-tower"></i> Start Broadcast' : (canSpeak ? '<i class="fas fa-phone"></i> Join Call' : '<i class="fas fa-headphones"></i> Join Broadcast');
             
             // Hide mute button
             if (muteBtn) muteBtn.classList.add('d-none');
@@ -1333,6 +1352,7 @@
                 
                 // Remove video if active
                 if (currentScreenSharerId === remoteUserId) {
+                    viewScreenBtn.classList.add('d-none');
                     document.getElementById('remoteVideoContainer').style.display = 'none';
                     document.getElementById('remoteVideo').srcObject = null;
                     currentScreenSharerId = null;
@@ -1476,6 +1496,7 @@
                         
                         container.style.display = 'flex';
                         const name = participants[remoteUserId]?.name || 'User';
+                        viewScreenBtn.classList.remove('d-none');
                         if (label) label.textContent = `${name}'s Screen`;
                         currentScreenSharerId = remoteUserId;
                         
@@ -1483,6 +1504,7 @@
                             if (currentScreenSharerId === remoteUserId) {
                                 container.style.display = 'none';
                                 video.srcObject = null;
+                                viewScreenBtn.classList.add('d-none');
                                 currentScreenSharerId = null;
                             }
                         };
