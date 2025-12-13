@@ -265,6 +265,7 @@
         border-radius: 16px;
         box-shadow: 0 10px 40px rgba(0,0,0,0.15);
         padding: 0;
+        background: white;
     }
     .notification-dropdown .dropdown-header {
         background: rgba(79, 70, 229, 0.08);
@@ -591,7 +592,12 @@
     }
 
     function formatTimeAgo(dateStr) {
-        const date = new Date(dateStr);
+        let date = new Date(dateStr);
+        // Handle naive UTC strings from server by treating them as UTC
+        if (typeof dateStr === 'string' && dateStr.includes('T') && !dateStr.endsWith('Z') && !dateStr.includes('+')) {
+            date = new Date(dateStr + 'Z');
+        }
+
         const now = new Date();
         const seconds = Math.floor((now - date) / 1000);
 

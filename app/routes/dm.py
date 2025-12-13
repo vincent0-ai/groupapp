@@ -217,7 +217,7 @@ def send_dm_message(thread_id):
         create_notification(
             user_id=other_user_id,
             notification_type='dm',
-            message = f'<span class="notif-msg">{html.escape(sender_name)} sent you a message</span>',
+            message = f'{sender_name} sent you a message',
             link=f'/dm?dm={g.user_id}'
         )
         
