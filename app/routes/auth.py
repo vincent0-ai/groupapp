@@ -26,7 +26,7 @@ auth_bp = Blueprint("auth", __name__, url_prefix="/api/auth")
 
 def send_verification_email(to_email, token):
     smtp_server = os.environ.get("SMTP_SERVER", "smtp.gmail.com")
-    smtp_port = int(os.environ.get("SMTP_PORT", 587))
+    smtp_port = int(os.environ.get("SMTP_PORT", 465))
     smtp_user = os.environ.get("SMTP_USER")
     smtp_password = os.environ.get("SMTP_PASSWORD")
     
