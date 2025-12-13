@@ -651,7 +651,7 @@
                     if (isCreator) {
                         const inviteContainer = document.getElementById('inviteLinkContainer');
                         if (inviteContainer) {
-                            const shareUrl = window.location.origin + '/whiteboard?session=' + wb.id;
+                            const shareUrl = window.location.origin + '/whiteboard?session=' + wb._id;
                             inviteContainer.innerHTML = `
                                 <div class="d-flex align-items-center gap-2">
                                     <small class="text-muted"><i class="fas fa-share-alt me-1"></i>Share:</small>

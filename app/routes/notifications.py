@@ -3,7 +3,7 @@ Notifications API Routes
 """
 from flask import Blueprint, request, jsonify, g
 from app.services import Database
-from app.utils.decorators import token_required
+from app.utils.decorators import require_auth
 from bson import ObjectId
 from datetime import datetime
 
@@ -12,7 +12,7 @@ db = Database()
 
 
 @notifications_bp.route('', methods=['GET'])
-@token_required
+@require_auth
 def get_notifications():
     """Get user's notifications"""
     try:
@@ -47,7 +47,7 @@ def get_notifications():
 
 
 @notifications_bp.route('/<notification_id>/read', methods=['POST'])
-@token_required
+@require_auth
 def mark_as_read(notification_id):
     """Mark a notification as read"""
     try:
@@ -68,7 +68,7 @@ def mark_as_read(notification_id):
 
 
 @notifications_bp.route('/read-all', methods=['POST'])
-@token_required
+@require_auth
 def mark_all_as_read():
     """Mark all notifications as read"""
     try:
@@ -83,7 +83,7 @@ def mark_all_as_read():
 
 
 @notifications_bp.route('/<notification_id>', methods=['DELETE'])
-@token_required
+@require_auth
 def delete_notification(notification_id):
     """Delete a notification"""
     try:
