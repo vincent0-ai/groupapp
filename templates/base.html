@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="theme-color" content="#6366f1">
+    <meta name="theme-color" content="#4F46E5">
     <meta name="description" content="Discussio - A collaborative learning platform for groups, discussions, and competitions.">
 
     <title>{% block title %}Discussio{% endblock %}</title>
@@ -26,7 +26,7 @@
 <nav class="navbar navbar-expand-lg navbar-light sticky-top">
     <div class="container-fluid px-3 px-lg-4">
         <a class="navbar-brand d-flex align-items-center" href="{{ url_for('dashboard') }}">
-            <i class="fas fa-graduation-cap me-2" style="background: linear-gradient(135deg, #6366f1, #8b5cf6); -webkit-background-clip: text; -webkit-text-fill-color: transparent;"></i>
+            <i class="fas fa-graduation-cap me-2" style="color: #4F46E5;"></i>
             Discussio
         </a>
         
@@ -196,7 +196,7 @@
             </div>
             <div class="modal-body text-center py-4">
                 <div class="mb-4">
-                    <i class="fas fa-graduation-cap fa-3x" style="background: linear-gradient(135deg, #6366f1, #8b5cf6); -webkit-background-clip: text; -webkit-text-fill-color: transparent;"></i>
+                    <i class="fas fa-graduation-cap fa-3x" style="color: #4F46E5;"></i>
                 </div>
                 <h4 class="mb-3 fw-bold">Discussio</h4>
                 <p class="text-muted mb-4">A modern collaborative learning platform for groups, discussions, and competitions.</p>
@@ -298,10 +298,10 @@
         justify-content: center;
         flex-shrink: 0;
     }
-    .notification-item .notif-icon.mention { background: rgba(99, 102, 241, 0.15); color: #6366f1; }
-    .notification-item .notif-icon.message { background: rgba(16, 185, 129, 0.15); color: #10b981; }
-    .notification-item .notif-icon.join { background: rgba(245, 158, 11, 0.15); color: #f59e0b; }
-    .notification-item .notif-icon.announcement { background: rgba(239, 68, 68, 0.15); color: #ef4444; }
+    .notification-item .notif-icon.mention { background: rgba(79, 70, 229, 0.12); color: #4F46E5; }
+    .notification-item .notif-icon.message { background: rgba(34, 197, 94, 0.12); color: #22C55E; }
+    .notification-item .notif-icon.join { background: rgba(245, 158, 11, 0.12); color: #F59E0B; }
+    .notification-item .notif-icon.announcement { background: rgba(239, 68, 68, 0.12); color: #EF4444; }
     .notification-item .notif-content {
         flex: 1;
         min-width: 0;
@@ -309,7 +309,7 @@
     .notification-item .notif-content p {
         margin: 0;
         font-size: 0.85rem;
-        color: var(--text-dark);
+        color: var(--text-heading);
     }
     .notification-item .notif-content small {
         color: var(--text-muted);
