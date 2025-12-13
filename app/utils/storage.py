@@ -95,7 +95,7 @@ class MinioClient:
                          expires: int = 3600) -> str:
         """Get a presigned URL for a file"""
         try:
-            url = self.client.get_presigned_download_url(
+            url = self.client.presigned_get_object(
                 self.bucket,
                 object_name,
                 expires=timedelta(seconds=expires)

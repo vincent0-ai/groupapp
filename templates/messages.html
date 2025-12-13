@@ -2,6 +2,10 @@
 
 {% block title %}Messages - Discussio{% endblock %}
 
+{% block footer %}
+<!-- Hide footer on messages page to prevent overlap with chat input -->
+{% endblock %}
+
 {% block content %}
     <style>
         /* Modern Message Styling */
@@ -273,7 +277,7 @@
             }
         }
     </style>
-    <div class="row g-3" style="height: calc(100vh - 160px);">
+    <div class="row g-3" style="height: calc(100vh - 160px); max-width: 1400px; margin: 0 auto;">
         <div class="col-12 h-100">
             <div class="card h-100 d-flex flex-column shadow-sm border-0">
                 <div class="card-header d-flex align-items-center bg-white border-bottom">

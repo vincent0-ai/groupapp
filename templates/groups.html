@@ -325,14 +325,14 @@
                     const category = channel.name || 'General';
                     const categoryGroups = channel.groups || [];
                     html += `
-                        <div class="accordion-item">
+                        <div class="accordion-item border-0 mb-2" style="border-radius: 12px; overflow: hidden;">
                             <h2 class="accordion-header" id="heading${index}">
-                                <button class="accordion-button ${index === 0 ? '' : 'collapsed'}" type="button" data-bs-toggle="collapse" data-bs-target="#collapse${index}">
-                                    ${category} <span class="badge bg-light text-muted ms-2">${categoryGroups.length}</span>
+                                <button class="accordion-button ${index === 0 ? '' : 'collapsed'}" type="button" data-bs-toggle="collapse" data-bs-target="#collapse${index}" style="background: var(--card-bg); color: var(--text-dark); font-weight: 600;">
+                                    <i class="fas fa-hashtag text-primary me-2"></i>${category} <span class="badge bg-primary bg-opacity-10 text-primary ms-2">${categoryGroups.length} groups</span>
                                 </button>
                             </h2>
                             <div id="collapse${index}" class="accordion-collapse collapse ${index === 0 ? 'show' : ''}" data-bs-parent="#availableGroupsAccordion">
-                                <div class="accordion-body">
+                                <div class="accordion-body" style="background: var(--card-bg);">
                                     <div class="row g-4">
                                         ${categoryGroups.map(g => `
                                             <div class="col-md-4 mb-3">
