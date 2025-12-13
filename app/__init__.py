@@ -121,6 +121,11 @@ def create_app(config_name='development'):
         """Serve leaderboard page"""
         return render_template('leaderboard.html')
     
+    @app.route('/terms')
+    def terms_page():
+        """Serve terms and conditions page"""
+        return render_template('terms.html')
+    
     # Error handlers
     @app.errorhandler(404)
     def not_found(error):
