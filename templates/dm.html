@@ -536,42 +536,43 @@
         });
         
         async function loadSuggestedUsers() {
+            console.log('Loading suggested users...');
+            
+            // Use leaderboard endpoint (same as dashboard's Top Performers)
             try {
-                // Try the search endpoint first
-                let res = await fetch('/api/users/search', {
+                const res = await fetch('/api/users/leaderboard?per_page=20', {
                     headers: { 'Authorization': `Bearer ${token}` }
                 });
-                let data = await res.json();
-                console.log('Suggested users response:', data);
+                const data = await res.json();
+                console.log('Leaderboard response:', data);
                 
-                if (data.success && data.data && data.data.length > 0) {
-                    renderUserResults(data.data);
-                    return;
-                }
-                
-                // Fallback to leaderboard if search returns empty
-                res = await fetch('/api/users/leaderboard?per_page=10', {
-                    headers: { 'Authorization': `Bearer ${token}` }
-                });
-                data = await res.json();
-                console.log('Leaderboard fallback response:', data);
-                
-                if (data.success && data.data?.users && data.data.users.length > 0) {
-                    renderUserResults(data.data.users);
-                } else {
-                    document.getElementById('userSearchResults').innerHTML = '<p class="text-muted text-center py-3">No users available</p>';
+                if (data.success && data.data) {
+                    // Use leaderboard array (same as dashboard)
+                    const users = data.data.leaderboard || data.data.users || [];
+                    console.log('Found users:', users.length);
+                    if (users.length > 0) {
+                        renderUserResults(users);
+                        return;
+                    }
                 }
             } catch (err) {
-                console.error('Error loading suggested users:', err);
-                document.getElementById('userSearchResults').innerHTML = '<p class="text-muted text-center py-3">Could not load users</p>';
+                console.error('Leaderboard fetch error:', err);
             }
+            
+            document.getElementById('userSearchResults').innerHTML = '<p class="text-muted text-center py-3">No other users available yet</p>';
         }
         
         function renderUserResults(users) {
-            const filteredUsers = users.filter(u => (u._id || u.id) !== userId);
+            // Filter out current user
+            const filteredUsers = users.filter(u => {
+                const odId = String(u._id || u.id);
+                return odId !== userId;
+            });
+            
+            console.log('Rendering', filteredUsers.length, 'users');
             
             if (filteredUsers.length === 0) {
-                document.getElementById('userSearchResults').innerHTML = '<p class="text-muted text-center py-3">No users found</p>';
+                document.getElementById('userSearchResults').innerHTML = '<p class="text-muted text-center py-3">No other users to message</p>';
                 return;
             }
             
@@ -592,44 +593,37 @@
         
         async function searchUsers(query) {
             if (!query || query.length < 2) {
-                // Load suggested users instead
                 loadSuggestedUsers();
                 return;
             }
             
+            console.log('Searching for:', query);
+            
+            // Search by filtering leaderboard results (most reliable)
             try {
-                // Try search endpoint
-                let res = await fetch(`/api/users/search?q=${encodeURIComponent(query)}`, {
+                const res = await fetch('/api/users/leaderboard?per_page=100', {
                     headers: { 'Authorization': `Bearer ${token}` }
                 });
-                let data = await res.json();
-                console.log('Search response:', data);
+                const data = await res.json();
                 
                 if (data.success && data.data) {
-                    renderUserResults(data.data);
-                    return;
-                }
-                
-                // Fallback: search in leaderboard results
-                res = await fetch('/api/users/leaderboard?per_page=50', {
-                    headers: { 'Authorization': `Bearer ${token}` }
-                });
-                data = await res.json();
-                
-                if (data.success && data.data?.users) {
+                    const allUsers = data.data.leaderboard || data.data.users || [];
                     const queryLower = query.toLowerCase();
-                    const matchedUsers = data.data.users.filter(u => 
+                    const matchedUsers = allUsers.filter(u => 
                         (u.username && u.username.toLowerCase().includes(queryLower)) ||
                         (u.full_name && u.full_name.toLowerCase().includes(queryLower))
                     );
-                    renderUserResults(matchedUsers);
-                } else {
-                    document.getElementById('userSearchResults').innerHTML = '<p class="text-muted text-center py-3">No users found</p>';
+                    
+                    if (matchedUsers.length > 0) {
+                        renderUserResults(matchedUsers);
+                        return;
+                    }
                 }
             } catch (err) {
-                console.error('Error searching users:', err);
-                document.getElementById('userSearchResults').innerHTML = '<p class="text-muted text-center py-3">Error searching. Please try again.</p>';
+                console.error('Search error:', err);
             }
+            
+            document.getElementById('userSearchResults').innerHTML = '<p class="text-muted text-center py-3">No users found matching "' + escapeHtml(query) + '"</p>';
         }
         
         function showSidebar() {
