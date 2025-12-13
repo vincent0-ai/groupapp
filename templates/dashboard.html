@@ -496,9 +496,9 @@
 
                 // Update top performers
                 const leaderboard = leaderboardData.data?.leaderboard || [];
-                const performersHtml = leaderboard.slice(0, 5).map((u, i) => `
+                const performersHtml = leaderboard.slice(0, 3).map((u, i) => `
                     <div class="performer-item">
-                        <div class="performer-rank ${['gold', 'silver', 'bronze', 'default', 'default'][i]}">${i + 1}</div>
+                        <div class="performer-rank ${['gold', 'silver', 'bronze'][i]}">${i + 1}</div>
                         <div class="flex-grow-1">
                             <div class="fw-semibold" style="color: var(--text-dark);">${u.username}</div>
                             <div class="small text-muted">${u.points || 0} points</div>

@@ -259,6 +259,7 @@ def search_users():
         user_id_obj = user['_id']
         groups_count = db.count('groups', {'members': user_id_obj})
         public_users.append({
+            '_id': str(user['_id']),
             'id': str(user['_id']),
             'username': user.get('username', ''),
             'full_name': user.get('full_name', ''),
