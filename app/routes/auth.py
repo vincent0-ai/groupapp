@@ -253,7 +253,24 @@ def google_callback():
     # Find or create user
     db = Database()
     user = db.find_one('users', {'email': email})
-    if not user:
+    
+    if user:
+        # User exists - update info and check status
+        if not user.get('is_active', True):
+            return error_response('Account is inactive', 403)
+            
+        # Update missing info
+        update_fields = {}
+        if not user.get('avatar_url') and id_info.get('picture'):
+            update_fields['avatar_url'] = id_info.get('picture')
+        if not user.get('full_name') and id_info.get('name'):
+            update_fields['full_name'] = id_info.get('name')
+            
+        from datetime import datetime
+        update_fields['last_login'] = datetime.utcnow()
+        
+        db.update_one('users', {'_id': user['_id']}, update_fields)
+    else:
         user_doc = User.create_user_doc(
             email,
             id_info.get('name', email.split('@')[0]),
@@ -261,6 +278,10 @@ def google_callback():
             id_info.get('name', ''),
             id_info.get('picture', '')
         )
+        # Set last_login
+        from datetime import datetime
+        user_doc['last_login'] = datetime.utcnow()
+        
         user_id = db.insert_one('users', user_doc)
         if not user_id:
             return error_response('Failed to create user.', 500)
