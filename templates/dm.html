@@ -183,6 +183,118 @@
             text-align: left;
         }
         
+        .dm-message-wrapper {
+            position: relative;
+        }
+        
+        .dm-message-actions {
+            display: none;
+            position: absolute;
+            top: -8px;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+            padding: 4px;
+            gap: 2px;
+            z-index: 10;
+        }
+        
+        .dm-message.sent .dm-message-actions {
+            right: 0;
+        }
+        
+        .dm-message.received .dm-message-actions {
+            left: 0;
+        }
+        
+        .dm-message-wrapper:hover .dm-message-actions {
+            display: flex;
+        }
+        
+        .dm-action-btn {
+            background: none;
+            border: none;
+            padding: 4px 8px;
+            cursor: pointer;
+            border-radius: 4px;
+            font-size: 0.85rem;
+            color: var(--text-muted);
+            transition: all 0.15s;
+        }
+        
+        .dm-action-btn:hover {
+            background: var(--primary-ultra-light);
+            color: var(--primary-color);
+        }
+        
+        .dm-action-btn.delete:hover {
+            background: #FEE2E2;
+            color: #DC2626;
+        }
+        
+        .dm-reactions {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 4px;
+            margin-top: 4px;
+        }
+        
+        .dm-reaction {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            padding: 2px 6px;
+            background: rgba(79, 70, 229, 0.1);
+            border-radius: 12px;
+            font-size: 0.8rem;
+            cursor: pointer;
+            transition: background 0.15s;
+        }
+        
+        .dm-reaction:hover {
+            background: rgba(79, 70, 229, 0.2);
+        }
+        
+        .dm-reaction.mine {
+            background: rgba(79, 70, 229, 0.25);
+            border: 1px solid var(--primary-color);
+        }
+        
+        .dm-reaction-count {
+            font-size: 0.7rem;
+            color: var(--text-muted);
+        }
+        
+        /* Emoji picker */
+        .emoji-picker-popup {
+            position: absolute;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 4px 16px rgba(0,0,0,0.15);
+            padding: 8px;
+            display: none;
+            z-index: 100;
+        }
+        
+        .emoji-picker-popup.show {
+            display: grid;
+            grid-template-columns: repeat(6, 1fr);
+            gap: 4px;
+        }
+        
+        .emoji-option {
+            padding: 6px;
+            font-size: 1.2rem;
+            cursor: pointer;
+            border-radius: 6px;
+            text-align: center;
+            transition: background 0.15s;
+        }
+        
+        .emoji-option:hover {
+            background: var(--primary-ultra-light);
+        }
+        
         .dm-empty-state {
             display: flex;
             flex-direction: column;
@@ -463,10 +575,31 @@
                 const isMine = m.sender_id === userId;
                 const timeStr = m.created_at ? new Date(m.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '';
                 
+                // Build reactions HTML
+                const reactions = m.reactions || {};
+                let reactionsHtml = '';
+                if (Object.keys(reactions).length > 0) {
+                    reactionsHtml = '<div class="dm-reactions">' + 
+                        Object.entries(reactions).map(([emoji, users]) => {
+                            const isMine = users.includes(userId);
+                            return `<span class="dm-reaction ${isMine ? 'mine' : ''}" onclick="toggleReaction('${m._id}', '${emoji}')">${emoji}<span class="dm-reaction-count">${users.length}</span></span>`;
+                        }).join('') +
+                    '</div>';
+                }
+                
                 return `
                     <div class="dm-message ${isMine ? 'sent' : 'received'}">
-                        <div>
+                        <div class="dm-message-wrapper">
+                            <div class="dm-message-actions">
+                                <button class="dm-action-btn" onclick="showEmojiPicker('${m._id}', this)" title="React">
+                                    <i class="far fa-smile"></i>
+                                </button>
+                                ${isMine ? `<button class="dm-action-btn delete" onclick="deleteMessage('${m._id}')" title="Delete">
+                                    <i class="fas fa-trash"></i>
+                                </button>` : ''}
+                            </div>
                             <div class="dm-message-bubble">${escapeHtml(m.content)}</div>
+                            ${reactionsHtml}
                             <div class="dm-message-time">${timeStr}</div>
                         </div>
                     </div>
@@ -703,6 +836,93 @@
             const div = document.createElement('div');
             div.textContent = text;
             return div.innerHTML;
+        }
+        
+        // Common emoji options for reactions
+        const commonEmojis = ['👍', '❤️', '😂', '😮', '😢', '🎉', '🔥', '👏', '💯', '🙏', '😍', '🤔'];
+        
+        async function deleteMessage(messageId) {
+            if (!confirm('Delete this message?')) return;
+            
+            try {
+                const res = await fetch(`/api/dm/message/${messageId}`, {
+                    method: 'DELETE',
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                
+                if (res.ok) {
+                    await loadMessages();
+                    await loadThreads();
+                }
+            } catch (err) {
+                console.error('Error deleting message:', err);
+            }
+        }
+        
+        async function toggleReaction(messageId, emoji) {
+            try {
+                const res = await fetch(`/api/dm/message/${messageId}/react`, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ emoji })
+                });
+                
+                if (res.ok) {
+                    await loadMessages();
+                }
+            } catch (err) {
+                console.error('Error toggling reaction:', err);
+            }
+        }
+        
+        let currentEmojiPicker = null;
+        
+        function showEmojiPicker(messageId, btn) {
+            // Close existing picker if any
+            closeEmojiPicker();
+            
+            const picker = document.createElement('div');
+            picker.className = 'emoji-picker-popup show';
+            picker.id = 'emojiPicker';
+            picker.innerHTML = commonEmojis.map(e => 
+                `<span class="emoji-option" onclick="selectEmoji('${messageId}', '${e}')">${e}</span>`
+            ).join('');
+            
+            // Position relative to button
+            const rect = btn.getBoundingClientRect();
+            picker.style.position = 'fixed';
+            picker.style.top = (rect.bottom + 4) + 'px';
+            picker.style.left = Math.max(10, rect.left - 100) + 'px';
+            
+            document.body.appendChild(picker);
+            currentEmojiPicker = picker;
+            
+            // Close on outside click
+            setTimeout(() => {
+                document.addEventListener('click', closeEmojiPickerOnOutsideClick);
+            }, 10);
+        }
+        
+        function closeEmojiPicker() {
+            if (currentEmojiPicker) {
+                currentEmojiPicker.remove();
+                currentEmojiPicker = null;
+            }
+            document.removeEventListener('click', closeEmojiPickerOnOutsideClick);
+        }
+        
+        function closeEmojiPickerOnOutsideClick(e) {
+            if (currentEmojiPicker && !currentEmojiPicker.contains(e.target)) {
+                closeEmojiPicker();
+            }
+        }
+        
+        function selectEmoji(messageId, emoji) {
+            closeEmojiPicker();
+            toggleReaction(messageId, emoji);
         }
         
         // Event listeners

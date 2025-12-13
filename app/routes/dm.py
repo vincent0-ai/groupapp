@@ -150,7 +150,8 @@ def get_dm_messages(thread_id):
                 'sender_id': str(msg['sender_id']),
                 'sender_name': sender.get('full_name', sender.get('username', 'Unknown')) if sender else 'Unknown',
                 'created_at': msg.get('created_at').isoformat() if msg.get('created_at') else None,
-                'read': msg.get('read', False)
+                'read': msg.get('read', False),
+                'reactions': msg.get('reactions', {})
             })
         
         return jsonify({'success': True, 'data': result})
@@ -245,5 +246,103 @@ def get_unread_dm_count():
             total_unread += count
         
         return jsonify({'success': True, 'data': {'unread_count': total_unread}})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@dm_bp.route('/message/<message_id>', methods=['DELETE'])
+@require_auth
+def delete_dm_message(message_id):
+    """Delete a DM message (only by sender)"""
+    try:
+        db = Database()
+        message_id_obj = ObjectId(message_id)
+        
+        # Find the message
+        message = db.db.dm_messages.find_one({'_id': message_id_obj})
+        if not message:
+            return jsonify({'success': False, 'error': 'Message not found'}), 404
+        
+        # Verify user is the sender
+        if str(message['sender_id']) != g.user_id:
+            return jsonify({'success': False, 'error': 'You can only delete your own messages'}), 403
+        
+        # Delete the message
+        db.db.dm_messages.delete_one({'_id': message_id_obj})
+        
+        # Update thread's last message if this was the last one
+        thread = db.db.dm_threads.find_one({'_id': message['thread_id']})
+        if thread:
+            last_msg = db.db.dm_messages.find_one(
+                {'thread_id': message['thread_id']},
+                sort=[('created_at', -1)]
+            )
+            if last_msg:
+                db.db.dm_threads.update_one(
+                    {'_id': message['thread_id']},
+                    {'$set': {
+                        'last_message': last_msg.get('content', '')[:100],
+                        'last_message_at': last_msg.get('created_at')
+                    }}
+                )
+            else:
+                db.db.dm_threads.update_one(
+                    {'_id': message['thread_id']},
+                    {'$set': {'last_message': None, 'last_message_at': thread.get('created_at')}}
+                )
+        
+        return jsonify({'success': True, 'message': 'Message deleted'})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@dm_bp.route('/message/<message_id>/react', methods=['POST'])
+@require_auth
+def react_to_dm_message(message_id):
+    """Add or toggle a reaction on a DM message"""
+    try:
+        db = Database()
+        message_id_obj = ObjectId(message_id)
+        
+        # Find the message
+        message = db.db.dm_messages.find_one({'_id': message_id_obj})
+        if not message:
+            return jsonify({'success': False, 'error': 'Message not found'}), 404
+        
+        # Verify user is a participant in the thread
+        thread = db.db.dm_threads.find_one({'_id': message['thread_id']})
+        if not thread or g.user_id not in thread.get('participants', []):
+            return jsonify({'success': False, 'error': 'Access denied'}), 403
+        
+        data = request.get_json()
+        emoji = data.get('emoji', '').strip()
+        
+        if not emoji:
+            return jsonify({'success': False, 'error': 'Emoji required'}), 400
+        
+        # Get current reactions
+        reactions = message.get('reactions', {})
+        
+        # Toggle reaction
+        if emoji in reactions:
+            if g.user_id in reactions[emoji]:
+                # Remove reaction
+                reactions[emoji].remove(g.user_id)
+                if not reactions[emoji]:
+                    del reactions[emoji]
+            else:
+                # Add reaction
+                reactions[emoji].append(g.user_id)
+        else:
+            # Add new reaction
+            reactions[emoji] = [g.user_id]
+        
+        # Update message
+        db.db.dm_messages.update_one(
+            {'_id': message_id_obj},
+            {'$set': {'reactions': reactions}}
+        )
+        
+        return jsonify({'success': True, 'data': {'reactions': reactions}})
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
