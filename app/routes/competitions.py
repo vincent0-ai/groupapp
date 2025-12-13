@@ -311,13 +311,29 @@ def submit_answer(comp_id):
         'submitted_at': datetime.utcnow()
     }
     
-    # Update participant answers and score
+    update_op = {
+        '$push': {'participants.$.answers': answer_data},
+        '$inc': {'participants.$.score': points_awarded}
+    }
+
+    # If correct answer, update group scores
+    if is_correct and points_awarded > 0:
+        user = db.find_one('users', {'_id': user_id_obj})
+        if user:
+            user_groups = user.get('groups', [])
+            comp_groups = competition.get('group_ids', [])
+            
+            # Find which of the user's groups are in this competition
+            groups_to_update = [gid for gid in user_groups if gid in comp_groups]
+            
+            for group_id in groups_to_update:
+                update_op['$inc'][f'group_scores.{group_id}'] = points_awarded
+
+    # Update participant answers and score, and group scores
     db.update_one('competitions', 
                  {'_id': comp_id_obj, 'participants.user_id': user_id_obj},
-                 {
-                     '$push': {'participants.$.answers': answer_data},
-                     '$inc': {'participants.$.score': points_awarded}
-                 })
+                 update_op,
+                 raw=True)
     
     # Get updated participant data
     updated_comp = db.find_one('competitions', {'_id': comp_id_obj})
@@ -341,10 +357,10 @@ def submit_answer(comp_id):
         'is_complete': is_complete
     }, 'Answer submitted successfully', 200)
 
-@competitions_bp.route('/<comp_id>/leaderboard', methods=['GET'])
+@competitions_bp.route('/<comp_id>/individual-leaderboard', methods=['GET'])
 @require_auth
-def get_leaderboard(comp_id):
-    """Get competition leaderboard"""
+def get_individual_leaderboard(comp_id):
+    """Get competition individual leaderboard"""
     try:
         comp_id_obj = ObjectId(comp_id)
     except:
@@ -372,6 +388,45 @@ def get_leaderboard(comp_id):
     leaderboard.sort(key=lambda x: x['score'], reverse=True)
     
     return success_response(leaderboard, 'Leaderboard retrieved successfully', 200)
+
+@competitions_bp.route('/<comp_id>/leaderboard', methods=['GET'])
+@require_auth
+def get_group_leaderboard(comp_id):
+    """Get competition group leaderboard"""
+    try:
+        comp_id_obj = ObjectId(comp_id)
+    except:
+        return error_response('Invalid competition ID', 400)
+    
+    db = Database()
+    competition = db.find_one('competitions', {'_id': comp_id_obj})
+    
+    if not competition:
+        return error_response('Competition not found', 404)
+        
+    group_scores = competition.get('group_scores', {})
+    if not group_scores:
+        return success_response([], 'Leaderboard is empty.', 200)
+        
+    leaderboard = []
+    for group_id, score in group_scores.items():
+        try:
+            group_id_obj = ObjectId(group_id)
+            group = db.find_one('groups', {'_id': group_id_obj})
+            if group:
+                leaderboard.append({
+                    'group': serialize_document(group),
+                    'score': score
+                })
+        except:
+            # Ignore invalid group IDs in scores map
+            continue
+            
+    # Sort by score descending
+    leaderboard.sort(key=lambda x: x['score'], reverse=True)
+    
+    return success_response(leaderboard, 'Leaderboard retrieved successfully', 200)
+
 
 @competitions_bp.route('/<comp_id>', methods=['DELETE'])
 @require_auth

@@ -133,6 +133,7 @@ class Competition:
                               channel_id: Optional[str] = None, category: str = 'General') -> Dict:
         """Create a new competition (optionally tied to a channel/category)"""
         is_intergroup = len(group_ids) > 1
+        group_scores = {gid: 0 for gid in group_ids}
         return {
             '_id': ObjectId(),
             'title': title,
@@ -147,7 +148,8 @@ class Competition:
             'start_time': start_time,
             'end_time': end_time,
             'participants': [],
-            'leaderboard': [],  # Format: [{'user_id': str, 'score': int, 'time': int}]
+            'group_scores': group_scores,
+            'individual_leaderboard': [],  # Format: [{'user_id': str, 'score': int, 'time': int}]
             'created_at': datetime.utcnow(),
             'updated_at': datetime.utcnow(),
             'is_active': True
