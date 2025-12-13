@@ -461,7 +461,11 @@
                     headers: { 'Authorization': `Bearer ${token}` }
                 });
                 const compsData = await compsRes.json();
-                const activeComps = (compsData.data?.competitions || []).filter(c => !c.completed);
+                const now = new Date();
+                const activeComps = (compsData.data?.competitions || []).filter(c => {
+                    const endTime = new Date(c.end_time);
+                    return c.is_active !== false && !c.completed && endTime > now;
+                });
 
                 // Update stats
                 const groups = groupsData.data?.groups || [];

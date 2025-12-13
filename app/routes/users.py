@@ -37,6 +37,47 @@ def require_auth(f):
     
     return decorated
 
+@users_bp.route('/search', methods=['GET'])
+@require_auth
+def search_users():
+    """Search users"""
+    query = request.args.get('q', '').strip()
+    
+    if not query:
+        return error_response('Search query is required', 400)
+    
+    if len(query) < 2:
+        return success_response([], 'Query too short', 200)
+    
+    db = Database()
+    
+    # Simple regex search on username and full_name only (not email for privacy)
+    users = list(db.find('users', {
+        '$or': [
+            {'username': {'$regex': query, '$options': 'i'}},
+            {'full_name': {'$regex': query, '$options': 'i'}}
+        ]
+    }, limit=20))
+    
+    # Return only public fields
+    public_users = []
+    for user in users:
+        user_id_obj = user['_id']
+        groups_count = db.count('groups', {'members': user_id_obj})
+        public_users.append({
+            '_id': str(user['_id']),
+            'id': str(user['_id']),
+            'username': user.get('username', ''),
+            'full_name': user.get('full_name', ''),
+            'avatar_url': user.get('avatar_url') or f"https://api.dicebear.com/7.x/avataaars/svg?seed={user.get('username', '')}",
+            'points': user.get('points', 0),
+            'badges': user.get('badges', []),
+            'groups_count': groups_count
+        })
+    
+    return success_response(public_users, 'Users found successfully', 200)
+
+
 @users_bp.route('/profile', methods=['GET'])
 @require_auth
 def get_profile():
@@ -235,42 +276,4 @@ def remove_push_subscription():
     return success_response(None, 'Push subscription removed', 200)
 
 
-@users_bp.route('/search', methods=['GET'])
-@require_auth
-def search_users():
-    """Search users"""
-    query = request.args.get('q', '').strip()
-    
-    if not query:
-        return error_response('Search query is required', 400)
-    
-    if len(query) < 2:
-        return success_response([], 'Query too short', 200)
-    
-    db = Database()
-    
-    # Simple regex search on username and full_name only (not email for privacy)
-    users = list(db.find('users', {
-        '$or': [
-            {'username': {'$regex': query, '$options': 'i'}},
-            {'full_name': {'$regex': query, '$options': 'i'}}
-        ]
-    }, limit=20))
-    
-    # Return only public fields
-    public_users = []
-    for user in users:
-        user_id_obj = user['_id']
-        groups_count = db.count('groups', {'members': user_id_obj})
-        public_users.append({
-            '_id': str(user['_id']),
-            'id': str(user['_id']),
-            'username': user.get('username', ''),
-            'full_name': user.get('full_name', ''),
-            'avatar_url': user.get('avatar_url') or f"https://api.dicebear.com/7.x/avataaars/svg?seed={user.get('username', '')}",
-            'points': user.get('points', 0),
-            'badges': user.get('badges', []),
-            'groups_count': groups_count
-        })
-    
-    return success_response(public_users, 'Users found successfully', 200)
+# search_users moved to top of file to avoid route conflict with /<user_id>
