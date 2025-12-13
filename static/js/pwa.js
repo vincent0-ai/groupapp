@@ -307,8 +307,8 @@ class PWAManager {
     sendNotification(title, options = {}) {
         if ('Notification' in window && Notification.permission === 'granted') {
             const notification = new Notification(title, {
-                icon: '/static/images/icon-192x192.png',
-                badge: '/static/images/badge-72x72.png',
+                icon: '/static/images/icon-192.png',
+                badge: '/static/images/badge-72.png',
                 ...options
             });
             

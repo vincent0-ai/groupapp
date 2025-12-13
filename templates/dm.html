@@ -658,7 +658,7 @@
             }
 
             try {
-                const res = await fetch(`/api/dm/threads`, {
+                const res = await fetch(`/api/dm/thread`, {
                     method: 'POST',
                     headers: { 
                         'Authorization': `Bearer ${token}`,
@@ -677,7 +677,7 @@
                     
                     if (data.status === 'success' && data.data) {
                         await loadThreads();
-                        await selectThread(data.data.thread_id, otherUserId, null);
+                        await selectThread(data.data.thread_id || data.data.id || data.data._id, otherUserId, null);
                         
                         const modal = bootstrap.Modal.getInstance(document.getElementById('newDmModal'));
                         if (modal) modal.hide();

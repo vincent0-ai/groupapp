@@ -128,8 +128,8 @@ self.addEventListener('push', event => {
   let data = {
     title: 'Discussio',
     body: 'You have a new notification',
-    icon: '/static/images/icon-192x192.png',
-    badge: '/static/images/badge-72x72.png',
+    icon: '/static/images/icon-192.png',
+    badge: '/static/images/badge-72.png',
     tag: 'Discussio-notification',
     data: { url: '/' }
   };
@@ -140,8 +140,8 @@ self.addEventListener('push', event => {
       data = {
         title: payload.title || 'Discussio',
         body: payload.body || payload.message || 'You have a new notification',
-        icon: payload.icon || '/static/images/icon-192x192.png',
-        badge: '/static/images/badge-72x72.png',
+        icon: payload.icon || '/static/images/icon-192.png',
+        badge: '/static/images/badge-72.png',
         tag: payload.tag || 'Discussio-notification',
         data: { url: payload.url || payload.link || '/' },
         requireInteraction: payload.requireInteraction || false
