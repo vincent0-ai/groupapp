@@ -6,6 +6,8 @@
 <!-- Hide footer on messages page to prevent overlap with chat input -->
 {% endblock %}
 
+{% block main_class %}container-fluid py-4 px-3 px-lg-4{% endblock %}
+
 {% block content %}
     <style>
         /* Modern Message Styling */
@@ -277,7 +279,7 @@
             }
         }
     </style>
-    <div class="row g-3" style="height: calc(100vh - 160px); max-width: 1400px; margin: 0 auto;">
+    <div class="row g-3" style="height: calc(100vh - 160px);">
         <div class="col-12 h-100">
             <div class="card h-100 d-flex flex-column shadow-sm border-0">
                 <div class="card-header d-flex align-items-center bg-white border-bottom">
@@ -675,7 +677,7 @@
                     
                     return `
                         <div class="mb-2 d-flex ${isMine ? 'justify-content-end' : 'justify-content-start'}" id="msg-${m._id}">
-                            <div class="d-flex flex-column ${isMine ? 'align-items-end' : 'align-items-start'}" style="max-width: 70%;">
+                            <div class="d-flex flex-column ${isMine ? 'align-items-end' : 'align-items-start'}" style="max-width: 85%;">
                                 <div class="message-bubble p-2 rounded shadow-sm ${isMine ? 'bg-primary text-white' : 'bg-white text-dark border'}">
                                     ${replyHtml}
                                     <div class="message-actions ${isMine ? '' : 'message-actions-left'}">
