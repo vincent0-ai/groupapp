@@ -536,43 +536,68 @@
         });
         
         async function loadSuggestedUsers() {
-            console.log('Loading suggested users...');
+            console.log('Loading suggested users... Current userId:', userId);
             
             // Use leaderboard endpoint (same as dashboard's Top Performers)
             try {
                 const res = await fetch('/api/users/leaderboard?per_page=20', {
                     headers: { 'Authorization': `Bearer ${token}` }
                 });
+                
+                if (!res.ok) {
+                    console.error('Leaderboard request failed:', res.status, res.statusText);
+                    document.getElementById('userSearchResults').innerHTML = `<p class="text-muted text-center py-3">Error loading users (${res.status})</p>`;
+                    return;
+                }
+                
                 const data = await res.json();
-                console.log('Leaderboard response:', data);
+                console.log('Leaderboard full response:', JSON.stringify(data, null, 2));
                 
                 if (data.success && data.data) {
                     // Use leaderboard array (same as dashboard)
                     const users = data.data.leaderboard || data.data.users || [];
-                    console.log('Found users:', users.length);
+                    console.log('Total users from API:', users.length);
+                    console.log('Users:', users.map(u => ({ id: u._id || u.id, username: u.username })));
+                    
                     if (users.length > 0) {
                         renderUserResults(users);
                         return;
+                    } else {
+                        document.getElementById('userSearchResults').innerHTML = '<p class="text-muted text-center py-3">No users registered yet. Invite others to join!</p>';
+                        return;
                     }
+                } else {
+                    console.error('API returned success=false or no data:', data);
                 }
             } catch (err) {
                 console.error('Leaderboard fetch error:', err);
             }
             
-            document.getElementById('userSearchResults').innerHTML = '<p class="text-muted text-center py-3">No other users available yet</p>';
+            document.getElementById('userSearchResults').innerHTML = '<p class="text-muted text-center py-3">Could not load users. Check console for details.</p>';
         }
         
         function renderUserResults(users) {
+            console.log('renderUserResults called with', users.length, 'users');
+            console.log('Current userId to filter:', userId, 'type:', typeof userId);
+            
             // Filter out current user
             const filteredUsers = users.filter(u => {
                 const odId = String(u._id || u.id);
-                return odId !== userId;
+                const match = odId === String(userId);
+                if (match) {
+                    console.log('Filtering out current user:', odId);
+                }
+                return !match;
             });
             
-            console.log('Rendering', filteredUsers.length, 'users');
+            console.log('After filtering:', filteredUsers.length, 'users remain');
             
             if (filteredUsers.length === 0) {
-                document.getElementById('userSearchResults').innerHTML = '<p class="text-muted text-center py-3">No other users to message</p>';
+                if (users.length === 1) {
+                    document.getElementById('userSearchResults').innerHTML = '<p class="text-muted text-center py-3">You are the only user. Invite others to join!</p>';
+                } else {
+                    document.getElementById('userSearchResults').innerHTML = '<p class="text-muted text-center py-3">No other users to message</p>';
+                }
                 return;
             }
             
