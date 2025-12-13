@@ -353,11 +353,11 @@
             }
             
             container.innerHTML = threads.map(t => {
-                const avatar = t.other_user.avatar_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(t.other_user.full_name || t.other_user.username)}&background=6366f1&color=fff`;
+                const avatar = t.other_user.avatar_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(t.other_user.full_name || t.other_user.username)}&background=4F46E5&color=fff`;
                 const timeStr = t.last_message_at ? formatTimeAgo(t.last_message_at) : '';
                 
                 return `
-                    <div class="dm-thread-item ${t._id === currentThreadId ? 'active' : ''}" onclick="selectThread('${t._id}', '${t.other_user.id}')">
+                    <div class="dm-thread-item ${t._id === currentThreadId ? 'active' : ''}" data-thread-id="${t._id}" onclick="selectThread('${t._id}', '${t.other_user.id}', this)">
                         <img src="${avatar}" alt="" class="dm-thread-avatar">
                         <div class="dm-thread-info">
                             <div class="dm-thread-name">${escapeHtml(t.other_user.full_name || t.other_user.username)}</div>
@@ -372,13 +372,22 @@
             }).join('');
         }
         
-        async function selectThread(threadId, otherUserId) {
+        async function selectThread(threadId, otherUserId, eventOrElement) {
             currentThreadId = threadId;
             currentOtherUserId = otherUserId;
             
-            // Update UI
+            // Update UI - handle both event and direct element
             document.querySelectorAll('.dm-thread-item').forEach(el => el.classList.remove('active'));
-            event.currentTarget?.classList.add('active');
+            if (eventOrElement) {
+                const element = eventOrElement.currentTarget || eventOrElement;
+                if (element && element.classList) {
+                    element.classList.add('active');
+                }
+            } else {
+                // Find and activate the thread element by data attribute
+                const threadEl = document.querySelector(`.dm-thread-item[data-thread-id="${threadId}"]`);
+                if (threadEl) threadEl.classList.add('active');
+            }
             
             document.getElementById('noChatSelected').style.display = 'none';
             document.getElementById('chatContainer').style.display = 'flex';
@@ -386,7 +395,7 @@
             // Set chat header
             const thread = threads.find(t => t._id === threadId);
             if (thread) {
-                const avatar = thread.other_user.avatar_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(thread.other_user.full_name || thread.other_user.username)}&background=6366f1&color=fff`;
+                const avatar = thread.other_user.avatar_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(thread.other_user.full_name || thread.other_user.username)}&background=4F46E5&color=fff`;
                 document.getElementById('chatAvatar').src = avatar;
                 document.getElementById('chatUserName').textContent = thread.other_user.full_name || thread.other_user.username;
                 document.getElementById('chatUserHandle').textContent = '@' + thread.other_user.username;
@@ -491,15 +500,18 @@
                     headers: { 'Authorization': `Bearer ${token}` }
                 });
                 const data = await res.json();
+                console.log('Start conversation response:', data);
                 
-                if (data.success) {
+                if (data.status === 'success' && data.data) {
                     // Reload threads and select this one
                     await loadThreads();
-                    await selectThread(data.data.thread_id, otherUserId);
+                    await selectThread(data.data.thread_id, otherUserId, null);
                     
                     // Close modal if open
                     const modal = bootstrap.Modal.getInstance(document.getElementById('newDmModal'));
                     if (modal) modal.hide();
+                } else {
+                    console.error('Failed to start conversation:', data.message);
                 }
             } catch (err) {
                 console.error('Error starting conversation:', err);
