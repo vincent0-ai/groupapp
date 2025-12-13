@@ -262,7 +262,14 @@ def google_callback():
             id_info.get('picture', '')
         )
         user_id = db.insert_one('users', user_doc)
+        if not user_id:
+            return error_response('Failed to create user.', 500)
+
         user = db.find_one('users', {'_id': user_id})
+
+    if not user:
+        return error_response('Authentication failed: User could not be retrieved.', 500)
+
     # Generate token
     token_jwt = generate_token(str(user['_id']))
     # Log in user (set session or return token)
