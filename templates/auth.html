@@ -12,6 +12,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
     
+    <script src="https://accounts.google.com/gsi/client" async defer></script>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
     <link rel="stylesheet" href="/static/css/style.css">
@@ -311,9 +312,12 @@
                         <div class="divider my-4">or continue with</div>
                         
                         <div class="d-flex gap-3">
-                            <button class="social-btn google flex-fill">
-                                <i class="fab fa-google"></i> Google
-                            </button>
+                            <div id="g_id_onload"
+                                 data-client_id="{{ google_client_id }}"
+                                 data-callback="handleGoogleLogin"
+                                 data-auto_prompt="false">
+                            </div>
+                            <div class="g_id_signin" data-type="standard" data-size="large" data-theme="outline" data-text="sign_in_with" data-shape="rectangular" data-logo_alignment="left" data-width="100%"></div>
                         </div>
 
                         <div class="text-center text-muted small mt-3">
@@ -332,17 +336,35 @@
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script src="/static/js/auth.js"></script>
     <script>
-      document.addEventListener('DOMContentLoaded', function() {
-        // Google Login
-        const googleBtn = document.querySelector('.social-btn.google');
-        if (googleBtn) {
-            googleBtn.onclick = function() {
-                this.innerHTML = '<span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>Redirecting...';
-                this.style.pointerEvents = 'none';
-                window.location.href = '/api/auth/google';
-            };
-        }
+      // Handle Google Login Callback
+      function handleGoogleLogin(response) {
+          fetch('/api/auth/google', {
+              method: 'POST',
+              headers: {
+                  'Content-Type': 'application/json'
+              },
+              body: JSON.stringify({
+                  id_token: response.credential
+              })
+          })
+          .then(res => res.json())
+          .then(data => {
+              if (data.status === 'success') {
+                  // Save token and redirect
+                  localStorage.setItem('token', data.data.token);
+                  localStorage.setItem('user', JSON.stringify(data.data.user));
+                  window.location.href = '/dashboard';
+              } else {
+                  alert(data.message || 'Google login failed');
+              }
+          })
+          .catch(err => {
+              console.error('Error:', err);
+              alert('An error occurred during login');
+          });
+      }
 
+      document.addEventListener('DOMContentLoaded', function() {
         // Form Loading States
         const setupFormLoading = (formId, btnId, loadingText) => {
             const form = document.getElementById(formId);

@@ -68,7 +68,7 @@ def create_app(config_name='development'):
     @app.route('/auth')
     def auth_page():
         """Serve auth page"""
-        return render_template('auth.html')
+        return render_template('auth.html', google_client_id=os.environ.get('GOOGLE_CLIENT_ID'))
     
     @app.route('/admin')
     def admin_page():
