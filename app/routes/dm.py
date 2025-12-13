@@ -3,16 +3,16 @@ Direct Messages (DM) API Routes
 """
 from flask import Blueprint, request, jsonify, g
 from app.services import Database
-from app.utils.decorators import token_required
+from app.utils.decorators import require_auth
 from bson import ObjectId
 from datetime import datetime
 
 dm_bp = Blueprint('dm', __name__, url_prefix='/api/dm')
-db = Database()
 
 
 def get_or_create_dm_thread(user1_id, user2_id):
     """Get existing DM thread or create a new one between two users."""
+    db = Database()
     # Sort IDs to ensure consistent lookup regardless of who initiated
     participant_ids = sorted([str(user1_id), str(user2_id)])
     
@@ -37,10 +37,11 @@ def get_or_create_dm_thread(user1_id, user2_id):
 
 
 @dm_bp.route('/threads', methods=['GET'])
-@token_required
+@require_auth
 def get_dm_threads():
     """Get all DM threads for the current user"""
     try:
+        db = Database()
         user_id = g.user_id
         
         threads = list(db.db.dm_threads.find({
@@ -76,10 +77,11 @@ def get_dm_threads():
 
 
 @dm_bp.route('/thread/<other_user_id>', methods=['GET'])
-@token_required
+@require_auth
 def get_or_start_thread(other_user_id):
     """Get or create a DM thread with another user"""
     try:
+        db = Database()
         # Verify other user exists
         other_user = db.find_one('users', {'_id': ObjectId(other_user_id)})
         if not other_user:
@@ -104,10 +106,11 @@ def get_or_start_thread(other_user_id):
 
 
 @dm_bp.route('/thread/<thread_id>/messages', methods=['GET'])
-@token_required
+@require_auth
 def get_dm_messages(thread_id):
     """Get messages from a DM thread"""
     try:
+        db = Database()
         thread_id_obj = ObjectId(thread_id)
         
         # Verify user is participant
@@ -156,10 +159,11 @@ def get_dm_messages(thread_id):
 
 
 @dm_bp.route('/thread/<thread_id>/messages', methods=['POST'])
-@token_required
+@require_auth
 def send_dm_message(thread_id):
     """Send a message in a DM thread"""
     try:
+        db = Database()
         thread_id_obj = ObjectId(thread_id)
         
         # Verify user is participant
@@ -222,10 +226,11 @@ def send_dm_message(thread_id):
 
 
 @dm_bp.route('/unread-count', methods=['GET'])
-@token_required
+@require_auth
 def get_unread_dm_count():
     """Get total unread DM count for the user"""
     try:
+        db = Database()
         # Find all threads the user is in
         threads = list(db.db.dm_threads.find({'participants': g.user_id}))
         
