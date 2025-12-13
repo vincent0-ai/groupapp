@@ -6,9 +6,15 @@ from app.utils import (
 from app.services import Database
 from app.models import User
 from bson import ObjectId
-from google_auth_oauthlib.flow import Flow
-from google.oauth2 import id_token
-from google.auth.transport import requests as google_requests
+
+try:
+    from google_auth_oauthlib.flow import Flow
+    from google.oauth2 import id_token
+    from google.auth.transport import requests as google_requests
+except ImportError:
+    Flow = None
+    id_token = None
+    google_requests = None
 
 auth_bp = Blueprint('auth', __name__, url_prefix='/api/auth')
 
@@ -132,6 +138,9 @@ def logout():
 
 @auth_bp.route('/google')
 def google_login():
+    if not Flow:
+        return error_response('Google Auth libraries are not installed on the server.', 500)
+
     client_id = current_app.config.get('GOOGLE_CLIENT_ID')
     client_secret = current_app.config.get('GOOGLE_CLIENT_SECRET')
 
@@ -168,6 +177,9 @@ def google_login():
 
 @auth_bp.route('/google/callback')
 def google_callback():
+    if not Flow:
+        return error_response('Google Auth libraries are not installed on the server.', 500)
+
     state = session.get('state')
     if not state:
         return error_response('State missing from session', 400)

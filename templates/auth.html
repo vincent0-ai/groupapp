@@ -256,7 +256,7 @@
                                             <input type="password" class="form-control border-start-0 ps-0" id="loginPassword" placeholder="Enter your password" required>
                                         </div>
                                     </div>
-                                    <button type="submit" class="btn btn-primary w-100 py-2 mb-3">
+                                    <button type="submit" class="btn btn-primary w-100 py-2 mb-3" id="loginBtn">
                                         <i class="fas fa-sign-in-alt me-2"></i>Login
                                     </button>
                                 </form>
@@ -301,7 +301,7 @@
                                             <input type="password" class="form-control border-start-0 ps-0" id="signupConfirmPassword" placeholder="Confirm your password" required>
                                         </div>
                                     </div>
-                                    <button type="submit" class="btn btn-primary w-100 py-2">
+                                    <button type="submit" class="btn btn-primary w-100 py-2" id="signupBtn">
                                         <i class="fas fa-user-plus me-2"></i>Create Account
                                     </button>
                                 </form>
@@ -333,9 +333,32 @@
     <script src="/static/js/auth.js"></script>
     <script>
       document.addEventListener('DOMContentLoaded', function() {
-        document.querySelector('.social-btn.google').onclick = function() {
-          window.location.href = '/api/auth/google';
+        // Google Login
+        const googleBtn = document.querySelector('.social-btn.google');
+        if (googleBtn) {
+            googleBtn.onclick = function() {
+                this.innerHTML = '<span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>Redirecting...';
+                this.style.pointerEvents = 'none';
+                window.location.href = '/api/auth/google';
+            };
+        }
+
+        // Form Loading States
+        const setupFormLoading = (formId, btnId, loadingText) => {
+            const form = document.getElementById(formId);
+            const btn = document.getElementById(btnId);
+            if (form && btn) {
+                form.addEventListener('submit', function() {
+                    if (form.checkValidity()) {
+                        btn.disabled = true;
+                        btn.innerHTML = `<span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>${loadingText}`;
+                    }
+                });
+            }
         };
+
+        setupFormLoading('loginForm', 'loginBtn', 'Logging in...');
+        setupFormLoading('signupForm', 'signupBtn', 'Creating account...');
       });
     </script>
 </body>
