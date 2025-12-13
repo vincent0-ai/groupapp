@@ -510,7 +510,28 @@
         let searchTimeout;
         document.getElementById('userSearchInput').addEventListener('input', (e) => {
             clearTimeout(searchTimeout);
-            searchTimeout = setTimeout(() => searchUsers(e.target.value), 300);
+            const query = e.target.value.trim();
+            if (query.length === 0) {
+                document.getElementById('userSearchResults').innerHTML = '<p class="text-muted text-center py-3">Start typing to search for users...</p>';
+                return;
+            }
+            if (query.length < 2) {
+                document.getElementById('userSearchResults').innerHTML = '<p class="text-muted text-center py-3">Type at least 2 characters...</p>';
+                return;
+            }
+            document.getElementById('userSearchResults').innerHTML = '<p class="text-muted text-center py-3"><i class="fas fa-spinner fa-spin me-2"></i>Searching...</p>';
+            searchTimeout = setTimeout(() => searchUsers(query), 300);
+        });
+        
+        // Reset search when modal opens
+        document.getElementById('newDmModal').addEventListener('show.bs.modal', () => {
+            document.getElementById('userSearchInput').value = '';
+            document.getElementById('userSearchResults').innerHTML = '<p class="text-muted text-center py-3">Start typing to search for users...</p>';
+        });
+        
+        // Focus search input when modal opens
+        document.getElementById('newDmModal').addEventListener('shown.bs.modal', () => {
+            document.getElementById('userSearchInput').focus();
         });
         
         async function searchUsers(query) {
@@ -524,6 +545,7 @@
                     headers: { 'Authorization': `Bearer ${token}` }
                 });
                 const data = await res.json();
+                console.log('Search response:', data);
                 
                 if (data.success) {
                     const users = (data.data || []).filter(u => u._id !== userId);
@@ -534,7 +556,7 @@
                     }
                     
                     document.getElementById('userSearchResults').innerHTML = users.map(u => {
-                        const avatar = u.avatar_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(u.full_name || u.username)}&background=6366f1&color=fff`;
+                        const avatar = u.avatar_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(u.full_name || u.username)}&background=4F46E5&color=fff`;
                         return `
                             <div class="user-search-result" onclick="startConversation('${u._id}')">
                                 <img src="${avatar}" alt="">
@@ -545,9 +567,13 @@
                             </div>
                         `;
                     }).join('');
+                } else {
+                    document.getElementById('userSearchResults').innerHTML = '<p class="text-muted text-center py-3">Search failed. Please try again.</p>';
+                    console.error('Search failed:', data.error);
                 }
             } catch (err) {
                 console.error('Error searching users:', err);
+                document.getElementById('userSearchResults').innerHTML = '<p class="text-muted text-center py-3">Error searching. Please try again.</p>';
             }
         }
         
