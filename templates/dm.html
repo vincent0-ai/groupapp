@@ -644,6 +644,19 @@
         }
         
         async function startConversation(otherUserId) {
+            // Check if thread already exists locally to avoid unnecessary API calls
+            const existingThread = threads.find(t => 
+                (t.other_user.id === otherUserId) || 
+                (t.other_user._id === otherUserId)
+            );
+
+            if (existingThread) {
+                selectThread(existingThread._id, otherUserId, null);
+                const modal = bootstrap.Modal.getInstance(document.getElementById('newDmModal'));
+                if (modal) modal.hide();
+                return;
+            }
+
             try {
                 const res = await fetch(`/api/dm/threads`, {
                     method: 'POST',
@@ -653,6 +666,13 @@
                     },
                     body: JSON.stringify({ recipient_id: otherUserId })
                 });
+                
+                if (!res.ok) {
+                    const text = await res.text();
+                    console.error('Start conversation failed:', res.status, text);
+                    throw new Error(`Failed to start conversation (Status: ${res.status})`);
+                }
+
                 const data = await res.json();
                 console.log('Start conversation response:', data);
                 
