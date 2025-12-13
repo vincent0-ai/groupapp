@@ -129,6 +129,8 @@ def logout():
 
 @auth_bp.route('/google')
 def google_login():
+    if not current_app.config.get('GOOGLE_CLIENT_ID'):
+        return error_response('Google Client ID is not configured.', 500)
     redirect_uri = url_for('auth.google_callback', _external=True)
     return current_app.google.authorize_redirect(redirect_uri)
 
