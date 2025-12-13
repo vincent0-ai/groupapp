@@ -97,9 +97,9 @@ def signup():
         username=username,
         password_hash=hash_password(password),
         full_name=full_name,
-        avatar_url=None,
-        auth_provider="local"
+        avatar_url=None
     )
+    user_doc["auth_provider"] = "local"
 
     # Add verification
     user_doc["is_verified"] = False
@@ -228,9 +228,9 @@ def google_login():
             username=username,
             password_hash=None,
             full_name=id_info.get("name"),
-            avatar_url=id_info.get("picture"),
-            auth_provider="google"
+            avatar_url=id_info.get("picture")
         )
+        user_doc["auth_provider"] = "google"
 
         user_doc["last_login"] = datetime.utcnow()
         user_id = db.insert_one("users", user_doc)
