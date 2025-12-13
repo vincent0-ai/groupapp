@@ -5,28 +5,25 @@
 {% block head %}
 <style>
     .welcome-section {
-        background: linear-gradient(135deg, rgba(99, 102, 241, 0.08) 0%, rgba(139, 92, 246, 0.05) 100%);
-        border-radius: 20px;
-        padding: 2rem;
-        margin-bottom: 2rem;
-        border: 1px solid rgba(99, 102, 241, 0.1);
+        background: var(--primary-ultra-light);
+        border-radius: 14px;
+        padding: 1.5rem;
+        margin-bottom: 1.5rem;
+        border: 1px solid var(--border-color);
     }
     
     .welcome-section h1 {
-        font-weight: 800;
-        background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
-        -webkit-background-clip: text;
-        -webkit-text-fill-color: transparent;
-        background-clip: text;
+        font-weight: 700;
+        color: #4F46E5;
     }
     
     .stat-card {
         background: var(--card-bg);
-        border-radius: 16px;
-        padding: 1.5rem;
+        border-radius: 12px;
+        padding: 1.25rem;
         height: 100%;
         border: 1px solid var(--border-color);
-        transition: all 0.3s ease;
+        transition: box-shadow 0.15s ease;
         position: relative;
         overflow: hidden;
     }
@@ -37,54 +34,53 @@
         top: 0;
         left: 0;
         right: 0;
-        height: 4px;
-        background: var(--gradient-primary);
+        height: 3px;
+        background: var(--primary-color);
         opacity: 0;
-        transition: opacity 0.3s ease;
+        transition: opacity 0.15s ease;
     }
     
     .stat-card:hover {
-        transform: translateY(-6px);
-        box-shadow: 0 20px 40px rgba(99, 102, 241, 0.15);
+        box-shadow: var(--shadow-md);
     }
     
     .stat-card:hover::before {
         opacity: 1;
     }
     
-    .stat-card.groups::before { background: linear-gradient(135deg, #6366f1, #8b5cf6); }
-    .stat-card.points::before { background: linear-gradient(135deg, #f59e0b, #fbbf24); }
-    .stat-card.competitions::before { background: linear-gradient(135deg, #10b981, #34d399); }
-    .stat-card.messages::before { background: linear-gradient(135deg, #06b6d4, #22d3ee); }
+    .stat-card.groups::before { background: #4F46E5; }
+    .stat-card.points::before { background: #F59E0B; }
+    .stat-card.competitions::before { background: #22C55E; }
+    .stat-card.messages::before { background: #38BDF8; }
     
     .stat-icon {
-        width: 56px;
-        height: 56px;
-        border-radius: 14px;
+        width: 48px;
+        height: 48px;
+        border-radius: 10px;
         display: flex;
         align-items: center;
         justify-content: center;
-        font-size: 1.5rem;
-        margin-bottom: 1rem;
+        font-size: 1.25rem;
+        margin-bottom: 0.875rem;
     }
     
-    .stat-icon.primary { background: rgba(99, 102, 241, 0.12); color: #6366f1; }
-    .stat-icon.warning { background: rgba(245, 158, 11, 0.12); color: #f59e0b; }
-    .stat-icon.success { background: rgba(16, 185, 129, 0.12); color: #10b981; }
-    .stat-icon.info { background: rgba(6, 182, 212, 0.12); color: #06b6d4; }
+    .stat-icon.primary { background: rgba(79, 70, 229, 0.1); color: #4F46E5; }
+    .stat-icon.warning { background: rgba(245, 158, 11, 0.1); color: #F59E0B; }
+    .stat-icon.success { background: rgba(34, 197, 94, 0.1); color: #22C55E; }
+    .stat-icon.info { background: rgba(56, 189, 248, 0.1); color: #38BDF8; }
     
     .stat-value {
-        font-size: 2.5rem;
-        font-weight: 800;
+        font-size: 2rem;
+        font-weight: 700;
         line-height: 1;
         margin-bottom: 0.25rem;
-        color: var(--text-dark);
+        color: var(--text-heading);
     }
     
     .stat-label {
         color: var(--text-muted);
         font-weight: 500;
-        font-size: 0.9rem;
+        font-size: 0.85rem;
     }
     
     .activity-card {
@@ -95,8 +91,8 @@
     .activity-card .card-header {
         background: transparent !important;
         border-bottom: 1px solid var(--border-color);
-        color: var(--text-dark) !important;
-        padding: 1rem 1.5rem;
+        color: var(--text-heading) !important;
+        padding: 0.875rem 1.25rem;
     }
     
     .activity-card .card-header h5 {
@@ -123,27 +119,27 @@
         border-radius: 14px;
         background: var(--card-bg);
         border: 1px solid var(--border-color);
-        transition: all 0.3s ease;
+        transition: box-shadow 0.15s ease, border-color 0.15s ease;
         text-decoration: none;
-        color: var(--text-dark);
+        color: var(--text-heading);
         cursor: pointer;
     }
     
     .quick-action-item:hover {
-        background: rgba(99, 102, 241, 0.08);
-        border-color: rgba(99, 102, 241, 0.3);
-        transform: translateY(-4px);
+        background: rgba(79, 70, 229, 0.06);
+        border-color: rgba(79, 70, 229, 0.2);
+        box-shadow: var(--shadow-sm);
         color: var(--primary-color);
     }
     
     .quick-action-item i {
-        font-size: 1.5rem;
+        font-size: 1.375rem;
         margin-bottom: 0.5rem;
         color: var(--primary-color);
     }
     
     .quick-action-item span {
-        font-size: 0.85rem;
+        font-size: 0.8rem;
         font-weight: 600;
     }
     
