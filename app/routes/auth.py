@@ -151,8 +151,13 @@ def google_login():
     # Allow overriding redirect_uri via env var (useful for proxies/containers)
     redirect_uri = current_app.config.get('GOOGLE_REDIRECT_URI') or os.environ.get('GOOGLE_REDIRECT_URI')
     if not redirect_uri:
-        redirect_uri = url_for('auth.google_callback', _external=True)
+        scheme = 'http' if current_app.debug else 'https'
+        redirect_uri = url_for('auth.google_callback', _external=True, _scheme=scheme)
     print(f"DEBUG: Google Redirect URI used: {redirect_uri}")
+
+    # Allow HTTP for local development to avoid InsecureTransportError
+    if redirect_uri.startswith('http://') or current_app.debug:
+        os.environ['OAUTHLIB_INSECURE_TRANSPORT'] = '1'
 
     client_config = {
         "web": {
@@ -202,7 +207,12 @@ def google_callback():
     
     redirect_uri = current_app.config.get('GOOGLE_REDIRECT_URI') or os.environ.get('GOOGLE_REDIRECT_URI')
     if not redirect_uri:
-        redirect_uri = url_for('auth.google_callback', _external=True)
+        scheme = 'http' if current_app.debug else 'https'
+        redirect_uri = url_for('auth.google_callback', _external=True, _scheme=scheme)
+
+    # Allow HTTP for local development to avoid InsecureTransportError
+    if redirect_uri.startswith('http://') or current_app.debug:
+        os.environ['OAUTHLIB_INSECURE_TRANSPORT'] = '1'
 
     client_config = {
         "web": {
