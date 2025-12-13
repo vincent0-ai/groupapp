@@ -633,27 +633,29 @@
             
             try {
                 let res;
-                if (currentThreadId.startsWith('new_')) {
-                    // Try generic messages endpoint with recipient_id first
-                    res = await fetch(`/api/messages`, {
-                        method: 'POST',
-                        headers: {
-                            'Authorization': `Bearer ${token}`,
-                            'Content-Type': 'application/json'
-                        },
-                        body: JSON.stringify({ recipient_id: currentOtherUserId, content: content })
+                const isNewThread = currentThreadId.startsWith('new_');
+
+                if (isNewThread) {
+                    // First ensure thread exists using the GET endpoint which creates if needed
+                    const threadRes = await fetch(`/api/dm/thread/${currentOtherUserId}`, {
+                        headers: { 'Authorization': `Bearer ${token}` }
                     });
                     
-                    // Fallback to DM specific create if generic fails
-                    if (!res.ok) {
-                         res = await fetch(`/api/dm/thread`, {
-                            method: 'POST',
-                            headers: {
-                                'Authorization': `Bearer ${token}`,
-                                'Content-Type': 'application/json'
-                            },
-                            body: JSON.stringify({ recipient_id: currentOtherUserId, content: content })
-                        });
+                    if (threadRes.ok) {
+                        const threadData = await threadRes.json();
+                        if (threadData.success && threadData.data.thread_id) {
+                            currentThreadId = threadData.data.thread_id;
+                            
+                            // Now send message to the thread
+                            res = await fetch(`/api/dm/thread/${currentThreadId}/messages`, {
+                                method: 'POST',
+                                headers: {
+                                    'Authorization': `Bearer ${token}`,
+                                    'Content-Type': 'application/json'
+                                },
+                                body: JSON.stringify({ content })
+                            });
+                        }
                     }
                 } else {
                     res = await fetch(`/api/dm/thread/${currentThreadId}/messages`, {
@@ -666,13 +668,10 @@
                     });
                 }
                 
-                if (res.ok) {
-                    if (currentThreadId.startsWith('new_')) {
+                if (res && res.ok) {
+                    if (isNewThread) {
                         await loadThreads();
-                        const newThread = threads.find(t => t.other_user.id === currentOtherUserId || t.other_user._id === currentOtherUserId);
-                        if (newThread) {
-                            selectThread(newThread._id, currentOtherUserId, null);
-                        }
+                        selectThread(currentThreadId, currentOtherUserId, null);
                     } else {
                         await loadMessages();
                         await loadThreads();
@@ -684,8 +683,12 @@
                         });
                     }
                 } else {
-                    const errData = await res.json().catch(() => ({}));
-                    console.error('Failed to send message:', res.status, errData);
+                    if (res) {
+                        const errData = await res.json().catch(() => ({}));
+                        console.error('Failed to send message:', res.status, errData);
+                    } else {
+                        console.error('Failed to send message: Could not create thread');
+                    }
                 }
             } catch (err) {
                 console.error('Error sending message:', err);
