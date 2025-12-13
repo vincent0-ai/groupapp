@@ -209,7 +209,7 @@ def send_dm_message(thread_id):
             user_id=other_user_id,
             notification_type='dm',
             message=f'{sender_name} sent you a message',
-            link=f'/messages?dm={g.user_id}'
+            link=f'/dm?dm={g.user_id}'
         )
         
         return jsonify({
