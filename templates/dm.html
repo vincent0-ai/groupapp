@@ -132,17 +132,29 @@
         
         .dm-message {
             display: flex;
+            flex-direction: row;
             margin-bottom: 12px;
+            width: 100%;
         }
         
         .dm-message.sent {
             justify-content: flex-end;
         }
         
-        .dm-message-bubble {
+        .dm-message.received {
+            justify-content: flex-start;
+        }
+        
+        .dm-message > div {
+            display: flex;
+            flex-direction: column;
             max-width: 70%;
+        }
+        
+        .dm-message-bubble {
             padding: 10px 14px;
             border-radius: 14px;
+            word-wrap: break-word;
         }
         
         .dm-message.sent .dm-message-bubble {
@@ -165,6 +177,10 @@
         
         .dm-message.sent .dm-message-time {
             text-align: right;
+        }
+        
+        .dm-message.received .dm-message-time {
+            text-align: left;
         }
         
         .dm-empty-state {
