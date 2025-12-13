@@ -132,15 +132,24 @@ def logout():
 
 @auth_bp.route('/google')
 def google_login():
-    if not current_app.config.get('GOOGLE_CLIENT_ID') or not current_app.config.get('GOOGLE_CLIENT_SECRET'):
+    client_id = current_app.config.get('GOOGLE_CLIENT_ID')
+    client_secret = current_app.config.get('GOOGLE_CLIENT_SECRET')
+
+    if not client_id or not client_secret:
         return error_response('Google Client configuration is missing.', 500)
     
+    # Ensure credentials are strings and stripped of whitespace
+    client_id = str(client_id).strip()
+    client_secret = str(client_secret).strip()
+    redirect_uri = url_for('auth.google_callback', _external=True)
+
     client_config = {
         "web": {
-            "client_id": current_app.config['GOOGLE_CLIENT_ID'],
-            "client_secret": current_app.config['GOOGLE_CLIENT_SECRET'],
+            "client_id": client_id,
+            "client_secret": client_secret,
             "auth_uri": "https://accounts.google.com/o/oauth2/auth",
             "token_uri": "https://oauth2.googleapis.com/token",
+            "redirect_uris": [redirect_uri]
         }
     }
     
@@ -148,7 +157,7 @@ def google_login():
         client_config,
         scopes=['openid', 'https://www.googleapis.com/auth/userinfo.email', 'https://www.googleapis.com/auth/userinfo.profile']
     )
-    flow.redirect_uri = url_for('auth.google_callback', _external=True)
+    flow.redirect_uri = redirect_uri
     
     authorization_url, state = flow.authorization_url(
         access_type='offline',
@@ -163,12 +172,21 @@ def google_callback():
     if not state:
         return error_response('State missing from session', 400)
         
+    client_id = current_app.config.get('GOOGLE_CLIENT_ID')
+    client_secret = current_app.config.get('GOOGLE_CLIENT_SECRET')
+    
+    # Ensure credentials are strings and stripped of whitespace
+    client_id = str(client_id).strip()
+    client_secret = str(client_secret).strip()
+    redirect_uri = url_for('auth.google_callback', _external=True)
+
     client_config = {
         "web": {
-            "client_id": current_app.config['GOOGLE_CLIENT_ID'],
-            "client_secret": current_app.config['GOOGLE_CLIENT_SECRET'],
+            "client_id": client_id,
+            "client_secret": client_secret,
             "auth_uri": "https://accounts.google.com/o/oauth2/auth",
             "token_uri": "https://oauth2.googleapis.com/token",
+            "redirect_uris": [redirect_uri]
         }
     }
     
@@ -177,14 +195,14 @@ def google_callback():
         scopes=['openid', 'https://www.googleapis.com/auth/userinfo.email', 'https://www.googleapis.com/auth/userinfo.profile'],
         state=state
     )
-    flow.redirect_uri = url_for('auth.google_callback', _external=True)
+    flow.redirect_uri = redirect_uri
     
     try:
         flow.fetch_token(authorization_response=request.url)
         credentials = flow.credentials
         request_adapter = google_requests.Request()
         id_info = id_token.verify_oauth2_token(
-            credentials.id_token, request_adapter, current_app.config['GOOGLE_CLIENT_ID']
+            credentials.id_token, request_adapter, client_id
         )
     except Exception as e:
         return error_response(f'Authentication failed: {str(e)}', 400)
