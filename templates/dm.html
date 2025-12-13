@@ -645,9 +645,13 @@
         
         async function startConversation(otherUserId) {
             try {
-                const res = await fetch(`/api/dm/thread/${otherUserId}`, {
+                const res = await fetch(`/api/dm/threads`, {
                     method: 'POST',
-                    headers: { 'Authorization': `Bearer ${token}` }
+                    headers: { 
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ recipient_id: otherUserId })
                 });
                 const data = await res.json();
                 console.log('Start conversation response:', data);
