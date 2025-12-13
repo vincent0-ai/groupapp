@@ -93,7 +93,7 @@ def login():
     if not user:
         return error_response("Invalid email or password", 401)
 
-    if user.get("auth_provider") != "local":
+    if user.get("auth_provider", "local") != "local":
         return error_response("Use Google login for this account", 400)
 
     if not verify_password(password, user.get("password_hash", "")):
