@@ -197,12 +197,17 @@ class LiveKitService:
         """
         Update a participant's permissions in a room.
         """
+        print(f"[LiveKitService] update_participant_permission called room={room_name} identity={identity} can_publish={can_publish} can_publish_data={can_publish_data}")
         try:
             # Use compatibility wrapper so code works across LiveKit SDK versions
             permissions = VideoGrants(
                 can_publish=can_publish,
                 can_publish_data=can_publish_data
             ).to_api()
+            try:
+                print(f"[LiveKitService] prepared permissions: {repr(permissions)}")
+            except Exception:
+                print("[LiveKitService] prepared permissions (repr failed)")
             # Ensure client exists
             if self.lkapi is None:
                 if not hasattr(api, 'LiveKitAPI'):
@@ -214,14 +219,33 @@ class LiveKitService:
                     self._start_background_loop()
                     fut = asyncio.run_coroutine_threadsafe(self._create_client_coro(), self._loop)
                     self.lkapi = fut.result(timeout=10)
-
-            await self.lkapi.room.update_participant(
-                room=room_name,
-                identity=identity,
-                permission=permissions
-            )
-            return True, None
+            try:
+                print(f"[LiveKitService] calling LiveKit API update_participant room={room_name} identity={identity}")
+                await self.lkapi.room.update_participant(
+                    room=room_name,
+                    identity=identity,
+                    permission=permissions
+                )
+                print(f"[LiveKitService] LiveKit update_participant succeeded for identity={identity} room={room_name}")
+                return True, None
+            except Exception as e:
+                print(f"[LiveKitService] LiveKit update_participant RPC error for identity={identity} room={room_name}: {e}")
+                try:
+                    import traceback
+                    traceback.print_exc()
+                except Exception:
+                    pass
+                return False, str(e)
         except rtc.RpcError as e:
+            print(f"[LiveKitService] caught rtc.RpcError: {e}")
+            return False, str(e)
+        except Exception as e:
+            print(f"[LiveKitService] unexpected error in update_participant_permission: {e}")
+            try:
+                import traceback
+                traceback.print_exc()
+            except Exception:
+                pass
             return False, str(e)
 
     async def remove_participant(self, room_name: str, identity: str):

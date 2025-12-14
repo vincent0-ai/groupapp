@@ -496,13 +496,21 @@ def create_app(config_name='development'):
 
         can_publish = bool(can_speak or can_share)
         try:
+            print(f"[_update_lk_permissions] updating LiveKit permissions for {target_user_id} in {room_name} - is_creator={is_creator} can_speak={can_speak} can_share={can_share} can_publish={can_publish}")
             livekit_service = LiveKitService()
             # Use the service helper that converts to the proper SDK permission object
             success, err = await livekit_service.update_participant_permission(room_name, target_user_id, can_publish, True)
             if not success:
                 print(f"LiveKit permission update returned error for {target_user_id} in {room_name}: {err}")
+            else:
+                print(f"LiveKit permission update succeeded for {target_user_id} in {room_name}")
         except Exception as e:
             print(f"Failed to update LiveKit permissions for {target_user_id} in {room_name}: {e}")
+            try:
+                import traceback
+                traceback.print_exc()
+            except Exception:
+                pass
 
     @socketio.on('grant_draw')
     def handle_grant_draw(data):
