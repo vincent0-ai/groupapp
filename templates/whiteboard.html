@@ -487,10 +487,15 @@
                     method: 'POST',
                     headers: { 'Authorization': `Bearer ${token}` }
                 });
-                if (!res.ok) throw new Error((await res.json()).message || 'Failed to get media token');
-                const json = await res.json();
+                const text = await res.text();
+                let json = null;
+                try { json = JSON.parse(text); } catch(e) { /* not JSON */ }
+                if (!res.ok) {
+                    console.error('LiveKit token endpoint error', res.status, text);
+                    throw new Error((json && (json.message || json.error)) || text || 'Failed to get media token');
+                }
                 // return both token and optional url from server
-                return { token: json.data?.token || json.token, url: json.data?.url || json.url };
+                return { token: json?.data?.token || json?.token, url: json?.data?.url || json?.url };
             } catch (e) {
                 console.error('getLiveKitToken failed:', e);
                 showCustomAlert(e.message, 'Media Server Error');
@@ -777,6 +782,40 @@
                  }
              });
         };
+
+        // --- Drawing helpers (position conversion, draw, emit) ---
+        function getPos(clientX, clientY) {
+            const rect = canvas.getBoundingClientRect();
+            // account for CSS size vs canvas resolution
+            const scaleX = canvas.width / rect.width;
+            const scaleY = canvas.height / rect.height;
+            return { x: (clientX - rect.left) * scaleX, y: (clientY - rect.top) * scaleY };
+        }
+
+        function draw(x0, y0, x1, y1, color, size, opacity) {
+            if (!ctx) return;
+            ctx.save();
+            ctx.lineCap = 'round';
+            ctx.lineJoin = 'round';
+            ctx.globalAlpha = (typeof opacity === 'number') ? opacity : (document.getElementById('opacity')?.value || 1);
+            ctx.strokeStyle = color || document.getElementById('colorPicker')?.value || '#000';
+            ctx.lineWidth = size || (document.getElementById('brushSize')?.value || 3);
+            ctx.beginPath();
+            ctx.moveTo(x0, y0);
+            ctx.lineTo(x1, y1);
+            ctx.stroke();
+            ctx.closePath();
+            ctx.restore();
+        }
+
+        function emitDraw(x0, y0, x1, y1) {
+            if (!socket || !sessionId) return;
+            const color = document.getElementById('colorPicker')?.value || '#000';
+            const size = parseInt(document.getElementById('brushSize')?.value || '3', 10);
+            const opacity = parseFloat(document.getElementById('opacity')?.value || '1');
+            const drawing_data = { x0, y0, x1, y1, color, size, opacity };
+            socket.emit('whiteboard_draw', { room: `whiteboard:${sessionId}`, drawing_data, user_id: userId });
+        }
         
         // Initial setup
         initDrawing();

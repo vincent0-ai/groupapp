@@ -279,8 +279,10 @@ def get_livekit_token(wb_id):
     except ValueError as e:
         # This catches the API key/secret not being set
         print(f"LiveKit config error: {e}")
-        return error_response('Media server is not configured', 503)
+        return error_response(f'Media server is not configured: {e}', 503)
     except Exception as e:
+        import traceback
+        traceback.print_exc()
         print(f"Error generating LiveKit token: {e}")
-        return error_response('Failed to connect to media server', 500)
+        return error_response(f'Failed to connect to media server: {e}', 500)
 
