@@ -1569,3 +1569,17 @@ html {
     .nav-tabs .nav-link { padding: 6px 8px !important; font-size: 0.9rem; }
     main { padding-left: 12px !important; padding-right: 12px !important; }
 }
+
+/* Force table cells to render horizontally and wrap gracefully on mobile/large-mobile devices */
+table, th, td, .table, .table-responsive * {
+    writing-mode: horizontal-tb !important;
+    text-orientation: mixed !important;
+    white-space: normal !important;
+    word-break: break-word !important;
+    overflow-wrap: anywhere !important;
+}
+
+/* Prevent extremely narrow table cells from collapsing into vertical stacks */
+.table td, .table th {
+    min-width: 40px;
+}
