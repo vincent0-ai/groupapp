@@ -488,7 +488,9 @@
                     headers: { 'Authorization': `Bearer ${token}` }
                 });
                 if (!res.ok) throw new Error((await res.json()).message || 'Failed to get media token');
-                return (await res.json()).data.token;
+                const json = await res.json();
+                // return both token and optional url from server
+                return { token: json.data?.token || json.token, url: json.data?.url || json.url };
             } catch (e) {
                 console.error('getLiveKitToken failed:', e);
                 showCustomAlert(e.message, 'Media Server Error');
@@ -502,18 +504,21 @@
             
             liveBtn.disabled = true;
             liveBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Joining...';
-
-            const lkToken = await getLiveKitToken(sessionId);
-            if (!lkToken) {
+            const lkResp = await getLiveKitToken(sessionId);
+            if (!lkResp || !lkResp.token) {
                 liveBtn.disabled = false;
                 liveBtn.innerHTML = '<i class="fas fa-phone"></i> Join Call';
                 return;
             }
 
-            const wsUrl = ("{{ config.LIVEKIT_URL }}" || "ws://localhost:7880").replace(/^http/, 'ws');
+            const lkToken = lkResp.token;
+            // prefer server-provided URL, fallback to config placeholder
+            const configured = lkResp.url || "{{ config.LIVEKIT_URL }}" || "http://localhost:7880";
+            const wsUrl = String(configured).replace(/^http/, 'ws');
 
             try {
-                await mediaService.connect(wsUrl, lkToken);
+                // MediaService.connect expects (token, url)
+                await mediaService.connect(lkToken, wsUrl);
                 isInCall = true;
 
                 const perms = mediaService.room.localParticipant.permissions;
