@@ -208,11 +208,10 @@ def upload_audio(wb_id):
 
 from app.services.livekit_service import LiveKitService, VideoGrants
 from livekit import api
-import asyncio
 
 @whiteboards_bp.route('/<wb_id>/livekit-token', methods=['POST'])
 @require_auth
-async def get_livekit_token(wb_id):
+def get_livekit_token(wb_id):
     """Generate a LiveKit access token for a user joining a whiteboard."""
     try:
         wb_obj_id = ObjectId(wb_id)
@@ -236,12 +235,13 @@ async def get_livekit_token(wb_id):
     try:
         livekit_service = LiveKitService()
         room_name = f'whiteboard:{wb_id}'
-        participants = await livekit_service.lkapi.room.list_participants(room=room_name)
+        # Use sync helper which will run the underlying coroutine on the appropriate loop
+        participants = livekit_service.list_participants(room_name)
         max_participants = current_app.config['MAX_PARTICIPANTS_PER_ROOM']
-        
+
         # Check if the user is already in the room before checking the limit
-        is_already_in_room = any(p.identity == user_id for p in participants)
-        
+        is_already_in_room = any(getattr(p, 'identity', None) == user_id for p in participants)
+
         if not is_already_in_room and len(participants) >= max_participants:
             return error_response(f'This session is full (max {max_participants} participants).', 429)
 

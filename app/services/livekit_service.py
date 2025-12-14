@@ -5,6 +5,9 @@ try:
 except Exception:
     current_app = None
 from typing import Any
+import asyncio
+import threading
+import concurrent.futures
 
 class LiveKitService:
     """
@@ -18,13 +21,55 @@ class LiveKitService:
         
         if not self.api_key or not self.api_secret:
             raise ValueError("LIVEKIT_API_KEY and LIVEKIT_API_SECRET must be set.")
-            
-        # Create LiveKitAPI client if available in the SDK; otherwise use a minimal stub
+        # Defer creating the LiveKitAPI client until we have a running loop.
+        # Try to create it now; if this fails due to no running event loop,
+        # start a background loop thread and create the client there.
+        self._loop = None
+        self._loop_thread = None
+        self.lkapi = None
+
         if hasattr(api, 'LiveKitAPI'):
-            self.lkapi = api.LiveKitAPI(self.url, self.api_key, self.api_secret)
+            try:
+                # Attempt to instantiate client (may require a running loop due to aiohttp)
+                self.lkapi = api.LiveKitAPI(self.url, self.api_key, self.api_secret)
+            except RuntimeError as e:
+                # Likely: "no running event loop" from aiohttp.ClientSession
+                # Start a background event loop and create the client there.
+                self._start_background_loop()
+                fut = asyncio.run_coroutine_threadsafe(self._create_client_coro(), self._loop)
+                self.lkapi = fut.result(timeout=10)
         else:
             import types
             self.lkapi = types.SimpleNamespace(room=types.SimpleNamespace())
+
+    def _start_background_loop(self):
+        if self._loop and self._loop.is_running():
+            return
+        self._loop = asyncio.new_event_loop()
+
+        def _run_loop(loop: asyncio.AbstractEventLoop):
+            asyncio.set_event_loop(loop)
+            loop.run_forever()
+
+        self._loop_thread = threading.Thread(target=_run_loop, args=(self._loop,), daemon=True)
+        self._loop_thread.start()
+
+    async def _create_client_coro(self):
+        # Run inside the running loop so aiohttp will find the loop
+        return api.LiveKitAPI(self.url, self.api_key, self.api_secret)
+
+    def _run_coro(self, coro):
+        """Run coroutine and return result; use background loop if available."""
+        if self._loop and self._loop.is_running():
+            fut = asyncio.run_coroutine_threadsafe(coro, self._loop)
+            return fut.result()
+        else:
+            # Fallback to running in current thread
+            try:
+                return asyncio.run(coro)
+            except Exception:
+                # As a last resort, run synchronously if possible
+                raise
 
     def create_access_token(self, user_id: str, user_name: str, room_name: str, permissions: Any) -> str:
         """
@@ -45,6 +90,18 @@ class LiveKitService:
                 can_publish=can_publish,
                 can_publish_data=can_publish_data
             ).to_api()
+            # Ensure client exists
+            if self.lkapi is None:
+                if not hasattr(api, 'LiveKitAPI'):
+                    raise RuntimeError('LiveKit SDK not available')
+                # create client in background loop if necessary
+                try:
+                    self.lkapi = api.LiveKitAPI(self.url, self.api_key, self.api_secret)
+                except RuntimeError:
+                    self._start_background_loop()
+                    fut = asyncio.run_coroutine_threadsafe(self._create_client_coro(), self._loop)
+                    self.lkapi = fut.result(timeout=10)
+
             await self.lkapi.room.update_participant(
                 room=room_name,
                 identity=identity,
@@ -73,6 +130,38 @@ class LiveKitService:
             return True, None
         except rtc.RpcError as e:
             return False, str(e)
+
+    def list_participants(self, room_name: str):
+        """Sync helper to list participants; runs underlying coroutine on appropriate loop."""
+        if not self.lkapi:
+            if hasattr(api, 'LiveKitAPI'):
+                try:
+                    self.lkapi = api.LiveKitAPI(self.url, self.api_key, self.api_secret)
+                except RuntimeError:
+                    self._start_background_loop()
+                    fut = asyncio.run_coroutine_threadsafe(self._create_client_coro(), self._loop)
+                    self.lkapi = fut.result(timeout=10)
+            else:
+                return []
+
+        coro = self.lkapi.room.list_participants(room=room_name)
+        return self._run_coro(coro)
+
+    def delete_room(self, room_name: str):
+        """Sync helper to delete a room (runs coroutine on background loop)."""
+        if not self.lkapi:
+            if hasattr(api, 'LiveKitAPI'):
+                try:
+                    self.lkapi = api.LiveKitAPI(self.url, self.api_key, self.api_secret)
+                except RuntimeError:
+                    self._start_background_loop()
+                    fut = asyncio.run_coroutine_threadsafe(self._create_client_coro(), self._loop)
+                    self.lkapi = fut.result(timeout=10)
+            else:
+                return False, 'SDK not available'
+
+        coro = self.lkapi.room.delete_room(room=room_name)
+        return self._run_coro(coro)
 
 
 class VideoGrants:
