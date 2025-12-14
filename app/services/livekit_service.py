@@ -203,10 +203,31 @@ class VideoGrants:
         self.can_subscribe = can_subscribe
 
     def to_api(self):
-        # Prefer api.VideoGrant when available
+        # Prefer api.VideoGrants (newer SDK) then api.VideoGrant (older naming)
+        # Try both snake_case and camelCase kwarg names to be robust across versions.
+        if hasattr(api, 'VideoGrants'):
+            try:
+                try:
+                    return api.VideoGrants(
+                        room_join=self.room_join,
+                        room=self.room,
+                        can_publish=self.can_publish,
+                        can_publish_data=self.can_publish_data,
+                        can_subscribe=self.can_subscribe,
+                    )
+                except TypeError:
+                    return api.VideoGrants(
+                        room=self.room,
+                        roomJoin=self.room_join,
+                        canPublish=self.can_publish,
+                        canPublishData=self.can_publish_data,
+                        canSubscribe=self.can_subscribe,
+                    )
+            except Exception:
+                pass
+
         if hasattr(api, 'VideoGrant'):
             try:
-                # Some LiveKit SDK versions do not accept `room_join` as a kwarg
                 try:
                     return api.VideoGrant(
                         room_join=self.room_join,
@@ -216,12 +237,12 @@ class VideoGrants:
                         can_subscribe=self.can_subscribe,
                     )
                 except TypeError:
-                    # Retry without `room_join` which some versions don't accept
                     return api.VideoGrant(
                         room=self.room,
-                        can_publish=self.can_publish,
-                        can_publish_data=self.can_publish_data,
-                        can_subscribe=self.can_subscribe,
+                        roomJoin=self.room_join,
+                        canPublish=self.can_publish,
+                        canPublishData=self.can_publish_data,
+                        canSubscribe=self.can_subscribe,
                     )
             except Exception:
                 pass
@@ -236,8 +257,7 @@ class VideoGrants:
             except Exception:
                 pass
 
-        # Final fallback: plain dict
-        # Return a simple object with attributes to satisfy older/newer SDK expectations
+        # Final fallback: return an object that will be wrapped as `video` grant
         return types.SimpleNamespace(
             room_join=self.room_join,
             room=self.room,
