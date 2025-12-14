@@ -149,7 +149,7 @@ def create_app(config_name='development'):
     import threading
     import time
     import asyncio
-    from app.services.livekit_service import LiveKitService, VideoGrant
+    from app.services.livekit_service import LiveKitService, VideoGrants
 
     def run_async_from_sync(coro):
         """Helper to run an async function from a sync context."""
@@ -178,7 +178,7 @@ def create_app(config_name='development'):
                         if session_duration > 1200: # 20 minutes
                             print(f"Session limit reached for room {room}. Terminating.")
                             socketio.emit('session_ended', {'session_id': room.split(':', 1)[1], 'reason': 'Time limit reached.'}, room=room)
-                            run_async_from_sync(livekit_service.room_service.delete_room(room=room))
+                            run_async_from_sync(livekit_service.lkapi.room.delete_room(room=room))
                             if room in room_timers:
                                 del room_timers[room]
                         
@@ -432,13 +432,13 @@ def create_app(config_name='development'):
         can_speak = is_creator or target_user_id in [str(uid) for uid in wb.get('can_speak', [])]
         can_share = is_creator or target_user_id in [str(uid) for uid in wb.get('can_share_screen', [])]
 
-        permissions = VideoGrant(
+        permissions = VideoGrants(
             can_publish = can_speak or can_share,
             can_publish_data = True
         )
         try:
             livekit_service = LiveKitService()
-            await livekit_service.room_service.update_participant(
+            await livekit_service.lkapi.room.update_participant(
                 room=room_name,
                 identity=target_user_id,
                 permission=permissions
