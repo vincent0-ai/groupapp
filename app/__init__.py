@@ -174,6 +174,13 @@ def create_app(config_name='development'):
         
         return loop.run_until_complete(coro)
 
+    def _is_valid_object_id(oid):
+        """Return True if oid is a valid BSON ObjectId string."""
+        try:
+            return bool(oid) and ObjectId.is_valid(str(oid))
+        except Exception:
+            return False
+
     def check_session_timers(app, socketio):
         """Background thread to enforce session duration limits."""
         with app.app_context():
@@ -238,6 +245,12 @@ def create_app(config_name='development'):
             if room.startswith('whiteboard:'):
                 try:
                     wb_id = room.split(':', 1)[1]
+                    # Validate whiteboard id before converting
+                    if not _is_valid_object_id(wb_id):
+                        print(f"Invalid whiteboard id when joining room: '{wb_id}'")
+                        emit('error', {'message': 'Invalid session id'})
+                        return
+
                     db = Database()
                     wb = db.find_one('whiteboards', {'_id': ObjectId(wb_id)})
                     if not wb or not wb.get('is_active', True):
@@ -248,8 +261,10 @@ def create_app(config_name='development'):
                     if room not in room_timers:
                         room_timers[room] = {'start_time': datetime.utcnow(), 'warned': False}
                         print(f"Started session timer for room: {room}")
-                    
-                    db.push_to_array('whiteboards', {'_id': ObjectId(wb_id)}, 'participants', ObjectId(user_id))
+
+                    # Only push participant if user_id looks like a valid ObjectId
+                    if _is_valid_object_id(user_id):
+                        db.push_to_array('whiteboards', {'_id': ObjectId(wb_id)}, 'participants', ObjectId(user_id))
                 except Exception as e:
                     print(f"Error joining whiteboard: {e}")
                     pass
@@ -347,6 +362,9 @@ def create_app(config_name='development'):
         
         if room and room.startswith('whiteboard:'):
             wb_id = room.split(':', 1)[1]
+            if not _is_valid_object_id(wb_id):
+                print(f"clear_board called with invalid wb_id: '{wb_id}'")
+                return
             # Verify permissions (creator or can_draw)
             db = Database()
             wb = db.find_one('whiteboards', {'_id': ObjectId(wb_id)})
@@ -373,9 +391,13 @@ def create_app(config_name='development'):
             try:
                 if room.startswith('whiteboard:'):
                     wb_id = room.split(':', 1)[1]
-                    from app.services import Database
-                    db = Database()
-                    wb = db.find_one('whiteboards', {'_id': ObjectId(wb_id)})
+                    if not _is_valid_object_id(wb_id):
+                        # invalid id, allow by default but skip permission checks
+                        wb = None
+                    else:
+                        from app.services import Database
+                        db = Database()
+                        wb = db.find_one('whiteboards', {'_id': ObjectId(wb_id)})
                     if wb and wb.get('can_draw'):
                         # can_draw contains ObjectIds
                         ids = [str(x) for x in wb.get('can_draw', [])]
@@ -390,9 +412,10 @@ def create_app(config_name='development'):
                 }, room=room, skip_sid=request.sid)
                 # Persist drawing to the whiteboard document
                 try:
-                    if room.startswith('whiteboard:'):
-                        wb_id = room.split(':', 1)[1]
-                        db.push_to_array('whiteboards', {'_id': ObjectId(wb_id)}, 'drawing_data', drawing_data)
+                        if room.startswith('whiteboard:'):
+                            wb_id = room.split(':', 1)[1]
+                            if _is_valid_object_id(wb_id):
+                                db.push_to_array('whiteboards', {'_id': ObjectId(wb_id)}, 'drawing_data', drawing_data)
                 except Exception:
                     pass
     
@@ -416,6 +439,9 @@ def create_app(config_name='development'):
         if not room or not room.startswith('whiteboard:'):
             return
         wb_id = room.split(':', 1)[1]
+        if not _is_valid_object_id(wb_id):
+            print(f"raise_hand called with invalid wb_id: '{wb_id}'")
+            return
         db = Database()
         try:
             db.push_to_array('whiteboards', {'_id': ObjectId(wb_id)}, 'raised_hands', ObjectId(user_id))
@@ -432,6 +458,9 @@ def create_app(config_name='development'):
         if not room or not room.startswith('whiteboard:'):
             return
         wb_id = room.split(':', 1)[1]
+        if not _is_valid_object_id(wb_id):
+            print(f"clear_hand called with invalid wb_id: '{wb_id}'")
+            return
         db = Database()
         try:
             db.pull_from_array('whiteboards', {'_id': ObjectId(wb_id)}, 'raised_hands', ObjectId(user_id))
@@ -483,6 +512,9 @@ def create_app(config_name='development'):
         if not room or not room.startswith('whiteboard:'):
             return
         wb_id = room.split(':', 1)[1]
+        if not _is_valid_object_id(wb_id):
+            print(f"grant_draw called with invalid wb_id: '{wb_id}'")
+            return
         db = Database()
         try:
             wb = db.find_one('whiteboards', {'_id': ObjectId(wb_id)})
@@ -514,6 +546,9 @@ def create_app(config_name='development'):
         if not room or not room.startswith('whiteboard:'):
             return
         wb_id = room.split(':', 1)[1]
+        if not _is_valid_object_id(wb_id):
+            print(f"revoke_draw called with invalid wb_id: '{wb_id}'")
+            return
         db = Database()
         try:
             wb = db.find_one('whiteboards', {'_id': ObjectId(wb_id)})
@@ -544,6 +579,9 @@ def create_app(config_name='development'):
         if not room or not room.startswith('whiteboard:'):
             return
         wb_id = room.split(':', 1)[1]
+        if not _is_valid_object_id(wb_id):
+            print(f"grant_speak called with invalid wb_id: '{wb_id}'")
+            return
         db = Database()
         try:
             wb = db.find_one('whiteboards', {'_id': ObjectId(wb_id)})
@@ -581,6 +619,9 @@ def create_app(config_name='development'):
         if not room or not room.startswith('whiteboard:'):
             return
         wb_id = room.split(':', 1)[1]
+        if not _is_valid_object_id(wb_id):
+            print(f"revoke_speak called with invalid wb_id: '{wb_id}'")
+            return
         db = Database()
         try:
             wb = db.find_one('whiteboards', {'_id': ObjectId(wb_id)})
@@ -617,6 +658,9 @@ def create_app(config_name='development'):
         if not room or not room.startswith('whiteboard:'):
             return
         wb_id = room.split(':', 1)[1]
+        if not _is_valid_object_id(wb_id):
+            print(f"grant_screen_share called with invalid wb_id: '{wb_id}'")
+            return
         db = Database()
         try:
             wb = db.find_one('whiteboards', {'_id': ObjectId(wb_id)})
@@ -651,6 +695,9 @@ def create_app(config_name='development'):
         if not room or not room.startswith('whiteboard:'):
             return
         wb_id = room.split(':', 1)[1]
+        if not _is_valid_object_id(wb_id):
+            print(f"revoke_screen_share called with invalid wb_id: '{wb_id}'")
+            return
         db = Database()
         try:
             wb = db.find_one('whiteboards', {'_id': ObjectId(wb_id)})
