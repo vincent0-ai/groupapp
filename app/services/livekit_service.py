@@ -1,6 +1,5 @@
 import os
-from livekit import api
-from livekit.exceptions import LiveKitException
+from livekit import api, rpc
 from flask import current_app
 
 class LiveKitService:
@@ -18,7 +17,7 @@ class LiveKitService:
             
         self.lkapi = api.LiveKitAPI(self.url, self.api_key, self.api_secret)
 
-    def create_access_token(self, user_id: str, user_name: str, room_name: str, permissions: api.VideoGrants) -> str:
+    def create_access_token(self, user_id: str, user_name: str, room_name: str, permissions: api.VideoGrant) -> str:
         """
         Create a LiveKit access token for a user.
         """
@@ -31,7 +30,7 @@ class LiveKitService:
         Update a participant's permissions in a room.
         """
         try:
-            permissions = api.VideoGrants(
+            permissions = api.VideoGrant(
                 can_publish=can_publish,
                 can_publish_data=can_publish_data
             )
@@ -41,7 +40,7 @@ class LiveKitService:
                 permission=permissions
             )
             return True, None
-        except LiveKitException as e:
+        except rpc.RpcError as e:
             return False, str(e)
 
     async def remove_participant(self, room_name: str, identity: str):
@@ -51,7 +50,7 @@ class LiveKitService:
         try:
             await self.lkapi.room.remove_participant(room=room_name, identity=identity)
             return True, None
-        except LiveKitException as e:
+        except rpc.RpcError as e:
             return False, str(e)
             
     async def close_room(self, room_name: str):
@@ -61,7 +60,7 @@ class LiveKitService:
         try:
             await self.lkapi.room.delete_room(room=room_name)
             return True, None
-        except LiveKitException as e:
+        except rpc.RpcError as e:
             return False, str(e)
 
 def get_livekit_service():

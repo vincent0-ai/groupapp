@@ -24,7 +24,6 @@ idna==3.11
 itsdangerous==2.2.0
 Jinja2==3.1.6
 livekit
-livekit-api
 MarkupSafe==3.0.3
 minio==7.2.20
 packaging==25.0
