@@ -751,11 +751,30 @@
                     const targetId = btn.dataset.uid;
                     if (!action || !targetId) return;
                     const payload = { room: `whiteboard:${sessionId}`, user_id: targetId, requester_id: userId };
+                    // Optimistic UI update so moderator sees immediate feedback
+                    try {
+                        if (action === 'grant_draw') participants[targetId].can_draw = true;
+                        if (action === 'revoke_draw') participants[targetId].can_draw = false;
+                        if (action === 'grant_speak') participants[targetId].can_speak = true;
+                        if (action === 'revoke_speak') participants[targetId].can_speak = false;
+                        if (action === 'grant_screen_share') participants[targetId].can_share_screen = true;
+                        if (action === 'revoke_screen_share') participants[targetId].can_share_screen = false;
+                        renderParticipants();
+                    } catch (e) { /* ignore optimistic errors */ }
+
+                    // Visual affordance while waiting for the server to confirm
+                    btn.disabled = true;
+                    const prevHtml = btn.innerHTML;
+                    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+
                     if (action === 'clear_hand') {
                         socket.emit(action, { room: `whiteboard:${sessionId}`, user_id: targetId });
                     } else {
                         socket.emit(action, payload);
                     }
+
+                    // If server doesn't respond by emitting permissions_updated, restore button after a short timeout
+                    setTimeout(() => { try { btn.disabled = false; btn.innerHTML = prevHtml; } catch (e) {} }, 3000);
                 });
             });
         }

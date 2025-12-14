@@ -177,8 +177,23 @@ def create_app(config_name='development'):
                         # Enforce 20-minute hard limit
                         if session_duration > 1200: # 20 minutes
                             print(f"Session limit reached for room {room}. Terminating.")
-                            socketio.emit('session_ended', {'session_id': room.split(':', 1)[1], 'reason': 'Time limit reached.'}, room=room)
-                            run_async_from_sync(livekit_service.lkapi.room.delete_room(room=room))
+                            wb_id = room.split(':', 1)[1]
+                            # Mark the whiteboard as ended in the DB so clients get correct state
+                            try:
+                                from app.services import Database
+                                from bson import ObjectId
+                                db = Database()
+                                db.update_one('whiteboards', {'_id': ObjectId(wb_id)}, {'is_active': False, 'ended_at': now})
+                            except Exception as e:
+                                print(f"Failed to mark whiteboard {wb_id} ended: {e}")
+
+                            # Notify connected clients and attempt to delete the underlying LiveKit room
+                            socketio.emit('session_ended', {'session_id': wb_id, 'reason': 'Time limit reached.'}, room=room)
+                            try:
+                                run_async_from_sync(livekit_service.lkapi.room.delete_room(room=room))
+                            except Exception as e:
+                                print(f"Failed to delete LiveKit room {room}: {e}")
+
                             if room in room_timers:
                                 del room_timers[room]
                         
