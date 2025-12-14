@@ -63,16 +63,9 @@
         height: 45px;
     }
 
-    @media (max-width: 768px) {
-        .fullscreen-toggle-btn {
-            display: inline-flex !important;
-        }
-    }
-
-    @media (min-width: 769px) {
-        .fullscreen-toggle-btn {
-            display: none !important;
-        }
+    /* Always show fullscreen toggle (desktop & mobile) */
+    .fullscreen-toggle-btn {
+        display: inline-flex !important;
     }
 
     /* Mobile Controls Bar */
@@ -215,7 +208,7 @@
 
     <div class="col-lg-10">
         <div class="card shadow-sm border-0" style="overflow: hidden;">
-            <div class="card-header d-flex justify-content-between align-items-center d-lg-none" style="background: rgba(79, 70, 229, 0.08); border-bottom: none;">
+            <div class="card-header d-flex justify-content-between align-items-center" style="background: rgba(79, 70, 229, 0.08); border-bottom: none;">
                 <span class="fw-semibold"><i class="fas fa-chalkboard text-primary me-2"></i>Whiteboard</span>
                 <button id="fullscreenToggleBtn" class="btn btn-sm btn-primary fullscreen-toggle-btn">
                     <i class="fas fa-expand me-1"></i> Fullscreen
@@ -510,6 +503,7 @@
             liveBtn.disabled = true;
             liveBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Joining...';
             const lkResp = await getLiveKitToken(sessionId);
+            console.log('LiveKit token response:', lkResp);
             if (!lkResp || !lkResp.token) {
                 liveBtn.disabled = false;
                 liveBtn.innerHTML = '<i class="fas fa-phone"></i> Join Call';
@@ -991,11 +985,23 @@
             const remoteContainer = document.getElementById('remoteVideoContainer');
 
             let _wbPrev = null;
-            function enterWhiteboardFullscreen() {
+            async function enterWhiteboardFullscreen() {
                 if (!canvasContainerEl) return;
                 // save previous sizing
                 _wbPrev = { width: canvas.width, height: canvas.height };
-                canvasContainerEl.classList.add('whiteboard-fullscreen');
+                // Prefer Fullscreen API
+                try {
+                    if (canvasContainerEl.requestFullscreen) {
+                        await canvasContainerEl.requestFullscreen();
+                    } else if (canvasContainerEl.webkitRequestFullscreen) {
+                        canvasContainerEl.webkitRequestFullscreen();
+                    } else {
+                        canvasContainerEl.classList.add('whiteboard-fullscreen');
+                    }
+                } catch (e) {
+                    // fallback to class-based fullscreen + resize
+                    canvasContainerEl.classList.add('whiteboard-fullscreen');
+                }
                 // resize canvas to match viewport (account for devicePixelRatio)
                 try {
                     const dpr = window.devicePixelRatio || 1;
