@@ -6,6 +6,14 @@ from app.services import Database
 import os
 from datetime import datetime
 from bson import ObjectId
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
+
+limiter = Limiter(
+    key_func=get_remote_address,
+    default_limits=[],  # Set default limits in config.py
+    storage_uri=None # Set in create_app
+)
 
 def create_app(config_name='development'):
     """Create and configure Flask app"""
@@ -20,6 +28,11 @@ def create_app(config_name='development'):
     socketio = SocketIO(app, cors_allowed_origins="*")
     # Attach socketio to app for access in routes
     app.socketio = socketio
+
+    # Initialize Flask-Limiter
+    limiter.init_app(app)
+    limiter.limit(app.config['DEFAULT_RATE_LIMITS'])
+    limiter.storage_uri = app.config['LIMITER_STORAGE_URI']
     
     # Create upload folder
     os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)

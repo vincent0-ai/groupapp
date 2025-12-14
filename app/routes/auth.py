@@ -20,6 +20,7 @@ from app.utils import (
 )
 from app.services import Database
 from app.models import User
+from app import limiter
 
 auth_bp = Blueprint("auth", __name__, url_prefix="/api/auth")
 
@@ -73,6 +74,7 @@ def send_verification_email(to_email, token):
 # EMAIL / PASSWORD SIGNUP
 # =========================
 @auth_bp.route("/signup", methods=["POST"])
+@limiter.limit("2 per hour")
 def signup():
     data = request.get_json() or {}
 
@@ -131,6 +133,7 @@ def signup():
 # EMAIL / PASSWORD LOGIN
 # =========================
 @auth_bp.route("/login", methods=["POST"])
+@limiter.limit("5 per 15 minute")
 def login():
     data = request.get_json() or {}
 
