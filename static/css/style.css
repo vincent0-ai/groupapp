@@ -1519,3 +1519,53 @@ a:hover {
 .notif-msg {
   color: var(--text-dark);
 }
+
+/* Responsive fixes: prevent vertical text and unwanted stacking on large phones */
+/* These overrides ensure tabs and flex containers wrap correctly and text breaks gracefully. */
+html {
+    -webkit-text-size-adjust: 100%;
+    -ms-text-size-adjust: 100%;
+}
+
+/* Global sensible wrapping for card content and text */
+.card-body, .card, .container, main, .page-header, .notification-item, .notification-list, .list-group-item {
+    min-width: 0;
+    word-break: break-word;
+    overflow-wrap: anywhere;
+}
+
+/* Make nav-tabs wrap instead of forcing vertical stacking on some devices */
+.nav-tabs {
+    display: flex !important;
+    flex-wrap: wrap !important;
+    gap: 6px;
+}
+.nav-tabs .nav-link {
+    white-space: normal !important;
+    text-align: center;
+    padding: 6px 10px !important;
+}
+
+/* Ensure bootstrap flex utilities don't force single-row layouts on small/large-mobile viewports */
+@media (max-width: 1024px) {
+    .d-flex { flex-wrap: wrap !important; }
+    .d-flex > * { min-width: 0; }
+    .row [class*="col-"] { min-width: 0; }
+
+    /* Override any inline writing-mode or forced nowrap that causes vertical text */
+    [style*="writing-mode"], [style*="text-orientation"] {
+        writing-mode: horizontal-tb !important;
+        text-orientation: mixed !important;
+    }
+
+    [style*="white-space: nowrap"] {
+        white-space: normal !important;
+    }
+}
+
+/* A narrower breakpoint to tighten spacing on small phones */
+@media (max-width: 420px) {
+    .nav-tabs { gap: 4px; }
+    .nav-tabs .nav-link { padding: 6px 8px !important; font-size: 0.9rem; }
+    main { padding-left: 12px !important; padding-right: 12px !important; }
+}
