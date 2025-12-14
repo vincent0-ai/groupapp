@@ -143,15 +143,13 @@ def update_permissions(wb_id):
     wb = db.find_one('whiteboards', {'_id': wb_obj_id})
     if not wb:
         return error_response('Whiteboard not found', 404)
-    # Only creator or group admin can update permissions
+    # Only the group owner (session creator) can update permissions
     creator_id = str(wb.get('created_by'))
     group_id = wb.get('group_id')
     db_group = db.find_one('groups', {'_id': group_id}) if group_id else None
-    is_admin = False
-    if db_group and 'admins' in db_group:
-        is_admin = ObjectId(g.user_id) in db_group['admins']
-    if creator_id != g.user_id and not is_admin:
-        return error_response('Only the whiteboard creator or a group admin can update permissions', 403)
+    is_owner = db_group and str(db_group.get('owner')) == g.user_id
+    if creator_id != g.user_id or not is_owner:
+        return error_response('Only the group owner (session creator) can update permissions', 403)
     can_draw = data.get('can_draw')
     can_speak = data.get('can_speak')
     update = {}

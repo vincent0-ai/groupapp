@@ -497,7 +497,9 @@ def create_whiteboard_session(group_id):
     whiteboard_doc = db.find_one('whiteboards', {'_id': whiteboard_doc['_id']})
     whiteboard_doc['id'] = str(whiteboard_doc['_id'])
 
-    # Default permissions: all group members can draw and speak unless restricted
+    # Only group owner can create a session and is the admin for the session
+    if str(group.get('owner')) != g.user_id:
+        return error_response('Only the group owner can create a whiteboard session', 403)
     member_ids = group.get('members', [])
     whiteboard_doc['can_draw'] = member_ids.copy()
     whiteboard_doc['can_speak'] = member_ids.copy()
