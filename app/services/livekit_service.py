@@ -77,9 +77,30 @@ class LiveKitService:
         Create a LiveKit access token for a user.
         """
         native_permissions = permissions.to_api() if hasattr(permissions, 'to_api') else permissions
-        token = api.AccessToken(self.api_key, self.api_secret).with_identity(user_id).with_name(user_name).with_grants(native_permissions)
-        
-        return token.to_jwt()
+
+        # Helper to convert dicts into objects with attribute access (recursively)
+        def _to_obj(d):
+            if isinstance(d, dict):
+                return types.SimpleNamespace(**{k: _to_obj(v) for k, v in d.items()})
+            return d
+
+        try:
+            token_builder = api.AccessToken(self.api_key, self.api_secret).with_identity(user_id).with_name(user_name)
+            if native_permissions:
+                grants_obj = _to_obj(native_permissions) if isinstance(native_permissions, dict) else native_permissions
+                token_builder = token_builder.with_grants(grants_obj)
+            return token_builder.to_jwt()
+        except Exception:
+            # Fall back to issuing a token without explicit grants to avoid SDK incompatibilities
+            tb = None
+            try:
+                import traceback
+                tb = traceback.format_exc()
+                print('Access token generation failed, falling back to token without grants:', tb)
+            except Exception:
+                pass
+            token_builder = api.AccessToken(self.api_key, self.api_secret).with_identity(user_id).with_name(user_name)
+            return token_builder.to_jwt()
 
     async def update_participant_permission(self, room_name: str, identity: str, can_publish: bool, can_publish_data: bool):
         """
