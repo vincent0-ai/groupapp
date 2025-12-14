@@ -234,8 +234,9 @@
 
 <!-- Remote Video Container (Screen Share) -->
 <div id="remoteVideoContainer" style="display:none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.9); z-index: 10000; align-items: center; justify-content: center; flex-direction: column;">
-    <div class="d-flex w-100 justify-content-end p-3" style="position: absolute; top: 0;">
-        <button class="btn btn-outline-light rounded-circle" onclick="document.getElementById('remoteVideoContainer').style.display='none'"><i class="fas fa-times"></i></button>
+    <div class="d-flex w-100 justify-content-end p-3" style="position: absolute; top: 0; right: 0;">
+        <button id="fullscreenBtn" class="btn btn-outline-light rounded-circle me-2" title="Toggle Fullscreen"><i class="fas fa-expand"></i></button>
+        <button class="btn btn-outline-light rounded-circle" onclick="document.getElementById('remoteVideoContainer').style.display='none'" title="Close Video"><i class="fas fa-times"></i></button>
     </div>
     <video id="remoteVideo" autoplay playsinline controls style="max-width: 95%; max-height: 90%; border-radius: 8px; box-shadow: 0 0 20px rgba(0,0,0,0.5);"></video>
     <div id="remoteVideoLabel" class="text-white mt-2 fw-bold fs-5"></div>
@@ -896,8 +897,20 @@
                     grantSpeak.addEventListener('click', () => {
                         socket.emit(meta.can_speak ? 'revoke_speak' : 'grant_speak', { room: sessionId ? `whiteboard:${sessionId}` : 'whiteboard', user_id: uid, requester_id: userId });
                     });
+                    
+                    const grantScreenShare = document.createElement('button');
+                    grantScreenShare.className = 'btn btn-xs ' + (meta.can_share_screen ? 'btn-info' : 'btn-outline-info');
+                    grantScreenShare.innerHTML = '<i class="fas fa-desktop"></i>';
+                    grantScreenShare.title = meta.can_share_screen ? 'Revoke Screen Share' : 'Grant Screen Share';
+                    grantScreenShare.style.cssText = 'padding: 2px 6px; font-size: 0.7rem;';
+                    grantScreenShare.addEventListener('click', () => {
+                        socket.emit(meta.can_share_screen ? 'revoke_screen_share' : 'grant_screen_share', { room: sessionId ? `whiteboard:${sessionId}` : 'whiteboard', user_id: uid, requester_id: userId });
+                    });
+
                     right.appendChild(grantDraw);
                     right.appendChild(grantSpeak);
+                    right.appendChild(grantScreenShare);
+                    
                     if (meta.raised) {
                         const clearHand = document.createElement('button');
                         clearHand.className = 'btn btn-xs btn-outline-danger';
@@ -1683,6 +1696,36 @@
         document.addEventListener('keydown', (e) => {
             if (e.key === 'Escape' && isFullscreen) {
                 exitFullscreen();
+            }
+        });
+
+        // Fullscreen for video player
+        const fullscreenBtn = document.getElementById('fullscreenBtn');
+        if (fullscreenBtn) {
+            fullscreenBtn.addEventListener('click', () => {
+                const videoContainer = document.getElementById('remoteVideoContainer');
+                if (!document.fullscreenElement) {
+                    if (videoContainer.requestFullscreen) {
+                        videoContainer.requestFullscreen();
+                    } else if (videoContainer.webkitRequestFullscreen) { /* Safari */
+                        videoContainer.webkitRequestFullscreen();
+                    }
+                } else {
+                    if (document.exitFullscreen) {
+                        document.exitFullscreen();
+                    }
+                }
+            });
+        }
+
+        document.addEventListener('fullscreenchange', () => {
+            const icon = fullscreenBtn.querySelector('i');
+            if (document.fullscreenElement) {
+                icon.classList.remove('fa-expand');
+                icon.classList.add('fa-compress');
+            } else {
+                icon.classList.remove('fa-compress');
+                icon.classList.add('fa-expand');
             }
         });
 

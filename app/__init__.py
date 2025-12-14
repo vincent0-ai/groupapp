@@ -490,7 +490,13 @@ def create_app(config_name='development'):
             if ObjectId(target_user) not in current:
                 current.append(ObjectId(target_user))
                 db.update_one('whiteboards', {'_id': wb['_id']}, {'can_draw': current})
-                emit('permissions_updated', {'can_draw': [str(x) for x in current]}, room=room)
+            
+            updated_wb = db.find_one('whiteboards', {'_id': ObjectId(wb_id)})
+            emit('permissions_updated', {
+                'can_draw': [str(x) for x in updated_wb.get('can_draw', [])],
+                'can_speak': [str(x) for x in updated_wb.get('can_speak', [])],
+                'can_share_screen': [str(x) for x in updated_wb.get('can_share_screen', [])]
+            }, room=room)
         except Exception:
             return
 
@@ -513,7 +519,13 @@ def create_app(config_name='development'):
             current = wb.get('can_draw', [])
             current = [x for x in current if str(x) != target_user]
             db.update_one('whiteboards', {'_id': wb['_id']}, {'can_draw': current})
-            emit('permissions_updated', {'can_draw': [str(x) for x in current]}, room=room)
+            
+            updated_wb = db.find_one('whiteboards', {'_id': ObjectId(wb_id)})
+            emit('permissions_updated', {
+                'can_draw': [str(x) for x in updated_wb.get('can_draw', [])],
+                'can_speak': [str(x) for x in updated_wb.get('can_speak', [])],
+                'can_share_screen': [str(x) for x in updated_wb.get('can_share_screen', [])]
+            }, room=room)
         except Exception:
             return
 
@@ -538,7 +550,13 @@ def create_app(config_name='development'):
             if ObjectId(target_user) not in current:
                 current.append(ObjectId(target_user))
                 db.update_one('whiteboards', {'_id': wb['_id']}, {'can_speak': current})
-                emit('permissions_updated', {'can_speak': [str(x) for x in current]}, room=room)
+
+            updated_wb = db.find_one('whiteboards', {'_id': ObjectId(wb_id)})
+            emit('permissions_updated', {
+                'can_draw': [str(x) for x in updated_wb.get('can_draw', [])],
+                'can_speak': [str(x) for x in updated_wb.get('can_speak', [])],
+                'can_share_screen': [str(x) for x in updated_wb.get('can_share_screen', [])]
+            }, room=room)
         except Exception:
             return
 
@@ -558,10 +576,76 @@ def create_app(config_name='development'):
                 return
             if str(wb.get('created_by')) != requester:
                 return
-            current = wb.get('can_speak', [])
+            current_speak = wb.get('can_speak', [])
+            current_speak = [x for x in current_speak if str(x) != target_user]
+            db.update_one('whiteboards', {'_id': wb['_id']}, {'can_speak': current_speak})
+
+            # Fetch latest permissions to send all at once
+            updated_wb = db.find_one('whiteboards', {'_id': ObjectId(wb_id)})
+            emit('permissions_updated', {
+                'can_draw': [str(x) for x in updated_wb.get('can_draw', [])],
+                'can_speak': [str(x) for x in updated_wb.get('can_speak', [])],
+                'can_share_screen': [str(x) for x in updated_wb.get('can_share_screen', [])]
+            }, room=room)
+        except Exception:
+            return
+
+
+    @socketio.on('grant_screen_share')
+    def handle_grant_screen_share(data):
+        room = data.get('room')
+        target_user = data.get('user_id')
+        requester = data.get('requester_id')
+        if not room or not room.startswith('whiteboard:'):
+            return
+        wb_id = room.split(':', 1)[1]
+        db = Database()
+        try:
+            wb = db.find_one('whiteboards', {'_id': ObjectId(wb_id)})
+            if not wb:
+                return
+            if str(wb.get('created_by')) != requester:
+                return
+            current = wb.get('can_share_screen', [])
+            if ObjectId(target_user) not in current:
+                current.append(ObjectId(target_user))
+                db.update_one('whiteboards', {'_id': wb['_id']}, {'can_share_screen': current})
+
+            updated_wb = db.find_one('whiteboards', {'_id': ObjectId(wb_id)})
+            emit('permissions_updated', {
+                'can_draw': [str(x) for x in updated_wb.get('can_draw', [])],
+                'can_speak': [str(x) for x in updated_wb.get('can_speak', [])],
+                'can_share_screen': [str(x) for x in updated_wb.get('can_share_screen', [])]
+            }, room=room)
+        except Exception:
+            return
+
+
+    @socketio.on('revoke_screen_share')
+    def handle_revoke_screen_share(data):
+        room = data.get('room')
+        target_user = data.get('user_id')
+        requester = data.get('requester_id')
+        if not room or not room.startswith('whiteboard:'):
+            return
+        wb_id = room.split(':', 1)[1]
+        db = Database()
+        try:
+            wb = db.find_one('whiteboards', {'_id': ObjectId(wb_id)})
+            if not wb:
+                return
+            if str(wb.get('created_by')) != requester:
+                return
+            current = wb.get('can_share_screen', [])
             current = [x for x in current if str(x) != target_user]
-            db.update_one('whiteboards', {'_id': wb['_id']}, {'can_speak': current})
-            emit('permissions_updated', {'can_speak': [str(x) for x in current]}, room=room)
+            db.update_one('whiteboards', {'_id': wb['_id']}, {'can_share_screen': current})
+
+            updated_wb = db.find_one('whiteboards', {'_id': ObjectId(wb_id)})
+            emit('permissions_updated', {
+                'can_draw': [str(x) for x in updated_wb.get('can_draw', [])],
+                'can_speak': [str(x) for x in updated_wb.get('can_speak', [])],
+                'can_share_screen': [str(x) for x in updated_wb.get('can_share_screen', [])]
+            }, room=room)
         except Exception:
             return
     
