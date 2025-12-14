@@ -80,6 +80,7 @@
             padding: 10px 15px;
             box-shadow: 0 2px 10px rgba(0,0,0,0.1);
             border-bottom: 1px solid var(--border-color);
+            /* keep controls on a single horizontal line and allow scrolling */
             flex-wrap: nowrap !important;
             overflow-x: auto;
             justify-content: flex-start;
@@ -94,6 +95,20 @@
         
         #sessionView {
             margin-top: 60px !important;
+        }
+
+        /* Prevent buttons from wrapping into vertical / stacked text on certain mobile browsers */
+        #sessionControls, #sessionControls * {
+            -webkit-overflow-scrolling: touch;
+            white-space: nowrap !important;
+            writing-mode: horizontal-tb !important;
+        }
+
+        #sessionControls .btn {
+            flex: 0 0 auto !important;
+            display: inline-flex !important;
+            align-items: center !important;
+            gap: 6px;
         }
     }
 </style>
