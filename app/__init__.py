@@ -143,7 +143,56 @@ def create_app(config_name='development'):
     # Socket.IO events for real-time communication
     connected_users = {}  # Store user connections {user_id: sid}
     online_users = {}  # Track online users per room {room: {user_id: {profile, last_seen}}}
+    room_timers = {} # {room_id: {'start_time': datetime, 'warned': boolean}}
     
+    # Import necessary modules for LiveKit integration
+    import threading
+    import time
+    import asyncio
+    from app.services.livekit_service import LiveKitService, VideoGrant
+
+    def run_async_from_sync(coro):
+        """Helper to run an async function from a sync context."""
+        try:
+            loop = asyncio.get_event_loop()
+        except RuntimeError:
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+        
+        return loop.run_until_complete(coro)
+
+    def check_session_timers(app, socketio):
+        """Background thread to enforce session duration limits."""
+        with app.app_context():
+            livekit_service = LiveKitService()
+            
+            while True:
+                now = datetime.utcnow()
+                try:
+                    # Make a copy of items to avoid runtime errors during iteration
+                    for room, timer_data in list(room_timers.items()):
+                        start_time = timer_data['start_time']
+                        session_duration = (now - start_time).total_seconds()
+
+                        # Enforce 20-minute hard limit
+                        if session_duration > 1200: # 20 minutes
+                            print(f"Session limit reached for room {room}. Terminating.")
+                            socketio.emit('session_ended', {'session_id': room.split(':', 1)[1], 'reason': 'Time limit reached.'}, room=room)
+                            run_async_from_sync(livekit_service.room_service.delete_room(room=room))
+                            if room in room_timers:
+                                del room_timers[room]
+                        
+                        # Broadcast 15-minute warning
+                        elif session_duration > 900 and not timer_data.get('warned'): # 15 minutes
+                            print(f"Session warning for room {room}.")
+                            remaining = 1200 - session_duration
+                            socketio.emit('session_warning', {'session_id': room.split(':', 1)[1], 'minutes_remaining': 5}, room=room)
+                            room_timers[room]['warned'] = True
+                except Exception as e:
+                    print(f"Error in session timer thread: {e}")
+                
+                time.sleep(30) # Check every 30 seconds
+
     @socketio.on('connect')
     def handle_connect():
         """Handle user connection"""
@@ -166,6 +215,11 @@ def create_app(config_name='development'):
                     if not wb or not wb.get('is_active', True):
                         emit('error', {'message': 'Session has ended'})
                         return
+
+                    # Start session timer on first join
+                    if room not in room_timers:
+                        room_timers[room] = {'start_time': datetime.utcnow(), 'warned': False}
+                        print(f"Started session timer for room: {room}")
                     
                     db.push_to_array('whiteboards', {'_id': ObjectId(wb_id)}, 'participants', ObjectId(user_id))
                 except Exception as e:
@@ -322,34 +376,6 @@ def create_app(config_name='development'):
                 'is_typing': is_typing
             }, room=room, skip_sid=request.sid)
 
-
-    @socketio.on('whiteboard_audio')
-    def handle_whiteboard_audio(data):
-        """Broadcast base64 audio chunks to room; clients will assemble/play them."""
-        room = data.get('room')
-        user_id = data.get('user_id')
-        audio_b64 = data.get('audio_b64')
-        if room and audio_b64:
-            # Enforce speak permissions similar to draw
-            allowed = True
-            try:
-                if room.startswith('whiteboard:'):
-                    wb_id = room.split(':', 1)[1]
-                    db = Database()
-                    wb = db.find_one('whiteboards', {'_id': ObjectId(wb_id)})
-                    if wb and wb.get('can_speak'):
-                        ids = [str(x) for x in wb.get('can_speak', [])]
-                        allowed = str(user_id) in ids
-            except Exception:
-                allowed = True
-            if allowed:
-                emit('audio_clip', {
-                    'user_id': user_id,
-                    'audio_b64': audio_b64,
-                    'timestamp': datetime.utcnow().isoformat()
-                }, room=room, skip_sid=request.sid)
-
-
     @socketio.on('raise_hand')
     def handle_raise_hand(data):
         room = data.get('room')
@@ -380,95 +406,45 @@ def create_app(config_name='development'):
         except Exception:
             pass
 
-    # WebRTC signaling - track users in each call room
-    webrtc_rooms = {}  # {room_id: set(user_ids)}
-    
-    @socketio.on('webrtc_join')
-    def handle_webrtc_join(data):
+    # Simplified handlers for video state, LiveKit handles the media part
+    @socketio.on('video_join')
+    def handle_video_join(data):
+        """User indicates they are joining the video/media session."""
         room = data.get('room')
         user_id = data.get('user_id')
-        if room and user_id:
-            # Initialize room if needed
-            if room not in webrtc_rooms:
-                webrtc_rooms[room] = set()
-            
-            # Get list of existing users BEFORE adding the new user
-            existing_users = list(webrtc_rooms[room])
-            
-            # Add user to the room
-            webrtc_rooms[room].add(user_id)
-            
-            # Send the list of existing users to the joining user
-            emit('webrtc_existing_users', {'users': existing_users})
-            
-            # Notify existing users that a new user joined
-            emit('webrtc_user_joined', {'user_id': user_id}, room=room, skip_sid=request.sid)
+        print(f"User {user_id} joining video session in room {room}")
+        # This is now mostly for app-level logic if needed.
+        # Client will fetch token and connect to LiveKit separately.
+        emit('video_user_joined', {'user_id': user_id}, room=room, skip_sid=request.sid)
 
-    @socketio.on('webrtc_leave')
-    def handle_webrtc_leave(data):
+    @socketio.on('video_leave')
+    def handle_video_leave(data):
+        """User indicates they are leaving the video/media session."""
         room = data.get('room')
         user_id = data.get('user_id')
-        if room and user_id:
-            # Remove user from room tracking
-            if room in webrtc_rooms:
-                webrtc_rooms[room].discard(user_id)
-                # Clean up empty rooms
-                if not webrtc_rooms[room]:
-                    del webrtc_rooms[room]
-            emit('webrtc_user_left', {'user_id': user_id}, room=room, skip_sid=request.sid)
+        print(f"User {user_id} leaving video session in room {room}")
+        # This is now mostly for app-level logic if needed.
+        emit('video_user_left', {'user_id': user_id}, room=room, skip_sid=request.sid)
 
-    @socketio.on('webrtc_offer')
-    def handle_webrtc_offer(data):
-        room = data.get('room')
-        offer = data.get('offer')
-        sender = data.get('sender')
-        target = data.get('target')
-        
-        if not room or not offer or not target:
-            return
-            
-        # Send only to the specific target user
-        # We need to find the socket ID for the target user
-        # For now, we'll broadcast to the room but clients will filter by target ID
-        # In a production app, you'd map user_ids to socket_ids
-        emit('webrtc_offer', {
-            'offer': offer, 
-            'sender': sender,
-            'target': target
-        }, room=room, skip_sid=request.sid)
+    async def _update_lk_permissions(wb, target_user_id, room_name):
+        """Async helper to update LiveKit participant permissions."""
+        is_creator = str(wb.get('created_by')) == target_user_id
+        can_speak = is_creator or target_user_id in [str(uid) for uid in wb.get('can_speak', [])]
+        can_share = is_creator or target_user_id in [str(uid) for uid in wb.get('can_share_screen', [])]
 
-    @socketio.on('webrtc_answer')
-    def handle_webrtc_answer(data):
-        room = data.get('room')
-        answer = data.get('answer')
-        sender = data.get('sender')
-        target = data.get('target')
-        
-        if not room or not answer or not target:
-            return
-            
-        emit('webrtc_answer', {
-            'answer': answer, 
-            'sender': sender,
-            'target': target
-        }, room=room, skip_sid=request.sid)
-
-    @socketio.on('webrtc_ice')
-    def handle_webrtc_ice(data):
-        room = data.get('room')
-        candidate = data.get('candidate')
-        sender = data.get('sender')
-        target = data.get('target')
-        
-        if not room or not candidate or not target:
-            return
-            
-        emit('webrtc_ice', {
-            'candidate': candidate, 
-            'sender': sender,
-            'target': target
-        }, room=room, skip_sid=request.sid)
-
+        permissions = VideoGrant(
+            can_publish = can_speak or can_share,
+            can_publish_data = True
+        )
+        try:
+            livekit_service = LiveKitService()
+            await livekit_service.room_service.update_participant(
+                room=room_name,
+                identity=target_user_id,
+                permission=permissions
+            )
+        except Exception as e:
+            print(f"Failed to update LiveKit permissions for {target_user_id} in {room_name}: {e}")
 
     @socketio.on('grant_draw')
     def handle_grant_draw(data):
@@ -500,7 +476,6 @@ def create_app(config_name='development'):
         except Exception:
             return
 
-
     @socketio.on('revoke_draw')
     def handle_revoke_draw(data):
         room = data.get('room')
@@ -529,7 +504,6 @@ def create_app(config_name='development'):
         except Exception:
             return
 
-
     @socketio.on('grant_speak')
     def handle_grant_speak(data):
         room = data.get('room')
@@ -550,14 +524,18 @@ def create_app(config_name='development'):
             if ObjectId(target_user) not in current:
                 current.append(ObjectId(target_user))
                 db.update_one('whiteboards', {'_id': wb['_id']}, {'can_speak': current})
-
+            
+            # Update LiveKit permissions
             updated_wb = db.find_one('whiteboards', {'_id': ObjectId(wb_id)})
+            run_async_from_sync(_update_lk_permissions(updated_wb, target_user, room))
+
             emit('permissions_updated', {
                 'can_draw': [str(x) for x in updated_wb.get('can_draw', [])],
                 'can_speak': [str(x) for x in updated_wb.get('can_speak', [])],
                 'can_share_screen': [str(x) for x in updated_wb.get('can_share_screen', [])]
             }, room=room)
-        except Exception:
+        except Exception as e:
+            print(f"Error in grant_speak: {e}")
             return
 
 
@@ -580,14 +558,17 @@ def create_app(config_name='development'):
             current_speak = [x for x in current_speak if str(x) != target_user]
             db.update_one('whiteboards', {'_id': wb['_id']}, {'can_speak': current_speak})
 
-            # Fetch latest permissions to send all at once
+            # Update LiveKit permissions
             updated_wb = db.find_one('whiteboards', {'_id': ObjectId(wb_id)})
+            run_async_from_sync(_update_lk_permissions(updated_wb, target_user, room))
+
             emit('permissions_updated', {
                 'can_draw': [str(x) for x in updated_wb.get('can_draw', [])],
                 'can_speak': [str(x) for x in updated_wb.get('can_speak', [])],
                 'can_share_screen': [str(x) for x in updated_wb.get('can_share_screen', [])]
             }, room=room)
-        except Exception:
+        except Exception as e:
+            print(f"Error in revoke_speak: {e}")
             return
 
 
@@ -611,13 +592,17 @@ def create_app(config_name='development'):
                 current.append(ObjectId(target_user))
                 db.update_one('whiteboards', {'_id': wb['_id']}, {'can_share_screen': current})
 
+            # Update LiveKit permissions
             updated_wb = db.find_one('whiteboards', {'_id': ObjectId(wb_id)})
+            run_async_from_sync(_update_lk_permissions(updated_wb, target_user, room))
+
             emit('permissions_updated', {
                 'can_draw': [str(x) for x in updated_wb.get('can_draw', [])],
                 'can_speak': [str(x) for x in updated_wb.get('can_speak', [])],
                 'can_share_screen': [str(x) for x in updated_wb.get('can_share_screen', [])]
             }, room=room)
-        except Exception:
+        except Exception as e:
+            print(f"Error in grant_screen_share: {e}")
             return
 
 
@@ -640,13 +625,17 @@ def create_app(config_name='development'):
             current = [x for x in current if str(x) != target_user]
             db.update_one('whiteboards', {'_id': wb['_id']}, {'can_share_screen': current})
 
+            # Update LiveKit permissions
             updated_wb = db.find_one('whiteboards', {'_id': ObjectId(wb_id)})
+            run_async_from_sync(_update_lk_permissions(updated_wb, target_user, room))
+
             emit('permissions_updated', {
                 'can_draw': [str(x) for x in updated_wb.get('can_draw', [])],
                 'can_speak': [str(x) for x in updated_wb.get('can_speak', [])],
                 'can_share_screen': [str(x) for x in updated_wb.get('can_share_screen', [])]
             }, room=room)
-        except Exception:
+        except Exception as e:
+            print(f"Error in revoke_screen_share: {e}")
             return
     
     @socketio.on('leave_room')
@@ -686,23 +675,30 @@ def create_app(config_name='development'):
         try:
             user_ids_to_remove = [u for u, sid in connected_users.items() if sid == request.sid]
             for uid in user_ids_to_remove:
-                del connected_users[uid]
+                if uid in connected_users:
+                    del connected_users[uid]
                 # remove from all whiteboards where user present
                 db = Database()
-                db.pull_from_array('whiteboards', {'participants': ObjectId(uid)}, 'participants', ObjectId(uid))
-                
-                # Remove from online_users and notify rooms
-                for room, users in list(online_users.items()):
-                    if uid in users:
-                        del online_users[room][uid]
-                        # Emit updated online users list
+                # Find all whiteboards the user is a participant in
+                user_obj_id = ObjectId(uid)
+                whiteboards = db.find('whiteboards', {'participants': user_obj_id})
+                for wb in whiteboards:
+                    room_name = f"whiteboard:{str(wb['_id'])}"
+                    # Pull from participants array
+                    db.pull_from_array('whiteboards', {'_id': wb['_id']}, 'participants', user_obj_id)
+                    # Handle online_users tracking
+                    if room_name in online_users and uid in online_users[room_name]:
+                        del online_users[room_name][uid]
                         online_list = [{'user_id': u, 'profile': info['profile']} 
-                                      for u, info in online_users.get(room, {}).items()]
-                        socketio.emit('online_users', {'users': online_list}, room=room)
-                        socketio.emit('user_left', {'user_id': uid, 'timestamp': datetime.utcnow().isoformat()}, room=room)
+                                      for u, info in online_users.get(room_name, {}).items()]
+                        socketio.emit('online_users', {'users': online_list}, room=room_name)
+                        socketio.emit('user_left', {'user_id': uid, 'timestamp': datetime.utcnow().isoformat()}, room=room_name)
         except Exception as e:
             print(f"Error in disconnect handler: {e}")
             pass
+    
+    # Start the background task for session timers
+    socketio.start_background_task(target=check_session_timers, app=app, socketio=socketio)
     
     return app, socketio
 
@@ -710,3 +706,4 @@ def create_app(config_name='development'):
 if __name__ == '__main__':
     app, socketio = create_app(os.getenv('FLASK_ENV', 'development'))
     socketio.run(app, debug=True, host='0.0.0.0', port=5000)
+
