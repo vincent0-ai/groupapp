@@ -15,6 +15,10 @@ class Config:
     # Redis
     REDIS_URL = os.getenv('REDIS_URL', 'redis://localhost:6379/0')
     
+    # Flask-Limiter
+    LIMITER_STORAGE_URI = os.getenv('LIMITER_STORAGE_URI', REDIS_URL)
+    DEFAULT_RATE_LIMITS = ["200 per day", "50 per hour"]
+    
     # MinIO
     MINIO_ENDPOINT = os.getenv('MINIO_ENDPOINT', 'localhost:9000')
     MINIO_ROOT_USER = os.getenv('MINIO_ROOT_USER', 'minioadmin')
