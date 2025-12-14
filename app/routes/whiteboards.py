@@ -275,6 +275,13 @@ def get_livekit_token(wb_id):
             room_name=f'whiteboard:{wb_id}',
             permissions=lk_permissions
         )
+        # For debugging: decode token payload (no signature verification) when app in debug
+        try:
+            import jwt as _jwt
+            payload = _jwt.decode(token, options={"verify_signature": False})
+            print(f"Generated LiveKit token payload: {payload}")
+        except Exception as e:
+            print(f"Could not decode token payload for debug: {e}")
         return success_response({'token': token, 'url': current_app.config['LIVEKIT_URL']}, 'LiveKit token generated', 200)
     except ValueError as e:
         # This catches the API key/secret not being set

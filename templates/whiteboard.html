@@ -990,9 +990,20 @@
             const remoteFsBtn = document.getElementById('fullscreenBtn');
             const remoteContainer = document.getElementById('remoteVideoContainer');
 
+            let _wbPrev = null;
             function enterWhiteboardFullscreen() {
                 if (!canvasContainerEl) return;
+                // save previous sizing
+                _wbPrev = { width: canvas.width, height: canvas.height };
                 canvasContainerEl.classList.add('whiteboard-fullscreen');
+                // resize canvas to match viewport (account for devicePixelRatio)
+                try {
+                    const dpr = window.devicePixelRatio || 1;
+                    canvas.style.width = '100%';
+                    canvas.style.height = '100%';
+                    canvas.width = Math.round(window.innerWidth * dpr);
+                    canvas.height = Math.round(window.innerHeight * dpr);
+                } catch (e) { console.warn('Could not resize canvas for fullscreen', e); }
                 // show an exit button
                 let exit = document.getElementById('wb-fs-exit');
                 if (!exit) {
@@ -1008,6 +1019,16 @@
             function exitWhiteboardFullscreen() {
                 if (!canvasContainerEl) return;
                 canvasContainerEl.classList.remove('whiteboard-fullscreen');
+                // restore canvas size
+                try {
+                    if (_wbPrev) {
+                        canvas.width = _wbPrev.width;
+                        canvas.height = _wbPrev.height;
+                        canvas.style.width = '';
+                        canvas.style.height = '';
+                        _wbPrev = null;
+                    }
+                } catch (e) { console.warn('Could not restore canvas size', e); }
                 const exit = document.getElementById('wb-fs-exit');
                 if (exit) exit.remove();
             }
