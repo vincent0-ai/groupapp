@@ -638,8 +638,16 @@
                 }
             } else if (track.kind === 'audio') {
                 const el = track.attach();
+                // Ensure audio elements are configured to play immediately
+                // where browsers allow it (helps avoid one-way audio issues).
                 el.id = `audio-${participant.identity}`;
+                el.autoplay = true;
+                el.playsInline = true;
+                el.controls = false;
+                el.muted = false;
                 participantsAudioContainer.appendChild(el);
+                // Attempt to start playback (may require user gesture in some browsers)
+                try { el.play().catch(() => {}); } catch (e) { /* ignore */ }
             }
         };
 
@@ -659,6 +667,8 @@
             }
             // Remove detached elements that are not the main video element
             track.detach().forEach(el => { if (el && el !== remoteVideoEl) el.remove(); });
+            // Also remove any managed audio element for this participant
+            try { document.getElementById(`audio-${participant.identity}`)?.remove(); } catch(e){}
         };
 
         mediaService.onParticipantDisconnected = (participant) => {
@@ -735,8 +745,18 @@
 
                 updatePermissionUI();
                 renderParticipants();
-                 if (wb.drawing_data) {
-                    wb.drawing_data.forEach(d => draw(d.x0, d.y0, d.x1, d.y1, d.color, d.size, d.opacity));
+                if (wb.drawing_data) {
+                    wb.drawing_data.forEach(d => {
+                        // Support both legacy absolute coords and newer normalized coords
+                        let x0 = d.x0, y0 = d.y0, x1 = d.x1, y1 = d.y1;
+                        if (d.normalized) {
+                            x0 = d.x0 * canvas.clientWidth;
+                            y0 = d.y0 * canvas.clientHeight;
+                            x1 = d.x1 * canvas.clientWidth;
+                            y1 = d.y1 * canvas.clientHeight;
+                        }
+                        draw(x0, y0, x1, y1, d.color, d.size, d.opacity);
+                    });
                 }
             } catch (e) { console.error('Failed to fetch session info', e); }
         }
@@ -830,7 +850,18 @@
             delete participants[data.user_id];
             renderParticipants();
         });
-        socket.on('draw_update', (data) => data.drawing_data && draw(data.drawing_data.x0, data.drawing_data.y0, data.drawing_data.x1, data.drawing_data.y1, data.drawing_data.color, data.drawing_data.size, data.drawing_data.opacity));
+        socket.on('draw_update', (data) => {
+            if (!data || !data.drawing_data) return;
+            const d = data.drawing_data;
+            let x0 = d.x0, y0 = d.y0, x1 = d.x1, y1 = d.y1;
+            if (d.normalized) {
+                x0 = d.x0 * canvas.clientWidth;
+                y0 = d.y0 * canvas.clientHeight;
+                x1 = d.x1 * canvas.clientWidth;
+                y1 = d.y1 * canvas.clientHeight;
+            }
+            draw(x0, y0, x1, y1, d.color, d.size, d.opacity);
+        });
         socket.on('board_cleared', () => ctx.clearRect(0, 0, canvas.width, canvas.height));
         socket.on('session_ended', async (data) => {
             await leaveCall();
@@ -885,6 +916,9 @@
         // Simplified drawing logic
         const initDrawing = () => {
              if (!canvas) return;
++            // Set canvas backing store to device pixel ratio for crisp lines
++            setCanvasSize();
++            window.addEventListener('resize', setCanvasSize);
              if (document.getElementById('brushSize')) {
                 document.getElementById('brushSize').addEventListener('input', (e) => {
                     document.getElementById('sizeValue').textContent = e.target.value;
@@ -899,7 +933,9 @@
              canvas.addEventListener('touchend', () => isDrawing = false);
              document.getElementById('clearBtn')?.addEventListener('click', () => {
                  if (confirm('Clear the entire whiteboard?')) {
-                     ctx.clearRect(0, 0, canvas.width, canvas.height);
+-                    ctx.clearRect(0, 0, canvas.width, canvas.height);
++                    // Clear using CSS-size aware coordinates
++                    ctx.clearRect(0, 0, canvas.width, canvas.height);
                      socket.emit('clear_board', { room: `whiteboard:${sessionId}`, user_id: userId });
                  }
              });
@@ -908,10 +944,24 @@
         // --- Drawing helpers (position conversion, draw, emit) ---
         function getPos(clientX, clientY) {
             const rect = canvas.getBoundingClientRect();
-            // account for CSS size vs canvas resolution
-            const scaleX = canvas.width / rect.width;
-            const scaleY = canvas.height / rect.height;
-            return { x: (clientX - rect.left) * scaleX, y: (clientY - rect.top) * scaleY };
+            // Use CSS pixels for coordinates; the context is scaled to devicePixelRatio
+            return { x: (clientX - rect.left), y: (clientY - rect.top) };
+        }
+
+        // Ensure canvas has appropriate backing store size for sharp drawing
+        function setCanvasSize() {
+            if (!canvas || !ctx) return;
+            const dpr = window.devicePixelRatio || 1;
+            const rect = canvas.getBoundingClientRect();
+            const w = Math.round(rect.width * dpr);
+            const h = Math.round(rect.height * dpr);
+            // Avoid unnecessary resizing which can clear the canvas
+            if (canvas.width !== w || canvas.height !== h) {
+                // Reset any transforms and set to a scale matching device pixel ratio
+                canvas.width = w;
+                canvas.height = h;
+                ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+            }
         }
 
         function draw(x0, y0, x1, y1, color, size, opacity) {
@@ -935,7 +985,8 @@
             const color = document.getElementById('colorPicker')?.value || '#000';
             const size = parseInt(document.getElementById('brushSize')?.value || '3', 10);
             const opacity = parseFloat(document.getElementById('opacity')?.value || '1');
-            const drawing_data = { x0, y0, x1, y1, color, size, opacity };
+            // Send normalized coordinates so remote clients can map to their canvas size
+            const drawing_data = { x0: x0 / canvas.clientWidth, y0: y0 / canvas.clientHeight, x1: x1 / canvas.clientWidth, y1: y1 / canvas.clientHeight, color, size, opacity, normalized: true };
             socket.emit('whiteboard_draw', { room: `whiteboard:${sessionId}`, drawing_data, user_id: userId });
         }
         

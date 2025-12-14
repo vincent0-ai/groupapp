@@ -452,17 +452,13 @@ def create_app(config_name='development'):
         can_speak = is_creator or target_user_id in [str(uid) for uid in wb.get('can_speak', [])]
         can_share = is_creator or target_user_id in [str(uid) for uid in wb.get('can_share_screen', [])]
 
-        permissions = VideoGrants(
-            can_publish = can_speak or can_share,
-            can_publish_data = True
-        )
+        can_publish = bool(can_speak or can_share)
         try:
             livekit_service = LiveKitService()
-            await livekit_service.lkapi.room.update_participant(
-                room=room_name,
-                identity=target_user_id,
-                permission=permissions
-            )
+            # Use the service helper that converts to the proper SDK permission object
+            success, err = await livekit_service.update_participant_permission(room_name, target_user_id, can_publish, True)
+            if not success:
+                print(f"LiveKit permission update returned error for {target_user_id} in {room_name}: {err}")
         except Exception as e:
             print(f"Failed to update LiveKit permissions for {target_user_id} in {room_name}: {e}")
 
