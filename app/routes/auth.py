@@ -136,6 +136,7 @@ def login():
 
     email = data.get("email", "").strip().lower()
     password = data.get("password", "").strip()
+    remember = data.get("remember", False)
 
     if not email or not password:
         return error_response("Missing email or password", 400)
@@ -164,7 +165,8 @@ def login():
         {"last_login": datetime.utcnow()}
     )
 
-    token = generate_token(str(user["_id"]))
+    expires_in = 2592000 if remember else 3600  # 30 days or 1 hour
+    token = generate_token(str(user["_id"]), expires_in=expires_in)
 
     del user["password_hash"]
     return success_response(
@@ -256,7 +258,9 @@ def google_login():
             {"last_login": datetime.utcnow()}
         )
 
-    token = generate_token(str(user["_id"]))
+    remember = data.get("remember", False)
+    expires_in = 2592000 if remember else 3600  # 30 days or 1 hour
+    token = generate_token(str(user["_id"]), expires_in=expires_in)
 
     del user["password_hash"]
     return success_response(

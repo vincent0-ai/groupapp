@@ -353,13 +353,15 @@
               socialContainer.innerHTML = '<div class="text-center w-100 py-2"><div class="spinner-border text-primary spinner-border-sm" role="status"></div><span class="ms-2">Authenticating with Google...</span></div>';
           }
 
+          const rememberMe = document.getElementById('rememberMe').checked;
           fetch('/api/auth/google', {
               method: 'POST',
               headers: {
                   'Content-Type': 'application/json'
               },
               body: JSON.stringify({
-                  id_token: response.credential
+                  id_token: response.credential,
+                  remember: rememberMe
               })
           })
           .then(res => res.json())
@@ -420,12 +422,13 @@
             
             const email = document.getElementById('loginEmail').value;
             const password = document.getElementById('loginPassword').value;
+            const rememberMe = document.getElementById('rememberMe').checked;
             
             try {
                 const res = await fetch('/api/auth/login', {
                     method: 'POST',
                     headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({email, password})
+                    body: JSON.stringify({email, password, remember: rememberMe})
                 });
                 const data = await res.json();
                 
