@@ -84,11 +84,30 @@ class Discussio {
         });
 
         // Whiteboard Canvas
-        this.whiteboardCanvas = document.getElementById('whiteboardCanvas');
+        this.whiteboardCanvas = document.getElementById('whiteboardCanvas') || document.getElementById('whiteboard');
         if (this.whiteboardCanvas) {
             this.whiteboardContext = this.whiteboardCanvas.getContext('2d');
+            this.resizeWhiteboardCanvas();
+            window.addEventListener('resize', () => this.resizeWhiteboardCanvas());
             this.setupWhiteboard();
         }
+    resizeWhiteboardCanvas() {
+        const canvas = this.whiteboardCanvas;
+        if (!canvas) return;
+        // Get the size the canvas is displayed
+        const displayWidth = canvas.clientWidth;
+        const displayHeight = canvas.clientHeight;
+        const dpr = window.devicePixelRatio || 1;
+        // Only resize if necessary
+        if (canvas.width !== displayWidth * dpr || canvas.height !== displayHeight * dpr) {
+            canvas.width = displayWidth * dpr;
+            canvas.height = displayHeight * dpr;
+            const ctx = canvas.getContext('2d');
+            ctx.setTransform(1, 0, 0, 1, 0, 0); // Reset transform
+            ctx.scale(dpr, dpr);
+            this.whiteboardContext = ctx;
+        }
+    }
 
         // Clear Canvas Button
         document.getElementById('clearCanvas').addEventListener('click', () => {
