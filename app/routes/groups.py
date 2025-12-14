@@ -496,9 +496,11 @@ def create_whiteboard_session(group_id):
     # Add invite token (simple): use the inserted _id as token; return usable URL path
     whiteboard_doc = db.find_one('whiteboards', {'_id': whiteboard_doc['_id']})
     whiteboard_doc['id'] = str(whiteboard_doc['_id'])
-    # Default permissions: only owner can draw and speak unless updated
-    whiteboard_doc['can_draw'] = [ObjectId(g.user_id)]
-    whiteboard_doc['can_speak'] = [ObjectId(g.user_id)]
+
+    # Default permissions: all group members can draw and speak unless restricted
+    member_ids = group.get('members', [])
+    whiteboard_doc['can_draw'] = member_ids.copy()
+    whiteboard_doc['can_speak'] = member_ids.copy()
     db.update_one('whiteboards', {'_id': whiteboard_doc['_id']}, {'can_draw': whiteboard_doc['can_draw'], 'can_speak': whiteboard_doc['can_speak']})
 
     # Build a simple invite URL

@@ -143,10 +143,15 @@ def update_permissions(wb_id):
     wb = db.find_one('whiteboards', {'_id': wb_obj_id})
     if not wb:
         return error_response('Whiteboard not found', 404)
-    # Only creator can update permissions (owner/moderator)
+    # Only creator or group admin can update permissions
     creator_id = str(wb.get('created_by'))
-    if creator_id != g.user_id:
-        return error_response('Only whiteboard creator can update permissions', 403)
+    group_id = wb.get('group_id')
+    db_group = db.find_one('groups', {'_id': group_id}) if group_id else None
+    is_admin = False
+    if db_group and 'admins' in db_group:
+        is_admin = ObjectId(g.user_id) in db_group['admins']
+    if creator_id != g.user_id and not is_admin:
+        return error_response('Only the whiteboard creator or a group admin can update permissions', 403)
     can_draw = data.get('can_draw')
     can_speak = data.get('can_speak')
     update = {}
@@ -158,6 +163,15 @@ def update_permissions(wb_id):
     if update:
         db.update_one('whiteboards', {'_id': wb_obj_id}, update)
     wb = db.find_one('whiteboards', {'_id': wb_obj_id})
+
+    # Emit socket event to notify all users in the session about permission changes
+    try:
+        from app import socketio
+        room = f'whiteboard:{wb_id}'
+        socketio.emit('permissions_updated', {'whiteboard_id': wb_id, 'permissions': serialize_document(wb)}, room=room)
+    except Exception as e:
+        print(f"Error emitting permissions_updated event: {e}")
+
     return success_response(serialize_document(wb), 'Whiteboard permissions updated', 200)
 
 
