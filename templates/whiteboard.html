@@ -526,9 +526,7 @@
                 await mediaService.connect(lkToken, wsUrl);
                 isInCall = true;
 
-                const perms = mediaService.room.localParticipant.permissions;
-                const canPublish = perms.canPublish;
-
+                // Use our server-side permission flags (canSpeak / canShareScreen) to show controls.
                 liveBtn.disabled = false;
                 liveBtn.className = 'btn btn-sm btn-danger';
                 liveBtn.innerHTML = '<i class="fas fa-phone-slash"></i> Leave';
@@ -536,12 +534,14 @@
                 const muteBtn = document.getElementById('muteBtn');
                 const screenShareBtn = document.getElementById('screenShareBtn');
 
-                if (canPublish) {
+                if (canSpeak) {
                     muteBtn?.classList.remove('d-none');
-                    screenShareBtn?.classList.remove('d-none');
                     isMuted = false;
                     await mediaService.publishAudio(true);
                     updateMuteButton();
+                }
+                if (canShareScreen) {
+                    screenShareBtn?.classList.remove('d-none');
                 }
 
             } catch (e) {
@@ -982,6 +982,57 @@
                 alert(e.message || 'Could not end session');
             }
         }
+
+        // --- Fullscreen handlers (mobile whiteboard + remote video) ---
+        (function setupFullscreen() {
+            const fsToggle = document.getElementById('fullscreenToggleBtn');
+            const canvasContainerEl = document.getElementById('canvasContainer');
+            const remoteFsBtn = document.getElementById('fullscreenBtn');
+            const remoteContainer = document.getElementById('remoteVideoContainer');
+
+            function enterWhiteboardFullscreen() {
+                if (!canvasContainerEl) return;
+                canvasContainerEl.classList.add('whiteboard-fullscreen');
+                // show an exit button
+                let exit = document.getElementById('wb-fs-exit');
+                if (!exit) {
+                    exit = document.createElement('button');
+                    exit.id = 'wb-fs-exit';
+                    exit.className = 'btn btn-light fullscreen-exit-btn';
+                    exit.innerHTML = '<i class="fas fa-times"></i>';
+                    exit.addEventListener('click', exitWhiteboardFullscreen);
+                    document.body.appendChild(exit);
+                }
+            }
+
+            function exitWhiteboardFullscreen() {
+                if (!canvasContainerEl) return;
+                canvasContainerEl.classList.remove('whiteboard-fullscreen');
+                const exit = document.getElementById('wb-fs-exit');
+                if (exit) exit.remove();
+            }
+
+            if (fsToggle) {
+                fsToggle.addEventListener('click', () => {
+                    if (canvasContainerEl.classList.contains('whiteboard-fullscreen')) exitWhiteboardFullscreen();
+                    else enterWhiteboardFullscreen();
+                    // adjust canvas size to fill
+                    try { canvas.style.width = '100%'; canvas.style.height = '100%'; } catch(e){}
+                });
+            }
+
+            if (remoteFsBtn && remoteContainer) {
+                remoteFsBtn.addEventListener('click', async () => {
+                    try {
+                        if (document.fullscreenElement) await document.exitFullscreen();
+                        else await remoteContainer.requestFullscreen();
+                    } catch (e) {
+                        console.warn('Fullscreen API failed, fallback toggling class');
+                        remoteContainer.classList.toggle('whiteboard-fullscreen');
+                    }
+                });
+            }
+        })();
         
     })();
 </script>
