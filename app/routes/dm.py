@@ -1,12 +1,11 @@
 """
 Direct Messages (DM) API Routes
 """
-from flask import Blueprint, request, jsonify, g
-from app.services import Database
+import bleach
+import html
 from app.utils.decorators import require_auth
 from bson import ObjectId
 from datetime import datetime
-import html
 
 dm_bp = Blueprint('dm', __name__, url_prefix='/api/dm')
 
@@ -152,9 +151,11 @@ def get_dm_messages(thread_id):
         result = []
         for msg in messages:
             sender = db.find_one('users', {'_id': msg['sender_id']})
+            content = html.escape(msg.get('content', ''))
+            
             result.append({
                 '_id': str(msg['_id']),
-                'content': msg.get('content', ''),
+                'content': bleach.linkify(content),
                 'sender_id': str(msg['sender_id']),
                 'sender_name': sender.get('full_name', sender.get('username', 'Unknown')) if sender else 'Unknown',
                 'created_at': msg.get('created_at').isoformat() if msg.get('created_at') else None,
