@@ -1,4 +1,4 @@
-from livekit import api, rpc
+from livekit import api, rtc
 from flask import current_app
 
 class LiveKitService:
@@ -39,7 +39,7 @@ class LiveKitService:
                 permission=permissions
             )
             return True, None
-        except rpc.RpcError as e:
+        except rtc.RpcError as e:
             return False, str(e)
 
     async def remove_participant(self, room_name: str, identity: str):
@@ -49,7 +49,7 @@ class LiveKitService:
         try:
             await self.lkapi.room.remove_participant(room=room_name, identity=identity)
             return True, None
-        except rpc.RpcError as e:
+        except rtc.RpcError as e:
             return False, str(e)
             
     async def close_room(self, room_name: str):
@@ -59,7 +59,7 @@ class LiveKitService:
         try:
             await self.lkapi.room.delete_room(room=room_name)
             return True, None
-        except rpc.RpcError as e:
+        except rtc.RpcError as e:
             return False, str(e)
 
 def get_livekit_service():
