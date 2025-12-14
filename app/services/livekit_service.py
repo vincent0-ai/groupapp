@@ -1,6 +1,9 @@
 from livekit import api
 from livekit import rtc
-from flask import current_app
+try:
+    from flask import current_app
+except Exception:
+    current_app = None
 from typing import Any
 
 class LiveKitService:
@@ -16,7 +19,12 @@ class LiveKitService:
         if not self.api_key or not self.api_secret:
             raise ValueError("LIVEKIT_API_KEY and LIVEKIT_API_SECRET must be set.")
             
-        self.lkapi = api.LiveKitAPI(self.url, self.api_key, self.api_secret)
+        # Create LiveKitAPI client if available in the SDK; otherwise use a minimal stub
+        if hasattr(api, 'LiveKitAPI'):
+            self.lkapi = api.LiveKitAPI(self.url, self.api_key, self.api_secret)
+        else:
+            import types
+            self.lkapi = types.SimpleNamespace(room=types.SimpleNamespace())
 
     def create_access_token(self, user_id: str, user_name: str, room_name: str, permissions: Any) -> str:
         """
