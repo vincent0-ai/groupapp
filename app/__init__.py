@@ -488,14 +488,15 @@ def create_app(config_name='development'):
             wb = db.find_one('whiteboards', {'_id': ObjectId(wb_id)})
             if not wb:
                 return
-            # only creator can grant
-            if str(wb.get('created_by')) != requester:
+            group_id = wb.get('group_id')
+            group = db.find_one('groups', {'_id': group_id}) if group_id else None
+            is_owner = group and str(group.get('owner')) == requester
+            if str(wb.get('created_by')) != requester or not is_owner:
                 return
             current = wb.get('can_draw', [])
             if ObjectId(target_user) not in current:
                 current.append(ObjectId(target_user))
                 db.update_one('whiteboards', {'_id': wb['_id']}, {'can_draw': current})
-            
             updated_wb = db.find_one('whiteboards', {'_id': ObjectId(wb_id)})
             emit('permissions_updated', {
                 'can_draw': [str(x) for x in updated_wb.get('can_draw', [])],
@@ -518,12 +519,14 @@ def create_app(config_name='development'):
             wb = db.find_one('whiteboards', {'_id': ObjectId(wb_id)})
             if not wb:
                 return
-            if str(wb.get('created_by')) != requester:
+            group_id = wb.get('group_id')
+            group = db.find_one('groups', {'_id': group_id}) if group_id else None
+            is_owner = group and str(group.get('owner')) == requester
+            if str(wb.get('created_by')) != requester or not is_owner:
                 return
             current = wb.get('can_draw', [])
             current = [x for x in current if str(x) != target_user]
             db.update_one('whiteboards', {'_id': wb['_id']}, {'can_draw': current})
-            
             updated_wb = db.find_one('whiteboards', {'_id': ObjectId(wb_id)})
             emit('permissions_updated', {
                 'can_draw': [str(x) for x in updated_wb.get('can_draw', [])],
@@ -546,8 +549,10 @@ def create_app(config_name='development'):
             wb = db.find_one('whiteboards', {'_id': ObjectId(wb_id)})
             if not wb:
                 return
-            # only creator can grant
-            if str(wb.get('created_by')) != requester:
+            group_id = wb.get('group_id')
+            group = db.find_one('groups', {'_id': group_id}) if group_id else None
+            is_owner = group and str(group.get('owner')) == requester
+            if str(wb.get('created_by')) != requester or not is_owner:
                 return
             current = wb.get('can_speak', [])
             if ObjectId(target_user) not in current:
@@ -581,7 +586,10 @@ def create_app(config_name='development'):
             wb = db.find_one('whiteboards', {'_id': ObjectId(wb_id)})
             if not wb:
                 return
-            if str(wb.get('created_by')) != requester:
+            group_id = wb.get('group_id')
+            group = db.find_one('groups', {'_id': group_id}) if group_id else None
+            is_owner = group and str(group.get('owner')) == requester
+            if str(wb.get('created_by')) != requester or not is_owner:
                 return
             current_speak = wb.get('can_speak', [])
             current_speak = [x for x in current_speak if str(x) != target_user]
