@@ -204,6 +204,16 @@
             width: 32px;
             height: 32px;
         }
+        /* Prevent table cells from wrapping so rows remain horizontal
+           and allow horizontal scrolling on very small screens */
+        .table-responsive {
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+        }
+        .table th, .table td {
+            white-space: nowrap;
+            vertical-align: middle;
+        }
     }
 </style>
 {% endblock %}
