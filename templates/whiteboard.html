@@ -617,12 +617,27 @@
         }
 
         mediaService.onTrackSubscribed = (track, participant) => {
-            const el = track.attach();
+            // For video tracks (screen share), attach to the existing <video> element
+            // instead of inserting a nested video element. This avoids nested
+            // <video> tags which can prevent playback for remote viewers.
             if (track.kind === 'video') {
                 remoteVideoContainer.style.display = 'flex';
-                remoteVideoEl.replaceChildren(el);
-                remoteVideoLabel.textContent = `${participant.name || participant.identity}'s screen`;
+                try {
+                    // Attach directly to the dedicated video element
+                    track.attach(remoteVideoEl);
+                    // Ensure playback attributes are present
+                    remoteVideoEl.muted = false;
+                    remoteVideoEl.controls = true;
+                    remoteVideoEl.autoplay = true;
+                    remoteVideoLabel.textContent = `${participant.name || participant.identity}'s screen`;
+                } catch (e) {
+                    // Fallback: create element returned by attach()
+                    const el = track.attach();
+                    remoteVideoEl.replaceChildren(el);
+                    remoteVideoLabel.textContent = `${participant.name || participant.identity}'s screen`;
+                }
             } else if (track.kind === 'audio') {
+                const el = track.attach();
                 el.id = `audio-${participant.identity}`;
                 participantsAudioContainer.appendChild(el);
             }
@@ -630,11 +645,20 @@
 
         mediaService.onTrackUnsubscribed = (track, participant) => {
             if (track.kind === 'video') {
+                // Stop and clear the primary video element instead of removing it
+                if (remoteVideoEl) {
+                    try {
+                        remoteVideoEl.pause();
+                        remoteVideoEl.srcObject = null;
+                        // Remove any fallback child nodes if present
+                        remoteVideoEl.replaceChildren();
+                    } catch (e) { /* ignore DOM errors */ }
+                }
                 remoteVideoContainer.style.display = 'none';
-                if(remoteVideoEl) remoteVideoEl.innerHTML = '';
                 remoteVideoLabel.textContent = '';
             }
-            track.detach().forEach(el => el.remove());
+            // Remove detached elements that are not the main video element
+            track.detach().forEach(el => { if (el && el !== remoteVideoEl) el.remove(); });
         };
 
         mediaService.onParticipantDisconnected = (participant) => {
