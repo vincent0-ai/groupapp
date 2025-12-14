@@ -297,6 +297,13 @@ class LiveKitService:
         except Exception:
             pass
 
+    def __del__(self):
+        """Ensure any underlying aiohttp session is closed when the service is garbage-collected."""
+        try:
+            self.maybe_close_session()
+        except Exception:
+            pass
+
     def delete_room(self, room_name: str):
         """Sync helper to delete a room (runs coroutine on background loop)."""
         if not self.lkapi:

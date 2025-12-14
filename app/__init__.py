@@ -155,11 +155,39 @@ def create_app(config_name='development'):
         """Helper to run an async function from a sync context."""
         try:
             loop = asyncio.get_event_loop()
+            # If the current loop is running (e.g., under eventlet/gevent or a background
+            # asyncio loop), we cannot call run_until_complete on it. Run the coroutine
+            # in a new temporary loop on a worker thread instead so it gets awaited.
+            if loop.is_running():
+                result = {}
+                def _runner():
+                    new_loop = asyncio.new_event_loop()
+                    asyncio.set_event_loop(new_loop)
+                    try:
+                        result['value'] = new_loop.run_until_complete(coro)
+                    finally:
+                        try:
+                            new_loop.close()
+                        except Exception:
+                            pass
+
+                th = threading.Thread(target=_runner)
+                th.start()
+                th.join()
+                return result.get('value')
+            else:
+                return loop.run_until_complete(coro)
         except RuntimeError:
-            loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(loop)
-        
-        return loop.run_until_complete(coro)
+            # No current loop; create one and run
+            new_loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(new_loop)
+            try:
+                return new_loop.run_until_complete(coro)
+            finally:
+                try:
+                    new_loop.close()
+                except Exception:
+                    pass
 
     def check_session_timers(app, socketio):
         """Background thread to enforce session duration limits."""
@@ -190,9 +218,15 @@ def create_app(config_name='development'):
                             # Notify connected clients and attempt to delete the underlying LiveKit room
                             socketio.emit('session_ended', {'session_id': wb_id, 'reason': 'Time limit reached.'}, room=room)
                             try:
-                                run_async_from_sync(livekit_service.lkapi.room.delete_room(room=room))
+                                # Use the LiveKitService helper which will run the delete on an appropriate loop
+                                livekit_service.delete_room(room)
                             except Exception as e:
                                 print(f"Failed to delete LiveKit room {room}: {e}")
+                            finally:
+                                try:
+                                    livekit_service.maybe_close_session()
+                                except Exception:
+                                    pass
 
                             if room in room_timers:
                                 del room_timers[room]
@@ -453,6 +487,7 @@ def create_app(config_name='development'):
         can_share = is_creator or target_user_id in [str(uid) for uid in wb.get('can_share_screen', [])]
 
         can_publish = bool(can_speak or can_share)
+        livekit_service = None
         try:
             livekit_service = LiveKitService()
             # Use the service helper that converts to the proper SDK permission object
@@ -461,6 +496,13 @@ def create_app(config_name='development'):
                 print(f"LiveKit permission update returned error for {target_user_id} in {room_name}: {err}")
         except Exception as e:
             print(f"Failed to update LiveKit permissions for {target_user_id} in {room_name}: {e}")
+        finally:
+            # Close any underlying aiohttp sessions to avoid 'Unclosed client session' warnings
+            try:
+                if livekit_service is not None:
+                    livekit_service.maybe_close_session()
+            except Exception:
+                pass
 
     @socketio.on('grant_draw')
     def handle_grant_draw(data):
