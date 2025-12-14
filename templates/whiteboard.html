@@ -436,10 +436,17 @@
             raiseBtn.className = 'btn btn-sm btn-outline-secondary';
             raiseBtn.innerHTML = '<i class="fas fa-hand-paper"></i> Raise Hand';
 
+            const leaveSessionBtn = document.createElement('button');
+            leaveSessionBtn.id = 'leaveSessionBtn';
+            leaveSessionBtn.className = 'btn btn-sm btn-outline-danger';
+            leaveSessionBtn.innerHTML = '<i class="fas fa-sign-out-alt me-1"></i> Leave';
+
+
             controlsContainer.appendChild(liveBtn);
             controlsContainer.appendChild(muteBtn);
             controlsContainer.appendChild(screenShareBtn);
             controlsContainer.appendChild(raiseBtn);
+            controlsContainer.appendChild(leaveSessionBtn);
 
             liveBtn.addEventListener('click', () => isInCall ? leaveCall() : joinCall());
             muteBtn.addEventListener('click', async () => {
@@ -467,6 +474,21 @@
                  socket.emit('raise_hand', { room: `whiteboard:${sessionId}`, user_id: userId });
                  if(participants[userId]) participants[userId].raised = true;
                  renderParticipants();
+            });
+
+            // Hide left-column leave control (we provide a top-bar button now)
+            try { document.getElementById('leaveSessionContainer').style.display = 'none'; } catch(e){}
+
+            leaveSessionBtn.addEventListener('click', async () => {
+                // If creator, confirm and end session; otherwise just leave
+                if (isCreator) {
+                    if (!confirm('End session for everyone?')) return;
+                    await endSession(sessionId);
+                    return;
+                }
+                // leave: ensure we disconnect from media and go back
+                try { await leaveCall(); } catch(e){}
+                window.location.href = '/whiteboard';
             });
         }
 
@@ -664,10 +686,18 @@
                 }
 
                 isCreator = wb.created_by === userId;
-                if (isCreator) {
-                    const leaveBtnContainer = document.getElementById('leaveSessionContainer');
-                    leaveBtnContainer.innerHTML = `<button id="endSessionBtn" class="btn btn-sm btn-danger w-100">End Session</button>`;
-                    document.getElementById('endSessionBtn').addEventListener('click', () => confirm('End session for everyone?') && endSession(sessionId));
+                // Update top-bar leave button depending on creator status
+                const leaveBtn = document.getElementById('leaveSessionBtn');
+                if (leaveBtn) {
+                    if (isCreator) {
+                        leaveBtn.innerHTML = '<i class="fas fa-stop-circle me-1"></i> End Session';
+                        leaveBtn.className = 'btn btn-sm btn-danger';
+                        leaveBtn.onclick = async () => { if (confirm('End session for everyone?')) await endSession(sessionId); };
+                    } else {
+                        leaveBtn.innerHTML = '<i class="fas fa-sign-out-alt me-1"></i> Leave';
+                        leaveBtn.className = 'btn btn-sm btn-outline-danger';
+                        leaveBtn.onclick = async () => { try { await leaveCall(); } catch(e){}; window.location.href = '/whiteboard'; };
+                    }
                 }
 
                 participants = (wb.participants || []).reduce((acc, p) => {
@@ -695,10 +725,10 @@
                 let moderatorControls = '';
                 if(isCreator && uid !== userId) {
                    moderatorControls = `
-                    <button class="btn btn-xs ${meta.can_draw ? 'btn-primary' : 'btn-outline-primary'}" title="${meta.can_draw ? 'Revoke' : 'Grant'} Draw" onclick="socket.emit('${meta.can_draw ? 'revoke_draw' : 'grant_draw'}', { room: 'whiteboard:${sessionId}', user_id: '${uid}', requester_id: '${userId}' })"><i class="fas fa-pencil-alt"></i></button>
-                    <button class="btn btn-xs ${meta.can_speak ? 'btn-success' : 'btn-outline-secondary'}" title="${meta.can_speak ? 'Revoke' : 'Grant'} Speak" onclick="socket.emit('${meta.can_speak ? 'revoke_speak' : 'grant_speak'}', { room: 'whiteboard:${sessionId}', user_id: '${uid}', requester_id: '${userId}' })"><i class="fas fa-microphone"></i></button>
-                    <button class="btn btn-xs ${meta.can_share_screen ? 'btn-info' : 'btn-outline-info'}" title="${meta.can_share_screen ? 'Revoke' : 'Grant'} Screen Share" onclick="socket.emit('${meta.can_share_screen ? 'revoke_screen_share' : 'grant_screen_share'}', { room: 'whiteboard:${sessionId}', user_id: '${uid}', requester_id: '${userId}' })"><i class="fas fa-desktop"></i></button>
-                    ${meta.raised ? `<button class="btn btn-xs btn-outline-danger" title="Clear Hand" onclick="socket.emit('clear_hand', { room: 'whiteboard:${sessionId}', user_id: '${uid}' })"><i class="fas fa-hand-paper"></i></button>` : ''}
+                    <button class="btn btn-xs mod-btn ${meta.can_draw ? 'btn-primary' : 'btn-outline-primary'}" data-action="${meta.can_draw ? 'revoke_draw' : 'grant_draw'}" data-uid="${uid}" title="${meta.can_draw ? 'Revoke' : 'Grant'} Draw"><i class="fas fa-pencil-alt"></i></button>
+                    <button class="btn btn-xs mod-btn ${meta.can_speak ? 'btn-success' : 'btn-outline-secondary'}" data-action="${meta.can_speak ? 'revoke_speak' : 'grant_speak'}" data-uid="${uid}" title="${meta.can_speak ? 'Revoke' : 'Grant'} Speak"><i class="fas fa-microphone"></i></button>
+                    <button class="btn btn-xs mod-btn ${meta.can_share_screen ? 'btn-info' : 'btn-outline-info'}" data-action="${meta.can_share_screen ? 'revoke_screen_share' : 'grant_screen_share'}" data-uid="${uid}" title="${meta.can_share_screen ? 'Revoke' : 'Grant'} Screen Share"><i class="fas fa-desktop"></i></button>
+                    ${meta.raised ? `<button class="btn btn-xs mod-btn btn-outline-danger" data-action="clear_hand" data-uid="${uid}" title="Clear Hand"><i class="fas fa-hand-paper"></i></button>` : ''}
                 `;
                 } else {
                     moderatorControls = `<small class="text-muted">${meta.can_draw ? '✏️' : ''} ${meta.raised ? '✋' : ''}</small>`;
@@ -714,6 +744,21 @@
             }).join('');
             participantsEl.innerHTML = content;
             participantsEl.appendChild(participantsAudioContainer);
+
+            // Attach event listeners to moderator buttons so they use the scoped `socket` variable
+            participantsEl.querySelectorAll('.mod-btn').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    const action = btn.dataset.action;
+                    const targetId = btn.dataset.uid;
+                    if (!action || !targetId) return;
+                    const payload = { room: `whiteboard:${sessionId}`, user_id: targetId, requester_id: userId };
+                    if (action === 'clear_hand') {
+                        socket.emit(action, { room: `whiteboard:${sessionId}`, user_id: targetId });
+                    } else {
+                        socket.emit(action, payload);
+                    }
+                });
+            });
         }
 
         function updatePermissionUI() {
