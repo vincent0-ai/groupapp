@@ -8,6 +8,7 @@ from typing import Any
 import asyncio
 import threading
 import concurrent.futures
+import types
 
 class LiveKitService:
     """
@@ -212,13 +213,14 @@ class VideoGrants:
                 pass
 
         # Final fallback: plain dict
-        return {
-            'room_join': self.room_join,
-            'room': self.room,
-            'can_publish': self.can_publish,
-            'can_publish_data': self.can_publish_data,
-            'can_subscribe': self.can_subscribe,
-        }
+        # Return a simple object with attributes to satisfy older/newer SDK expectations
+        return types.SimpleNamespace(
+            room_join=self.room_join,
+            room=self.room,
+            can_publish=self.can_publish,
+            can_publish_data=self.can_publish_data,
+            can_subscribe=self.can_subscribe,
+        )
 
 def get_livekit_service():
     """Factory function to get a LiveKitService instance."""
