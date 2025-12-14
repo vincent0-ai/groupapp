@@ -1,5 +1,6 @@
 import os
-from livekit import api, rpc
+from livekit.server_sdk import AccessToken, RoomService, VideoGrant
+from livekit import rpc
 from flask import current_app
 
 class LiveKitService:
@@ -15,13 +16,13 @@ class LiveKitService:
         if not self.api_key or not self.api_secret:
             raise ValueError("LIVEKIT_API_KEY and LIVEKIT_API_SECRET must be set.")
             
-        self.lkapi = api.LiveKitAPI(self.url, self.api_key, self.api_secret)
+        self.room_service = RoomService(self.url, self.api_key, self.api_secret)
 
-    def create_access_token(self, user_id: str, user_name: str, room_name: str, permissions: api.VideoGrant) -> str:
+    def create_access_token(self, user_id: str, user_name: str, room_name: str, permissions: VideoGrant) -> str:
         """
         Create a LiveKit access token for a user.
         """
-        token = api.AccessToken(self.api_key, self.api_secret).with_identity(user_id).with_name(user_name).with_grants(permissions)
+        token = AccessToken(self.api_key, self.api_secret).with_identity(user_id).with_name(user_name).with_grants(permissions)
         
         return token.to_jwt()
 
@@ -30,11 +31,11 @@ class LiveKitService:
         Update a participant's permissions in a room.
         """
         try:
-            permissions = api.VideoGrant(
+            permissions = VideoGrant(
                 can_publish=can_publish,
                 can_publish_data=can_publish_data
             )
-            await self.lkapi.room.update_participant(
+            await self.room_service.update_participant(
                 room=room_name,
                 identity=identity,
                 permission=permissions
@@ -48,7 +49,7 @@ class LiveKitService:
         Remove a participant from a room.
         """
         try:
-            await self.lkapi.room.remove_participant(room=room_name, identity=identity)
+            await self.room_service.remove_participant(room=room_name, identity=identity)
             return True, None
         except rpc.RpcError as e:
             return False, str(e)
@@ -58,7 +59,7 @@ class LiveKitService:
         End a room session for all participants.
         """
         try:
-            await self.lkapi.room.delete_room(room=room_name)
+            await self.room_service.delete_room(room=room_name)
             return True, None
         except rpc.RpcError as e:
             return False, str(e)

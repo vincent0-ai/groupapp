@@ -207,7 +207,7 @@ def upload_audio(wb_id):
 
 
 from app.services.livekit_service import LiveKitService
-from livekit.api import VideoGrant
+from livekit.server_sdk import VideoGrant
 import asyncio
 
 @whiteboards_bp.route('/<wb_id>/livekit-token', methods=['POST'])
@@ -236,7 +236,7 @@ async def get_livekit_token(wb_id):
     try:
         livekit_service = LiveKitService()
         room_name = f'whiteboard:{wb_id}'
-        participants = await livekit_service.lkapi.room.list_participants(room=room_name)
+        participants = await livekit_service.room_service.list_participants(room=room_name)
         max_participants = current_app.config['MAX_PARTICIPANTS_PER_ROOM']
         
         # Check if the user is already in the room before checking the limit
