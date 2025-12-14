@@ -523,7 +523,8 @@ def create_app(config_name='development'):
             group_id = wb.get('group_id')
             group = db.find_one('groups', {'_id': group_id}) if group_id else None
             is_owner = group and str(group.get('owner')) == requester
-            if str(wb.get('created_by')) != requester or not is_owner:
+            # Allow update if requester is either the session creator OR the group owner
+            if str(wb.get('created_by')) != requester and not is_owner:
                 return
             current = wb.get('can_draw', [])
             if ObjectId(target_user) not in current:
@@ -557,7 +558,8 @@ def create_app(config_name='development'):
             group_id = wb.get('group_id')
             group = db.find_one('groups', {'_id': group_id}) if group_id else None
             is_owner = group and str(group.get('owner')) == requester
-            if str(wb.get('created_by')) != requester or not is_owner:
+            # Allow update if requester is either the session creator OR the group owner
+            if str(wb.get('created_by')) != requester and not is_owner:
                 return
             current = wb.get('can_draw', [])
             current = [x for x in current if str(x) != target_user]
@@ -590,7 +592,8 @@ def create_app(config_name='development'):
             group_id = wb.get('group_id')
             group = db.find_one('groups', {'_id': group_id}) if group_id else None
             is_owner = group and str(group.get('owner')) == requester
-            if str(wb.get('created_by')) != requester or not is_owner:
+            # Allow update if requester is either the session creator OR the group owner
+            if str(wb.get('created_by')) != requester and not is_owner:
                 return
             current = wb.get('can_speak', [])
             if ObjectId(target_user) not in current:
@@ -630,7 +633,8 @@ def create_app(config_name='development'):
             group_id = wb.get('group_id')
             group = db.find_one('groups', {'_id': group_id}) if group_id else None
             is_owner = group and str(group.get('owner')) == requester
-            if str(wb.get('created_by')) != requester or not is_owner:
+            # Allow update if requester is either the session creator OR the group owner
+            if str(wb.get('created_by')) != requester and not is_owner:
                 return
             current_speak = wb.get('can_speak', [])
             current_speak = [x for x in current_speak if str(x) != target_user]

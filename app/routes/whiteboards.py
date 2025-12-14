@@ -148,7 +148,8 @@ def update_permissions(wb_id):
     group_id = wb.get('group_id')
     db_group = db.find_one('groups', {'_id': group_id}) if group_id else None
     is_owner = db_group and str(db_group.get('owner')) == g.user_id
-    if creator_id != g.user_id or not is_owner:
+    # Allow update if requester is either the session creator OR the group owner
+    if creator_id != g.user_id and not is_owner:
         return error_response('Only the group owner (session creator) can update permissions', 403)
     can_draw = data.get('can_draw')
     can_speak = data.get('can_speak')
