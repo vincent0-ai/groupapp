@@ -193,26 +193,11 @@
         }
         .table th, .table td {
             padding: 0.5rem 0.25rem;
-            font-size: 0.8rem;
-        }
-        /* Hide Badges and Groups columns on mobile */
-        .table th:nth-child(5), .table td:nth-child(5),
-        .table th:nth-child(6), .table td:nth-child(6) {
-            display: none;
+            font-size: 0.9rem;
         }
         .table img {
             width: 32px;
             height: 32px;
-        }
-        /* Prevent table cells from wrapping so rows remain horizontal
-           and allow horizontal scrolling on very small screens */
-        .table-responsive {
-            overflow-x: auto;
-            -webkit-overflow-scrolling: touch;
-        }
-        .table th, .table td {
-            white-space: nowrap;
-            vertical-align: middle;
         }
     }
 </style>
@@ -246,28 +231,12 @@
                         <h5 class="mb-0">Top Performers</h5>
                     </div>
                     <div class="card-body">
-                        <div class="table-responsive">
-                            <table class="table table-hover align-middle mb-0">
-                                <thead>
-                                    <tr>
-                                        <th style="width: 80px;">Rank</th>
-                                        <th style="width: 50px;">Avatar</th>
-                                        <th>Username</th>
-                                        <th>Points</th>
-                                        <th>Badges</th>
-                                        <th>Groups</th>
-                                        <th>Action</th>
-                                    </tr>
-                                </thead>
-                                <tbody id="leaderboardBody">
-                                    <tr>
-                                        <td colspan="7" class="text-center py-5">
-                                            <div class="spinner-border text-primary" role="status"></div>
-                                            <p class="text-muted mt-2 mb-0">Loading leaderboard...</p>
-                                        </td>
-                                    </tr>
-                                </tbody>
-                            </table>
+                        <!-- Leaderboard list view (replaces table for normal display) -->
+                        <div id="leaderboardBody" class="list-group">
+                            <div class="list-group-item text-center py-5">
+                                <div class="spinner-border text-primary" role="status"></div>
+                                <p class="text-muted mt-2 mb-0">Loading leaderboard...</p>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -452,28 +421,34 @@
 
                 const rows = users.map((user, index) => {
                     const medal = index < 3 ? medals[index] : `${index + 1}`;
-                    const isCurrentUser = user.id === userId ? 'table-primary' : '';
+                    const isCurrentUser = (user.id == userId) ? 'active' : '';
                     return `
-                        <tr class="${isCurrentUser}">
-                            <td><strong>${medal}</strong></td>
-                            <td>
+                        <div class="list-group-item d-flex align-items-center justify-content-between ${isCurrentUser}">
+                            <div class="d-flex align-items-center">
+                                <div class="me-3">
+                                    <div class="rank-num">${medal}</div>
+                                </div>
                                 <img src="${user.avatar_url || 'https://api.dicebear.com/7.x/avataaars/svg?seed=' + user.username}" 
-                                     alt="Avatar" class="rounded-circle" width="40" height="40">
-                            </td>
-                            <td><strong>${user.username}</strong></td>
-                            <td><span class="badge bg-success">${user.points || 0}</span></td>
-                            <td>${user.badges?.length || 0}</td>
-                            <td>${user.groups_count || 0}</td>
-                            <td>
+                                     alt="Avatar" class="rounded-circle me-3" width="48" height="48">
+                                <div>
+                                    <div><strong>${user.username}</strong></div>
+                                    <div class="text-muted small">
+                                        <span class="badge bg-success">${user.points || 0}</span>
+                                        &nbsp;·&nbsp; Badges: ${user.badges?.length || 0}
+                                        &nbsp;·&nbsp; Groups: ${user.groups_count || 0}
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="ms-3">
                                 <button onclick="viewUserProfile('${user.id}')" class="btn btn-sm btn-primary">
-                                    <i class="fas fa-eye"></i> View
+                                    <i class="fas fa-eye"></i>
                                 </button>
-                            </td>
-                        </tr>
+                            </div>
+                        </div>
                     `;
                 }).join('');
 
-                tbody.innerHTML = rows || '<tr><td colspan="7" class="text-center text-muted">No users found</td></tr>';
+                tbody.innerHTML = rows || '<div class="list-group-item text-center text-muted">No users found</div>';
 
                 // Load current user rank
                 loadMyRank(users);
@@ -526,26 +501,36 @@
                 const users = data.data || [];
 
                 const tbody = document.getElementById('leaderboardBody');
-                const rows = users.map((user, index) => `
-                    <tr>
-                        <td><strong>${index + 1}</strong></td>
-                        <td>
-                            <img src="${user.avatar_url || 'https://api.dicebear.com/7.x/avataaars/svg?seed=' + user.username}" 
-                                 alt="Avatar" class="rounded-circle" width="40" height="40">
-                        </td>
-                        <td><strong>${user.username}</strong></td>
-                        <td><span class="badge bg-success">${user.points || 0}</span></td>
-                        <td>${user.badges?.length || 0}</td>
-                        <td>${user.groups_count || 0}</td>
-                        <td>
-                            <button onclick="viewUserProfile('${user._id || user.id}')" class="btn btn-sm btn-primary">
-                                <i class="fas fa-eye"></i> View
-                            </button>
-                        </td>
-                    </tr>
-                `).join('');
+                const rows = users.map((user, index) => {
+                    const medal = index < 3 ? medals[index] : `${index + 1}`;
+                    const isCurrentUser = (user._id == userId || user.id == userId) ? 'active' : '';
+                    return `
+                        <div class="list-group-item d-flex align-items-center justify-content-between ${isCurrentUser}">
+                            <div class="d-flex align-items-center">
+                                <div class="me-3">
+                                    <div class="rank-num">${medal}</div>
+                                </div>
+                                <img src="${user.avatar_url || 'https://api.dicebear.com/7.x/avataaars/svg?seed=' + user.username}" 
+                                     alt="Avatar" class="rounded-circle me-3" width="48" height="48">
+                                <div>
+                                    <div><strong>${user.username}</strong></div>
+                                    <div class="text-muted small">
+                                        <span class="badge bg-success">${user.points || 0}</span>
+                                        &nbsp;·&nbsp; Badges: ${user.badges?.length || 0}
+                                        &nbsp;·&nbsp; Groups: ${user.groups_count || 0}
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="ms-3">
+                                <button onclick="viewUserProfile('${user._id || user.id}')" class="btn btn-sm btn-primary">
+                                    <i class="fas fa-eye"></i>
+                                </button>
+                            </div>
+                        </div>
+                    `;
+                }).join('');
 
-                tbody.innerHTML = rows || '<tr><td colspan="7" class="text-center text-muted">No users found</td></tr>';
+                tbody.innerHTML = rows || '<div class="list-group-item text-center text-muted">No users found</div>';
             } catch (error) {
                 console.error('Error searching users:', error);
             }
