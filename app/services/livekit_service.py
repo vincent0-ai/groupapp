@@ -1,4 +1,5 @@
-from livekit import api, rtc
+from livekit import api
+from livekit import rtc
 from flask import current_app
 
 class LiveKitService:
