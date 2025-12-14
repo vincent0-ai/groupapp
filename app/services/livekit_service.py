@@ -181,13 +181,23 @@ class VideoGrants:
         # Prefer api.VideoGrant when available
         if hasattr(api, 'VideoGrant'):
             try:
-                return api.VideoGrant(
-                    room_join=self.room_join,
-                    room=self.room,
-                    can_publish=self.can_publish,
-                    can_publish_data=self.can_publish_data,
-                    can_subscribe=self.can_subscribe,
-                )
+                # Some LiveKit SDK versions do not accept `room_join` as a kwarg
+                try:
+                    return api.VideoGrant(
+                        room_join=self.room_join,
+                        room=self.room,
+                        can_publish=self.can_publish,
+                        can_publish_data=self.can_publish_data,
+                        can_subscribe=self.can_subscribe,
+                    )
+                except TypeError:
+                    # Retry without `room_join` which some versions don't accept
+                    return api.VideoGrant(
+                        room=self.room,
+                        can_publish=self.can_publish,
+                        can_publish_data=self.can_publish_data,
+                        can_subscribe=self.can_subscribe,
+                    )
             except Exception:
                 pass
 
