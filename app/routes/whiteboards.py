@@ -283,7 +283,6 @@ def get_livekit_token(wb_id):
         try:
             import jwt as _jwt
             payload = _jwt.decode(token, options={"verify_signature": False})
-            print(f"Generated LiveKit token payload: {payload}")
         except Exception as e:
             print(f"Could not decode token payload for debug: {e}")
         return success_response({'token': token, 'url': current_app.config['LIVEKIT_URL']}, 'LiveKit token generated', 200)

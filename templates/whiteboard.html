@@ -537,7 +537,6 @@
             liveBtn.disabled = true;
             liveBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Joining...';
             const lkResp = await getLiveKitToken(sessionId);
-            console.log('LiveKit token response:', lkResp);
             if (!lkResp || !lkResp.token) {
                 liveBtn.disabled = false;
                 liveBtn.innerHTML = '<i class="fas fa-phone"></i> Join Call';
