@@ -419,12 +419,16 @@
 
             const muteBtn = document.createElement('button');
             muteBtn.id = 'muteBtn';
-            muteBtn.className = 'btn btn-sm btn-outline-warning d-none';
+            // Show mute button but disable until in-call; visibility communicates capability to users
+            muteBtn.className = 'btn btn-sm btn-outline-warning';
+            muteBtn.disabled = true;
             muteBtn.innerHTML = '<i class="fas fa-microphone"></i> Mute';
 
             const screenShareBtn = document.createElement('button');
             screenShareBtn.id = 'screenShareBtn';
-            screenShareBtn.className = 'btn btn-sm btn-outline-info d-none';
+            // Show share button but disable until in-call; will enable only if permission allows
+            screenShareBtn.className = 'btn btn-sm btn-outline-info';
+            screenShareBtn.disabled = true;
             screenShareBtn.innerHTML = '<i class="fas fa-desktop"></i> Share Screen';
             
             const raiseBtn = document.createElement('button');
@@ -438,18 +442,24 @@
             controlsContainer.appendChild(raiseBtn);
 
             liveBtn.addEventListener('click', () => isInCall ? leaveCall() : joinCall());
-            muteBtn.addEventListener('click', () => {
+            muteBtn.addEventListener('click', async () => {
+                // only allow toggling while connected
+                if (!isInCall) return showCustomAlert('Join the call first to toggle microphone.', 'Not In Call');
                 isMuted = !isMuted;
-                mediaService.publishAudio(!isMuted);
+                try { await mediaService.publishAudio(!isMuted); } catch (e) { console.error('Failed to toggle audio', e); }
                 updateMuteButton();
             });
             screenShareBtn.addEventListener('click', async () => {
+                if (!isInCall) return showCustomAlert('Join the call first to share your screen.', 'Not In Call');
+                // Only allow if server-side permission says user may share
+                if (!canShareScreen) return showCustomAlert('You do not have permission to share your screen in this session.', 'Permission');
                 isScreenSharing = !isScreenSharing;
-                 try {
+                try {
                     await mediaService.publishScreenShare(isScreenSharing);
                 } catch(e) {
-                     console.error("Screen share failed:", e);
+                     console.error('Screen share failed:', e);
                      isScreenSharing = false;
+                     showCustomAlert('Could not start screen sharing. Make sure you allowed the browser to share your screen.', 'Screen Share');
                 }
                 updateScreenShareButton();
             });
@@ -465,6 +475,7 @@
             if(!muteBtn) return;
             muteBtn.innerHTML = isMuted ? '<i class="fas fa-microphone-slash"></i> Unmute' : '<i class="fas fa-microphone"></i> Mute';
             muteBtn.className = isMuted ? 'btn btn-sm btn-warning' : 'btn btn-sm btn-outline-warning';
+            muteBtn.disabled = !isInCall || !canSpeak;
         }
 
         function updateScreenShareButton() {
@@ -472,6 +483,7 @@
             if(!screenShareBtn) return;
             screenShareBtn.innerHTML = isScreenSharing ? '<i class="fas fa-desktop"></i> Stop Sharing' : '<i class="fas fa-desktop"></i> Share Screen';
             screenShareBtn.className = isScreenSharing ? 'btn btn-sm btn-info text-white' : 'btn btn-sm btn-outline-info';
+            screenShareBtn.disabled = !isInCall || !canShareScreen;
         }
 
         async function getLiveKitToken(lkSessionId) {
@@ -516,6 +528,17 @@
             const wsUrl = String(configured).replace(/^http/, 'ws');
 
             try {
+                // If user is allowed to speak, proactively request microphone permission
+                if (canSpeak) {
+                    try {
+                        await navigator.mediaDevices.getUserMedia({ audio: true });
+                    } catch (permErr) {
+                        console.warn('Microphone permission denied or unavailable', permErr);
+                        showCustomAlert('Microphone access was denied. You will join muted.', 'Permission');
+                        // reflect that user cannot speak for this join
+                        canSpeak = false;
+                    }
+                }
                 // MediaService.connect expects (token, url)
                 await mediaService.connect(lkToken, wsUrl);
                 isInCall = true;
@@ -528,14 +551,17 @@
                 const muteBtn = document.getElementById('muteBtn');
                 const screenShareBtn = document.getElementById('screenShareBtn');
 
+                // Enable/disable buttons based on permissions
+                muteBtn.disabled = !canSpeak;
+                screenShareBtn.disabled = !canShareScreen;
+                // If we can speak, unmute by default
                 if (canSpeak) {
-                    muteBtn?.classList.remove('d-none');
                     isMuted = false;
-                    await mediaService.publishAudio(true);
+                    try { await mediaService.publishAudio(true); } catch(e) { console.warn('Auto-enable mic failed', e); }
                     updateMuteButton();
-                }
-                if (canShareScreen) {
-                    screenShareBtn?.classList.remove('d-none');
+                } else {
+                    isMuted = true;
+                    updateMuteButton();
                 }
 
             } catch (e) {
@@ -558,7 +584,11 @@
                 liveBtn.innerHTML = '<i class="fas fa-phone"></i> Join Call';
             }
             document.getElementById('muteBtn')?.classList.add('d-none');
-            document.getElementById('screenShareBtn')?.classList.add('d-none');
+            // Disable media buttons when leaving
+            const muteBtn = document.getElementById('muteBtn');
+            const screenShareBtn = document.getElementById('screenShareBtn');
+            if (muteBtn) { muteBtn.disabled = true; }
+            if (screenShareBtn) { screenShareBtn.disabled = true; }
             
             remoteVideoContainer.style.display = 'none';
             if(remoteVideoEl) remoteVideoEl.srcObject = null;
@@ -688,8 +718,17 @@
 
         function updatePermissionUI() {
             if(!document.getElementById('permissionStatus')) return;
-            document.getElementById('permissionStatus').textContent = canDraw ? 'You can draw' : 'You cannot draw';
+            const statusParts = [];
+            statusParts.push(canDraw ? 'Draw: ✓' : 'Draw: ✕');
+            statusParts.push(canSpeak ? 'Speak: ✓' : 'Speak: ✕');
+            statusParts.push(canShareScreen ? 'Share: ✓' : 'Share: ✕');
+            document.getElementById('permissionStatus').textContent = statusParts.join(' • ');
             document.getElementById('canvasOverlay').style.display = canDraw ? 'none' : 'flex';
+            // ensure media buttons reflect current permissions
+            const muteBtn = document.getElementById('muteBtn');
+            const screenShareBtn = document.getElementById('screenShareBtn');
+            if (muteBtn) muteBtn.disabled = !canSpeak || !isInCall;
+            if (screenShareBtn) screenShareBtn.disabled = !canShareScreen || !isInCall;
         }
         
         socket.on('connect', () => socket.emit('join_room', { room: `whiteboard:${sessionId}`, user_id: userId }));
@@ -725,15 +764,17 @@
             updatePermissionUI();
             
             if (isInCall) {
-                document.getElementById('muteBtn')?.classList.toggle('d-none', !canSpeak);
-                document.getElementById('screenShareBtn')?.classList.toggle('d-none', !canShareScreen);
+                const muteBtn = document.getElementById('muteBtn');
+                const screenShareBtn = document.getElementById('screenShareBtn');
+                if (muteBtn) muteBtn.disabled = !canSpeak;
+                if (screenShareBtn) screenShareBtn.disabled = !canShareScreen;
                 if(!canSpeak && !isMuted) {
-                    mediaService.publishAudio(false);
+                    try { mediaService.publishAudio(false); } catch(e) { console.warn('Could not mute after permission update', e); }
                     isMuted = true;
                     updateMuteButton();
                 }
                 if(!canShareScreen && isScreenSharing) {
-                    mediaService.publishScreenShare(false);
+                    try { mediaService.publishScreenShare(false); } catch(e) { console.warn('Could not stop screen share after permission update', e); }
                     isScreenSharing = false;
                     updateScreenShareButton();
                 }
