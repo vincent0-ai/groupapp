@@ -110,6 +110,23 @@
             align-items: center !important;
             gap: 6px;
         }
+
+        /* Compact icon-only mode for very narrow screens */
+        @media (max-width: 420px) {
+            #sessionControls {
+                padding: 8px 10px;
+            }
+            #sessionControls .btn {
+                padding: 0 !important;
+                width: 44px !important;
+                height: 44px !important;
+                border-radius: 50% !important;
+                justify-content: center !important;
+                font-size: 0; /* hide stray text nodes if any */
+            }
+            #sessionControls .btn .btn-text { display: none !important; }
+            #sessionControls .btn i { font-size: 1.05rem !important; }
+        }
     }
 </style>
 {% endblock %}
@@ -430,31 +447,36 @@
             const liveBtn = document.createElement('button');
             liveBtn.id = 'liveBtn';
             liveBtn.className = 'btn btn-sm btn-outline-success';
-            liveBtn.innerHTML = '<i class="fas fa-phone"></i> Join Call';
+            liveBtn.setAttribute('aria-label', 'Join Call');
+            liveBtn.innerHTML = '<i class="fas fa-phone"></i><span class="btn-text"> Join Call</span>';
 
             const muteBtn = document.createElement('button');
             muteBtn.id = 'muteBtn';
             // Show mute button but disable until in-call; visibility communicates capability to users
             muteBtn.className = 'btn btn-sm btn-outline-warning';
+            muteBtn.setAttribute('aria-label', 'Mute');
             muteBtn.disabled = true;
-            muteBtn.innerHTML = '<i class="fas fa-microphone"></i> Mute';
+            muteBtn.innerHTML = '<i class="fas fa-microphone"></i><span class="btn-text"> Mute</span>';
 
             const screenShareBtn = document.createElement('button');
             screenShareBtn.id = 'screenShareBtn';
             // Show share button but disable until in-call; will enable only if permission allows
             screenShareBtn.className = 'btn btn-sm btn-outline-info';
+            screenShareBtn.setAttribute('aria-label', 'Share Screen');
             screenShareBtn.disabled = true;
-            screenShareBtn.innerHTML = '<i class="fas fa-desktop"></i> Share Screen';
+            screenShareBtn.innerHTML = '<i class="fas fa-desktop"></i><span class="btn-text"> Share Screen</span>';
             
             const raiseBtn = document.createElement('button');
             raiseBtn.id = 'raiseBtn';
             raiseBtn.className = 'btn btn-sm btn-outline-secondary';
-            raiseBtn.innerHTML = '<i class="fas fa-hand-paper"></i> Raise Hand';
+            raiseBtn.setAttribute('aria-label', 'Raise Hand');
+            raiseBtn.innerHTML = '<i class="fas fa-hand-paper"></i><span class="btn-text"> Raise Hand</span>';
 
             const leaveSessionBtn = document.createElement('button');
             leaveSessionBtn.id = 'leaveSessionBtn';
             leaveSessionBtn.className = 'btn btn-sm btn-outline-danger';
-            leaveSessionBtn.innerHTML = '<i class="fas fa-sign-out-alt me-1"></i> Leave';
+            leaveSessionBtn.setAttribute('aria-label', 'Leave Session');
+            leaveSessionBtn.innerHTML = '<i class="fas fa-sign-out-alt me-1"></i><span class="btn-text"> Leave</span>';
 
 
             controlsContainer.appendChild(liveBtn);
@@ -510,7 +532,7 @@
         function updateMuteButton() {
             const muteBtn = document.getElementById('muteBtn');
             if(!muteBtn) return;
-            muteBtn.innerHTML = isMuted ? '<i class="fas fa-microphone-slash"></i> Unmute' : '<i class="fas fa-microphone"></i> Mute';
+            muteBtn.innerHTML = isMuted ? '<i class="fas fa-microphone-slash"></i><span class="btn-text"> Unmute</span>' : '<i class="fas fa-microphone"></i><span class="btn-text"> Mute</span>';
             muteBtn.className = isMuted ? 'btn btn-sm btn-warning' : 'btn btn-sm btn-outline-warning';
             muteBtn.disabled = !isInCall || !canSpeak;
         }
@@ -518,7 +540,7 @@
         function updateScreenShareButton() {
             const screenShareBtn = document.getElementById('screenShareBtn');
             if(!screenShareBtn) return;
-            screenShareBtn.innerHTML = isScreenSharing ? '<i class="fas fa-desktop"></i> Stop Sharing' : '<i class="fas fa-desktop"></i> Share Screen';
+            screenShareBtn.innerHTML = isScreenSharing ? '<i class="fas fa-desktop"></i><span class="btn-text"> Stop Sharing</span>' : '<i class="fas fa-desktop"></i><span class="btn-text"> Share Screen</span>';
             screenShareBtn.className = isScreenSharing ? 'btn btn-sm btn-info text-white' : 'btn btn-sm btn-outline-info';
             screenShareBtn.disabled = !isInCall || !canShareScreen;
         }
@@ -550,11 +572,11 @@
             if (!liveBtn) return;
             
             liveBtn.disabled = true;
-            liveBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Joining...';
+            liveBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i><span class="btn-text"> Joining...</span>';
             const lkResp = await getLiveKitToken(sessionId);
             if (!lkResp || !lkResp.token) {
                 liveBtn.disabled = false;
-                liveBtn.innerHTML = '<i class="fas fa-phone"></i> Join Call';
+                liveBtn.innerHTML = '<i class="fas fa-phone"></i><span class="btn-text"> Join Call</span>';
                 return;
             }
 
@@ -582,7 +604,7 @@
                 // Use our server-side permission flags (canSpeak / canShareScreen) to show controls.
                 liveBtn.disabled = false;
                 liveBtn.className = 'btn btn-sm btn-danger';
-                liveBtn.innerHTML = '<i class="fas fa-phone-slash"></i> Leave';
+                liveBtn.innerHTML = '<i class="fas fa-phone-slash"></i><span class="btn-text"> Leave</span>';
 
                 const muteBtn = document.getElementById('muteBtn');
                 const screenShareBtn = document.getElementById('screenShareBtn');
@@ -605,7 +627,7 @@
                 showCustomAlert('Could not connect to the media session.', 'Connection Error');
                 isInCall = false;
                 liveBtn.disabled = false;
-                liveBtn.innerHTML = '<i class="fas fa-phone"></i> Join Call';
+                liveBtn.innerHTML = '<i class="fas fa-phone"></i><span class="btn-text"> Join Call</span>';
             }
         }
 
@@ -617,7 +639,7 @@
             const liveBtn = document.getElementById('liveBtn');
             if(liveBtn) {
                 liveBtn.className = 'btn btn-sm btn-outline-success';
-                liveBtn.innerHTML = '<i class="fas fa-phone"></i> Join Call';
+                liveBtn.innerHTML = '<i class="fas fa-phone"></i><span class="btn-text"> Join Call</span>';
             }
             document.getElementById('muteBtn')?.classList.add('d-none');
             // Disable media buttons when leaving
@@ -738,11 +760,13 @@
                 const leaveBtn = document.getElementById('leaveSessionBtn');
                 if (leaveBtn) {
                     if (isCreator) {
-                        leaveBtn.innerHTML = '<i class="fas fa-stop-circle me-1"></i> End Session';
+                        leaveBtn.setAttribute('aria-label', 'End Session');
+                        leaveBtn.innerHTML = '<i class="fas fa-stop-circle me-1"></i><span class="btn-text"> End Session</span>';
                         leaveBtn.className = 'btn btn-sm btn-danger';
                         leaveBtn.onclick = async () => { if (confirm('End session for everyone?')) await endSession(sessionId); };
                     } else {
-                        leaveBtn.innerHTML = '<i class="fas fa-sign-out-alt me-1"></i> Leave';
+                        leaveBtn.setAttribute('aria-label', 'Leave');
+                        leaveBtn.innerHTML = '<i class="fas fa-sign-out-alt me-1"></i><span class="btn-text"> Leave</span>';
                         leaveBtn.className = 'btn btn-sm btn-outline-danger';
                         leaveBtn.onclick = async () => { try { await leaveCall(); } catch(e){}; window.location.href = '/whiteboard'; };
                     }
