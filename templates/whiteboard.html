@@ -934,6 +934,30 @@
             }
             renderParticipants();
         });
+
+        // Server-initiated forced actions (immediate effects)
+        socket.on('force_mute', (data) => {
+            // Ask the media service to stop publishing immediately
+            try {
+                if (isInCall) {
+                    mediaService.publishAudio(false).catch(() => {});
+                    isMuted = true;
+                    updateMuteButton();
+                }
+            } catch (e) { console.warn('force_mute handling failed', e); }
+            try { showCustomAlert(data?.reason || 'You have been muted by the moderator.', 'Muted'); } catch(e){}
+        });
+
+        socket.on('force_stop_screen', (data) => {
+            try {
+                if (isInCall && isScreenSharing) {
+                    mediaService.publishScreenShare(false).catch(() => {});
+                    isScreenSharing = false;
+                    updateScreenShareButton();
+                }
+            } catch (e) { console.warn('force_stop_screen handling failed', e); }
+            try { showCustomAlert(data?.reason || 'Screen sharing disabled by moderator.', 'Screen Share'); } catch(e){}
+        });
         
         socket.on('hand_raised', (data) => {
             if(participants[data.user_id]) {

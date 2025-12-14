@@ -649,6 +649,13 @@ def create_app(config_name='development'):
                 'can_speak': [str(x) for x in updated_wb.get('can_speak', [])],
                 'can_share_screen': [str(x) for x in updated_wb.get('can_share_screen', [])]
             }, room=room)
+            # If the target user is currently connected, send a direct event to force them to stop publishing
+            try:
+                sid = connected_users.get(str(target_user))
+                if sid:
+                    socketio.emit('force_mute', {'reason': 'Your microphone has been disabled by the session moderator.'}, to=sid)
+            except Exception:
+                pass
         except Exception as e:
             print(f"Error in revoke_speak: {e}")
             return
@@ -722,6 +729,13 @@ def create_app(config_name='development'):
                 'can_speak': [str(x) for x in updated_wb.get('can_speak', [])],
                 'can_share_screen': [str(x) for x in updated_wb.get('can_share_screen', [])]
             }, room=room)
+            # Notify target participant to stop screen sharing if connected
+            try:
+                sid = connected_users.get(str(target_user))
+                if sid:
+                    socketio.emit('force_stop_screen', {'reason': 'Screen sharing has been disabled by the session moderator.'}, to=sid)
+            except Exception:
+                pass
         except Exception as e:
             print(f"Error in revoke_screen_share: {e}")
             return
