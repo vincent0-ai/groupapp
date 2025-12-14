@@ -774,6 +774,106 @@
         // Initial setup
         initDrawing();
         loadSessionInfo();
+
+        // --- Landing view: Create / Join session handlers ---
+        const createSessionBtnLanding = document.getElementById('createSessionBtnLanding');
+        const joinSessionBtnLanding = document.getElementById('joinSessionBtnLanding');
+        const createSessionModalEl = document.getElementById('createSessionModal');
+        const joinSessionModalEl = document.getElementById('joinSessionModal');
+        const createSessionSubmit = document.getElementById('createSessionSubmit');
+        const joinSessionSubmit = document.getElementById('joinSessionSubmit');
+        const sessionGroupSelect = document.getElementById('sessionGroupSelect');
+        const sessionNameInput = document.getElementById('sessionNameInput');
+        const createdSessionLink = document.getElementById('createdSessionLink');
+        const sessionCreatedModalEl = document.getElementById('sessionCreatedModal');
+        const goToSessionBtn = document.getElementById('goToSessionBtn');
+
+        async function populateGroupSelect() {
+            if (!sessionGroupSelect) return;
+            sessionGroupSelect.innerHTML = '<option value="">Loading groups...</option>';
+            try {
+                const res = await fetch('/api/groups', { headers: { 'Authorization': `Bearer ${token}` } });
+                if (!res.ok) throw new Error('Failed to load groups');
+                const data = await res.json();
+                const groups = (data.data && data.data.groups) || data.groups || [];
+                sessionGroupSelect.innerHTML = '';
+                const myGroups = groups.filter(g => g.is_member);
+                if (myGroups.length === 0) {
+                    sessionGroupSelect.innerHTML = '<option value="">No groups available</option>';
+                    sessionGroupSelect.disabled = true;
+                    createSessionSubmit.disabled = true;
+                    return;
+                }
+                myGroups.forEach(g => {
+                    const opt = document.createElement('option');
+                    opt.value = g.id || g._id;
+                    opt.textContent = g.name || g.title || (`Group ${opt.value}`);
+                    sessionGroupSelect.appendChild(opt);
+                });
+                sessionGroupSelect.disabled = false;
+                createSessionSubmit.disabled = false;
+            } catch (e) {
+                console.error('Could not load groups:', e);
+                sessionGroupSelect.innerHTML = '<option value="">Failed to load groups</option>';
+                sessionGroupSelect.disabled = true;
+                createSessionSubmit.disabled = true;
+            }
+        }
+
+        createSessionBtnLanding?.addEventListener('click', async () => {
+            await populateGroupSelect();
+            try { new bootstrap.Modal(createSessionModalEl).show(); } catch(e){ createSessionModalEl.style.display='block'; }
+        });
+
+        joinSessionBtnLanding?.addEventListener('click', () => {
+            try { new bootstrap.Modal(joinSessionModalEl).show(); } catch(e){ joinSessionModalEl.style.display='block'; }
+        });
+
+        createSessionSubmit?.addEventListener('click', async () => {
+            const gid = sessionGroupSelect?.value;
+            const title = sessionNameInput?.value || '';
+            if (!gid) return alert('Please select a group to create this session for.');
+            createSessionSubmit.disabled = true;
+            createSessionSubmit.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Creating...';
+            try {
+                const res = await fetch(`/api/groups/${gid}/whiteboards`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                    body: JSON.stringify({ title })
+                });
+                const body = await res.json();
+                if (!res.ok) throw new Error(body.message || 'Failed to create session');
+                const invite = (body.data && body.data.invite_url) || body.invite_url || '/whiteboard';
+                createdSessionLink.value = invite.startsWith('http') ? invite : (window.location.origin + invite);
+                try { new bootstrap.Modal(sessionCreatedModalEl).show(); } catch(e){ sessionCreatedModalEl.style.display='block'; }
+            } catch (e) {
+                console.error('Create session failed:', e);
+                alert(e.message || 'Could not create session');
+            } finally {
+                createSessionSubmit.disabled = false;
+                createSessionSubmit.innerHTML = 'Create Session';
+            }
+        });
+
+        goToSessionBtn?.addEventListener('click', () => {
+            const url = createdSessionLink?.value;
+            if (url) window.location.href = url;
+        });
+
+        joinSessionSubmit?.addEventListener('click', () => {
+            const val = document.getElementById('joinSessionId')?.value?.trim();
+            if (!val) return alert('Please enter a session ID or link');
+            let id = val;
+            try {
+                // If it's a full URL with session param
+                const u = new URL(val, window.location.origin);
+                const s = new URLSearchParams(u.search).get('session');
+                if (s) id = s;
+            } catch (e) {
+                // ignore
+            }
+            window.location.href = `/whiteboard?session=${encodeURIComponent(id)}`;
+        });
         
     })();
 </script>
