@@ -88,6 +88,9 @@ class LiveKitService:
             token_builder = api.AccessToken(self.api_key, self.api_secret).with_identity(user_id).with_name(user_name)
             if native_permissions:
                 grants_obj = _to_obj(native_permissions) if isinstance(native_permissions, dict) else native_permissions
+                # Ensure the grants object exposes a `video` attribute as expected by AccessToken
+                if not hasattr(grants_obj, 'video'):
+                    grants_obj = types.SimpleNamespace(video=grants_obj)
                 token_builder = token_builder.with_grants(grants_obj)
             return token_builder.to_jwt()
         except Exception:
