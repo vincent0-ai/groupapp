@@ -226,7 +226,12 @@ def create_app(config_name='development'):
                     print(f"Error joining whiteboard: {e}")
                     pass
 
-            join_room(room)
+            try:
+                join_room(room)
+            except KeyError as e:
+                # This can happen if the Engine.IO session mapping is lost due to a disconnect.
+                print(f"Warning: could not join room {room} for sid {request.sid}: {e}")
+                emit('error', {'message': 'Could not join room due to transient connection error'})
             connected_users[user_id] = request.sid
             
             # Include basic user profile info

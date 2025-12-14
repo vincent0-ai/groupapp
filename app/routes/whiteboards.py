@@ -249,6 +249,10 @@ def get_livekit_token(wb_id):
         # If the room doesn't exist on LiveKit server, list_participants will fail.
         # This is fine, it just means the room is not full.
         print(f"Could not check participant list (room may not exist yet): {e}")
+        try:
+            livekit_service.maybe_close_session()
+        except Exception:
+            pass
 
 
     # Determine permissions from the whiteboard document

@@ -9,6 +9,7 @@ import asyncio
 import threading
 import concurrent.futures
 import types
+from datetime import datetime
 
 class LiveKitService:
     """
@@ -86,13 +87,100 @@ class LiveKitService:
 
         try:
             token_builder = api.AccessToken(self.api_key, self.api_secret).with_identity(user_id).with_name(user_name)
+
+            # Normalize permission fields (accept both snake_case and camelCase)
+            def _get_attr(obj, *names, default=None):
+                for n in names:
+                    if hasattr(obj, n):
+                        return getattr(obj, n)
+                return default
+
             if native_permissions:
-                grants_obj = _to_obj(native_permissions) if isinstance(native_permissions, dict) else native_permissions
-                # Ensure the grants object exposes a `video` attribute as expected by AccessToken
-                if not hasattr(grants_obj, 'video'):
-                    grants_obj = types.SimpleNamespace(video=grants_obj)
-                token_builder = token_builder.with_grants(grants_obj)
-            return token_builder.to_jwt()
+                p = native_permissions
+                # If it's a dict, convert to SimpleNamespace for attribute access
+                if isinstance(p, dict):
+                    p = _to_obj(p)
+
+                room = _get_attr(p, 'room', 'room')
+                room_join = _get_attr(p, 'room_join', 'roomJoin', default=True)
+                can_publish = _get_attr(p, 'can_publish', 'canPublish', default=False)
+                can_publish_data = _get_attr(p, 'can_publish_data', 'canPublishData', default=False)
+                can_subscribe = _get_attr(p, 'can_subscribe', 'canSubscribe', default=True)
+
+                video_kwargs_snake = dict(room_join=room_join, room=room, can_publish=can_publish, can_publish_data=can_publish_data, can_subscribe=can_subscribe)
+                video_kwargs_camel = dict(roomJoin=room_join, room=room, canPublish=can_publish, canPublishData=can_publish_data, canSubscribe=can_subscribe)
+
+                prepared = None
+                # Try constructing an SDK VideoGrant/VideoGrants in multiple ways
+                if hasattr(api, 'VideoGrants'):
+                    try:
+                        prepared = api.VideoGrants(**video_kwargs_snake)
+                        print('Using api.VideoGrants with snake_case')
+                    except Exception:
+                        try:
+                            prepared = api.VideoGrants(**video_kwargs_camel)
+                            print('Using api.VideoGrants with camelCase')
+                        except Exception as e:
+                            print('api.VideoGrants not accepted:', e)
+
+                if prepared is None and hasattr(api, 'VideoGrant'):
+                    try:
+                        prepared = api.VideoGrant(**video_kwargs_snake)
+                        print('Using api.VideoGrant with snake_case')
+                    except Exception:
+                        try:
+                            prepared = api.VideoGrant(**video_kwargs_camel)
+                            print('Using api.VideoGrant with camelCase')
+                        except Exception as e:
+                            print('api.VideoGrant not accepted:', e)
+
+                # Fallback: create an object with a `video` attribute
+                if prepared is None:
+                    grant_inner = types.SimpleNamespace(**video_kwargs_snake)
+                    prepared = types.SimpleNamespace(video=grant_inner)
+
+                try:
+                    token_builder = token_builder.with_grants(prepared)
+                except Exception as e:
+                    print('with_grants failed:', e)
+                    raise
+
+            token_str = token_builder.to_jwt()
+            # Try to decode token; if it's not a JWT (e.g., test dummy), return as-is
+            try:
+                import jwt as _pyjwt
+                decoded = _pyjwt.decode(token_str, options={"verify_signature": False})
+            except Exception:
+                return token_str
+
+            # If token has no video grant or room info, fall back to creating a manual token
+            if not decoded.get('video') or not decoded.get('video', {}).get('room'):
+                try:
+                    now = int(datetime.utcnow().timestamp())
+                    ttl = 3600
+                    payload = {
+                        'iss': self.api_key,
+                        'sub': user_id,
+                        'name': user_name,
+                        'nbf': now,
+                        'exp': now + ttl,
+                        'video': {
+                            'room': room_name,
+                            'roomJoin': True,
+                            'canPublish': getattr(native_permissions, 'can_publish', True) if not isinstance(native_permissions, dict) else (native_permissions.get('can_publish') if native_permissions.get('can_publish') is not None else True),
+                            'canPublishData': getattr(native_permissions, 'can_publish_data', True) if not isinstance(native_permissions, dict) else (native_permissions.get('can_publish_data') if native_permissions.get('can_publish_data') is not None else True),
+                            'canSubscribe': getattr(native_permissions, 'can_subscribe', True) if not isinstance(native_permissions, dict) else (native_permissions.get('can_subscribe') if native_permissions.get('can_subscribe') is not None else True),
+                        },
+                        'metadata': ''
+                    }
+                    manual = _pyjwt.encode(payload, self.api_secret, algorithm='HS256')
+                    print('Generated manual JWT with video grant as fallback')
+                    return manual
+                except Exception as e:
+                    print('Failed to create manual JWT fallback:', e)
+                    return token_str
+
+            return token_str
         except Exception:
             # Fall back to issuing a token without explicit grants to avoid SDK incompatibilities
             tb = None
@@ -170,7 +258,44 @@ class LiveKitService:
                 return []
 
         coro = self.lkapi.room.list_participants(room=room_name)
-        return self._run_coro(coro)
+        result = self._run_coro(coro)
+        # Try to close any underlying aiohttp session to avoid 'Unclosed client session' warnings
+        try:
+            self.maybe_close_session()
+        except Exception:
+            pass
+        return result
+
+    def maybe_close_session(self):
+        """Attempt to close underlying aiohttp ClientSession if present on the LiveKit API client."""
+        if not self.lkapi:
+            return
+        sess = getattr(self.lkapi, 'session', None)
+        if sess is None:
+            # Some versions keep session on ._session or similar
+            sess = getattr(self.lkapi, '_session', None)
+        if sess is None:
+            return
+        try:
+            # If session has an async close method, try to run it on the running loop
+            coro = None
+            if hasattr(sess, 'close') and asyncio.iscoroutinefunction(sess.close):
+                coro = sess.close()
+            elif hasattr(sess, 'close'):
+                # synchronous close
+                try:
+                    sess.close()
+                    return
+                except Exception:
+                    pass
+            if coro is not None:
+                if self._loop and self._loop.is_running():
+                    fut = asyncio.run_coroutine_threadsafe(coro, self._loop)
+                    fut.result(timeout=5)
+                else:
+                    asyncio.run(coro)
+        except Exception:
+            pass
 
     def delete_room(self, room_name: str):
         """Sync helper to delete a room (runs coroutine on background loop)."""
