@@ -608,6 +608,8 @@
         } else {
             landingView.style.display = 'block';
             sessionView.style.display = 'none';
+            // Load user's active sessions for quick access
+            try { loadMySessions(); } catch(e) { console.warn('loadMySessions unavailable yet'); }
         }
         
         async function loadSessionInfo() {
@@ -846,6 +848,8 @@
                 const invite = (body.data && body.data.invite_url) || body.invite_url || '/whiteboard';
                 createdSessionLink.value = invite.startsWith('http') ? invite : (window.location.origin + invite);
                 try { new bootstrap.Modal(sessionCreatedModalEl).show(); } catch(e){ sessionCreatedModalEl.style.display='block'; }
+                // refresh the session list on landing so user sees the created session
+                try { loadMySessions(); } catch(e){}
             } catch (e) {
                 console.error('Create session failed:', e);
                 alert(e.message || 'Could not create session');
@@ -874,6 +878,66 @@
             }
             window.location.href = `/whiteboard?session=${encodeURIComponent(id)}`;
         });
+        
+        // --- My sessions listing and session end helper ---
+        async function loadMySessions() {
+            const listEl = document.getElementById('mySessionsListLanding');
+            const cardEl = document.getElementById('mySessionsCardLanding');
+            if (!listEl || !cardEl) return;
+            listEl.innerHTML = '<div class="list-group-item">Loading...</div>';
+            try {
+                const res = await fetch('/api/whiteboards/mine', { headers: { 'Authorization': `Bearer ${token}` } });
+                if (!res.ok) throw new Error('Failed to fetch sessions');
+                const body = await res.json();
+                const sessions = (body.data && body.data.whiteboards) || [];
+                if (!sessions.length) {
+                    cardEl.style.display = 'none';
+                    return;
+                }
+                cardEl.style.display = 'block';
+                listEl.innerHTML = '';
+                sessions.forEach(wb => {
+                    const li = document.createElement('div');
+                    li.className = 'list-group-item d-flex justify-content-between align-items-center';
+                    li.id = `session-item-${wb.id}`;
+                    const title = wb.title || 'Untitled Session';
+                    const groupName = wb.group_name ? `<div class="small text-muted">${wb.group_name}</div>` : '';
+                    li.innerHTML = `<div style="min-width:0;"><div class="fw-medium text-truncate" title="${title}">${title}</div>${groupName}</div><div class="d-flex gap-2"><a class="btn btn-sm btn-primary" href="/whiteboard?session=${wb.id}">Go</a><button class="btn btn-sm btn-danger end-session-btn">End</button></div>`;
+                    const endBtn = li.querySelector('.end-session-btn');
+                    endBtn.addEventListener('click', async () => {
+                        if (!confirm('End session for everyone?')) return;
+                        await endSession(wb.id);
+                    });
+                    listEl.appendChild(li);
+                });
+            } catch (e) {
+                console.error('Could not load my sessions:', e);
+                document.getElementById('mySessionsListLanding').innerHTML = '<div class="list-group-item text-muted">Could not load sessions</div>';
+            }
+        }
+
+        async function endSession(id) {
+            try {
+                const res = await fetch(`/api/whiteboards/${id}`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${token}` } });
+                const body = await res.json();
+                if (!res.ok) throw new Error(body.message || 'Failed to end session');
+                // If currently in that session, redirect to landing
+                if (sessionId && sessionId === id) {
+                    window.location.href = '/whiteboard';
+                    return;
+                }
+                // Otherwise remove from list
+                const el = document.getElementById(`session-item-${id}`);
+                if (el) el.remove();
+                // hide card if no items left
+                const listEl = document.getElementById('mySessionsListLanding');
+                if (listEl && listEl.children.length === 0) document.getElementById('mySessionsCardLanding').style.display = 'none';
+                alert(body.message || 'Session ended');
+            } catch (e) {
+                console.error('Failed to end session:', e);
+                alert(e.message || 'Could not end session');
+            }
+        }
         
     })();
 </script>
