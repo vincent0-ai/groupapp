@@ -206,7 +206,7 @@ def upload_audio(wb_id):
     return success_response({'file_id': str(file_id)}, 'Audio uploaded', 201)
 
 
-from app.services.livekit_service import LiveKitService
+from app.services.livekit_service import LiveKitService, VideoGrants
 from livekit import api
 import asyncio
 
@@ -258,7 +258,7 @@ async def get_livekit_token(wb_id):
 
     # Define LiveKit permissions based on app logic
     # can_publish allows audio/video, can_publish_data for things like chat
-    lk_permissions = api.VideoGrant(
+    lk_permissions = VideoGrants(
         room_join=True,
         room=f'whiteboard:{wb_id}',
         can_publish=can_speak or can_share_screen,
