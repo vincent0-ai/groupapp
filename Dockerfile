@@ -2,9 +2,13 @@ FROM python:3.11-slim
 
 WORKDIR /app
 
-# Install system dependencies
+# Install system dependencies required by LiveKit RTC
 RUN apt-get update && apt-get install -y \
     gcc \
+    libx11-6 \
+    libxext6 \
+    libxrender1 \
+    libxtst6 \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy requirements
@@ -19,8 +23,6 @@ COPY . .
 # Create uploads directory
 RUN mkdir -p uploads
 
-# Expose port
 EXPOSE 5000
 
-# Run application
 CMD ["gunicorn", "--worker-class", "eventlet", "-w", "1", "-b", "0.0.0.0:5000", "main:app"]

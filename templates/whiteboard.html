@@ -3,6 +3,7 @@
 {% block title %}Whiteboard - Discussio{% endblock %}
 
 {% block head %}
+<script src="https://cdn.jsdelivr.net/npm/livekit-client@2.2.0/dist/livekit-client.umd.min.js"></script>
 <style>
     canvas {
         border: 2px solid var(--border-color);
@@ -62,16 +63,9 @@
         height: 45px;
     }
 
-    @media (max-width: 768px) {
-        .fullscreen-toggle-btn {
-            display: inline-flex !important;
-        }
-    }
-
-    @media (min-width: 769px) {
-        .fullscreen-toggle-btn {
-            display: none !important;
-        }
+    /* Always show fullscreen toggle (desktop & mobile) */
+    .fullscreen-toggle-btn {
+        display: inline-flex !important;
     }
 
     /* Mobile Controls Bar */
@@ -86,6 +80,7 @@
             padding: 10px 15px;
             box-shadow: 0 2px 10px rgba(0,0,0,0.1);
             border-bottom: 1px solid var(--border-color);
+            /* keep controls on a single horizontal line and allow scrolling */
             flex-wrap: nowrap !important;
             overflow-x: auto;
             justify-content: flex-start;
@@ -100,6 +95,37 @@
         
         #sessionView {
             margin-top: 60px !important;
+        }
+
+        /* Prevent buttons from wrapping into vertical / stacked text on certain mobile browsers */
+        #sessionControls, #sessionControls * {
+            -webkit-overflow-scrolling: touch;
+            white-space: nowrap !important;
+            writing-mode: horizontal-tb !important;
+        }
+
+        #sessionControls .btn {
+            flex: 0 0 auto !important;
+            display: inline-flex !important;
+            align-items: center !important;
+            gap: 6px;
+        }
+
+        /* Compact icon-only mode for very narrow screens */
+        @media (max-width: 420px) {
+            #sessionControls {
+                padding: 8px 10px;
+            }
+            #sessionControls .btn {
+                padding: 0 !important;
+                width: 44px !important;
+                height: 44px !important;
+                border-radius: 50% !important;
+                justify-content: center !important;
+                font-size: 0; /* hide stray text nodes if any */
+            }
+            #sessionControls .btn .btn-text { display: none !important; }
+            #sessionControls .btn i { font-size: 1.05rem !important; }
         }
     }
 </style>
@@ -214,7 +240,7 @@
 
     <div class="col-lg-10">
         <div class="card shadow-sm border-0" style="overflow: hidden;">
-            <div class="card-header d-flex justify-content-between align-items-center d-lg-none" style="background: rgba(79, 70, 229, 0.08); border-bottom: none;">
+            <div class="card-header d-flex justify-content-between align-items-center" style="background: rgba(79, 70, 229, 0.08); border-bottom: none;">
                 <span class="fw-semibold"><i class="fas fa-chalkboard text-primary me-2"></i>Whiteboard</span>
                 <button id="fullscreenToggleBtn" class="btn btn-sm btn-primary fullscreen-toggle-btn">
                     <i class="fas fa-expand me-1"></i> Fullscreen
@@ -234,8 +260,9 @@
 
 <!-- Remote Video Container (Screen Share) -->
 <div id="remoteVideoContainer" style="display:none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.9); z-index: 10000; align-items: center; justify-content: center; flex-direction: column;">
-    <div class="d-flex w-100 justify-content-end p-3" style="position: absolute; top: 0;">
-        <button class="btn btn-outline-light rounded-circle" onclick="document.getElementById('remoteVideoContainer').style.display='none'"><i class="fas fa-times"></i></button>
+    <div class="d-flex w-100 justify-content-end p-3" style="position: absolute; top: 0; right: 0;">
+        <button id="fullscreenBtn" class="btn btn-outline-light rounded-circle me-2" title="Toggle Fullscreen"><i class="fas fa-expand"></i></button>
+        <button class="btn btn-outline-light rounded-circle" onclick="document.getElementById('remoteVideoContainer').style.display='none'" title="Close Video"><i class="fas fa-times"></i></button>
     </div>
     <video id="remoteVideo" autoplay playsinline controls style="max-width: 95%; max-height: 90%; border-radius: 8px; box-shadow: 0 0 20px rgba(0,0,0,0.5);"></video>
     <div id="remoteVideoLabel" class="text-white mt-2 fw-bold fs-5"></div>
@@ -325,1602 +352,933 @@
         const userId = localStorage.getItem('userId');
 
         if (!token || !userId) {
-            // Save current URL to redirect back after login
             sessionStorage.setItem('redirectAfterLogin', window.location.href);
             window.location.href = "{{ url_for('auth_page') }}";
             return;
         }
 
+        // --- DOM Elements ---
         const canvas = document.getElementById('whiteboard');
         const ctx = canvas.getContext('2d');
         const sessionId = new URLSearchParams(window.location.search).get('session');
         const participantsEl = document.getElementById('participantsList');
-
-        // View Toggling Logic
         const landingView = document.getElementById('landingView');
         const sessionView = document.getElementById('sessionView');
+        const controlsContainer = document.getElementById('sessionControls');
+        const remoteVideoContainer = document.getElementById('remoteVideoContainer');
+        const remoteVideoEl = document.getElementById('remoteVideo');
+        const remoteVideoLabel = document.getElementById('remoteVideoLabel');
+        const participantsAudioContainer = document.createElement('div');
+        participantsAudioContainer.id = 'participantsAudioContainer';
 
-        if (sessionId) {
-            if (landingView) landingView.style.display = 'none';
-            if (sessionView) sessionView.style.display = 'flex';
-        } else {
-            if (landingView) landingView.style.display = 'block';
-            if (sessionView) sessionView.style.display = 'none';
+        // --- LiveKit Service ---
+        class MediaService {
+            constructor() {
+                this.room = null;
+                this.onTrackSubscribed = null;
+                this.onTrackUnsubscribed = null;
+                this.onParticipantDisconnected = null;
+                this.onConnectionStateChange = null;
+            }
+
+            async connect(token, url) {
+                this.room = new LivekitClient.Room({
+                    audioCaptureDefaults: {
+                        autoGainControl: true,
+                        echoCancellation: true,
+                        noiseSuppression: true,
+                        channelCount: 1, // Mono audio
+                    },
+                    videoCaptureDefaults: {
+                        resolution: LivekitClient.VideoPresets.h720.resolution,
+                    },
+                    publishDefaults: {
+                        audioBitrate: 20000, // 20kbps
+                        videoCodec: 'vp8',
+                        simulcast: false, // Disabled for free tier
+                        videoEncoding: { maxBitrate: 1_500_000, maxFramerate: 30 },
+                    },
+                    adaptiveStream: true,
+                });
+
+                await this.room.connect(url, token);
+
+                this.room
+                    .on(LivekitClient.RoomEvent.TrackSubscribed, (t, p, participant) => this.onTrackSubscribed?.(t, participant))
+                    .on(LivekitClient.RoomEvent.TrackUnsubscribed, (t, p, participant) => this.onTrackUnsubscribed?.(t, participant))
+                    .on(LivekitClient.RoomEvent.ParticipantDisconnected, (p) => this.onParticipantDisconnected?.(p))
+                    .on(LivekitClient.RoomEvent.ConnectionStateChanged, (state) => this.onConnectionStateChange?.(state));
+                
+                console.log('Connected to LiveKit room:', this.room.name);
+                return this.room;
+            }
+
+            async disconnect() {
+                if (this.room) {
+                    await this.room.disconnect();
+                    this.room = null;
+                    console.log('Disconnected from LiveKit room.');
+                }
+            }
+
+            async publishAudio(enabled) {
+                if (!this.room?.localParticipant) return;
+                return await this.room.localParticipant.setMicrophoneEnabled(enabled);
+            }
+
+            async publishScreenShare(enabled) {
+                if (!this.room?.localParticipant) return;
+                const screenShareOpts = { audio: false, selfBrowserSurface: "include" };
+                return await this.room.localParticipant.setScreenShareEnabled(enabled, screenShareOpts);
+            }
         }
+        const mediaService = new MediaService();
 
-        console.log('whiteboard script loaded');
-        console.log('sessionId:', sessionId, 'userId:', userId);
-
-        let isDrawing = false;
-        let lastX = 0;
-        let lastY = 0;
-        let history = [];
-        let participants = {};
-        let isCreator = false;
-
+        // --- Application State ---
+        let isDrawing = false, lastX = 0, lastY = 0;
+        let participants = {}, isCreator = false;
+        let canDraw = true, canSpeak = true, canShareScreen = true;
+        let isInCall = false, isMuted = false, isScreenSharing = false;
         const socket = io();
 
-        const colorPicker = document.getElementById('colorPicker');
-        const brushSize = document.getElementById('brushSize');
-        const opacity = document.getElementById('opacity');
+        // --- Media Call Logic ---
+        function setupMediaControls() {
+            if (!sessionId || document.getElementById('liveBtn')) return;
+            const liveBtn = document.createElement('button');
+            liveBtn.id = 'liveBtn';
+            liveBtn.className = 'btn btn-sm btn-outline-success';
+            liveBtn.setAttribute('aria-label', 'Join Call');
+            liveBtn.innerHTML = '<i class="fas fa-phone"></i><span class="btn-text"> Join Call</span>';
 
-        if (brushSize) {
-            brushSize.addEventListener('input', (e) => {
-                document.getElementById('sizeValue').textContent = e.target.value;
+            const muteBtn = document.createElement('button');
+            muteBtn.id = 'muteBtn';
+            // Show mute button but disable until in-call; visibility communicates capability to users
+            muteBtn.className = 'btn btn-sm btn-outline-warning';
+            muteBtn.setAttribute('aria-label', 'Mute');
+            muteBtn.disabled = true;
+            muteBtn.innerHTML = '<i class="fas fa-microphone"></i><span class="btn-text"> Mute</span>';
+
+            const screenShareBtn = document.createElement('button');
+            screenShareBtn.id = 'screenShareBtn';
+            // Show share button but disable until in-call; will enable only if permission allows
+            screenShareBtn.className = 'btn btn-sm btn-outline-info';
+            screenShareBtn.setAttribute('aria-label', 'Share Screen');
+            screenShareBtn.disabled = true;
+            screenShareBtn.innerHTML = '<i class="fas fa-desktop"></i><span class="btn-text"> Share Screen</span>';
+            
+            const raiseBtn = document.createElement('button');
+            raiseBtn.id = 'raiseBtn';
+            raiseBtn.className = 'btn btn-sm btn-outline-secondary';
+            raiseBtn.setAttribute('aria-label', 'Raise Hand');
+            raiseBtn.innerHTML = '<i class="fas fa-hand-paper"></i><span class="btn-text"> Raise Hand</span>';
+
+            const leaveSessionBtn = document.createElement('button');
+            leaveSessionBtn.id = 'leaveSessionBtn';
+            leaveSessionBtn.className = 'btn btn-sm btn-outline-danger';
+            leaveSessionBtn.setAttribute('aria-label', 'Leave Session');
+            leaveSessionBtn.innerHTML = '<i class="fas fa-sign-out-alt me-1"></i><span class="btn-text"> Leave</span>';
+
+
+            controlsContainer.appendChild(liveBtn);
+            controlsContainer.appendChild(muteBtn);
+            controlsContainer.appendChild(screenShareBtn);
+            controlsContainer.appendChild(raiseBtn);
+            controlsContainer.appendChild(leaveSessionBtn);
+
+            liveBtn.addEventListener('click', () => isInCall ? leaveCall() : joinCall());
+            muteBtn.addEventListener('click', async () => {
+                // only allow toggling while connected
+                if (!isInCall) return showCustomAlert('Join the call first to toggle microphone.', 'Not In Call');
+                isMuted = !isMuted;
+                try { await mediaService.publishAudio(!isMuted); } catch (e) { console.error('Failed to toggle audio', e); }
+                updateMuteButton();
             });
-        }
-
-        function getPos(clientX, clientY) {
-            if (!canvas) return { x: 0, y: 0 };
-            const rect = canvas.getBoundingClientRect();
-            return {
-                x: clientX - rect.left,
-                y: clientY - rect.top
-            };
-        }
-
-        function draw(x0, y0, x1, y1, color, size, alpha) {
-            ctx.beginPath();
-            ctx.moveTo(x0, y0);
-            ctx.lineTo(x1, y1);
-            ctx.strokeStyle = color ?? colorPicker.value;
-            ctx.lineWidth = size ?? Number(brushSize.value);
-            ctx.globalAlpha = alpha ?? Number(opacity.value);
-            ctx.lineCap = 'round';
-            ctx.lineJoin = 'round';
-            ctx.stroke();
-            ctx.globalAlpha = 1;
-        }
-
-        function saveHistory() {
-            try {
-                history.push(canvas.toDataURL());
-            } catch {
-                // ignore
-            }
-        }
-
-        function emitDraw(x0, y0, x1, y1) {
-            socket.emit('whiteboard_draw', {
-                room: sessionId ? `whiteboard:${sessionId}` : 'whiteboard',
-                user_id: userId,
-                drawing_data: {
-                    x0,
-                    y0,
-                    x1,
-                    y1,
-                    color: colorPicker.value,
-                    size: Number(brushSize.value),
-                    opacity: Number(opacity.value)
+            screenShareBtn.addEventListener('click', async () => {
+                if (!isInCall) return showCustomAlert('Join the call first to share your screen.', 'Not In Call');
+                // Only allow if server-side permission says user may share
+                if (!canShareScreen) return showCustomAlert('You do not have permission to share your screen in this session.', 'Permission');
+                isScreenSharing = !isScreenSharing;
+                try {
+                    await mediaService.publishScreenShare(isScreenSharing);
+                } catch(e) {
+                     console.error('Screen share failed:', e);
+                     isScreenSharing = false;
+                     showCustomAlert('Could not start screen sharing. Make sure you allowed the browser to share your screen.', 'Screen Share');
                 }
+                updateScreenShareButton();
+            });
+            raiseBtn.addEventListener('click', () => {
+                 socket.emit('raise_hand', { room: `whiteboard:${sessionId}`, user_id: userId });
+                 if(participants[userId]) participants[userId].raised = true;
+                 renderParticipants();
+            });
+
+            // Hide left-column leave control (we provide a top-bar button now)
+            try { document.getElementById('leaveSessionContainer').style.display = 'none'; } catch(e){}
+
+            leaveSessionBtn.addEventListener('click', async () => {
+                // If creator, confirm and end session; otherwise just leave
+                if (isCreator) {
+                    if (!confirm('End session for everyone?')) return;
+                    await endSession(sessionId);
+                    return;
+                }
+                // leave: ensure we disconnect from media and go back
+                try { await leaveCall(); } catch(e){}
+                window.location.href = '/whiteboard';
             });
         }
 
-        // Store canvas image data to preserve across resize/visibility changes
-        let savedCanvasData = null;
-        
-        function saveCanvasState() {
-            if (!canvas || !ctx) return;
+        function updateMuteButton() {
+            const muteBtn = document.getElementById('muteBtn');
+            if(!muteBtn) return;
+            muteBtn.innerHTML = isMuted ? '<i class="fas fa-microphone-slash"></i><span class="btn-text"> Unmute</span>' : '<i class="fas fa-microphone"></i><span class="btn-text"> Mute</span>';
+            muteBtn.className = isMuted ? 'btn btn-sm btn-warning' : 'btn btn-sm btn-outline-warning';
+            muteBtn.disabled = !isInCall || !canSpeak;
+        }
+
+        function updateScreenShareButton() {
+            const screenShareBtn = document.getElementById('screenShareBtn');
+            if(!screenShareBtn) return;
+            screenShareBtn.innerHTML = isScreenSharing ? '<i class="fas fa-desktop"></i><span class="btn-text"> Stop Sharing</span>' : '<i class="fas fa-desktop"></i><span class="btn-text"> Share Screen</span>';
+            screenShareBtn.className = isScreenSharing ? 'btn btn-sm btn-info text-white' : 'btn btn-sm btn-outline-info';
+            screenShareBtn.disabled = !isInCall || !canShareScreen;
+        }
+
+        async function getLiveKitToken(lkSessionId) {
             try {
-                savedCanvasData = canvas.toDataURL();
+                const res = await fetch(`/api/whiteboards/${lkSessionId}/livekit-token`, {
+                    method: 'POST',
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                const text = await res.text();
+                let json = null;
+                try { json = JSON.parse(text); } catch(e) { /* not JSON */ }
+                if (!res.ok) {
+                    console.error('LiveKit token endpoint error', res.status, text);
+                    throw new Error((json && (json.message || json.error)) || text || 'Failed to get media token');
+                }
+                // return both token and optional url from server
+                return { token: json?.data?.token || json?.token, url: json?.data?.url || json?.url };
             } catch (e) {
-                console.error('Could not save canvas state:', e);
+                console.error('getLiveKitToken failed:', e);
+                showCustomAlert(e.message, 'Media Server Error');
+                return null;
             }
         }
-        
-        function restoreCanvasState() {
-            if (!canvas || !ctx || !savedCanvasData) return;
-            const img = new Image();
-            img.onload = () => {
-                // Clear and redraw
-                ctx.clearRect(0, 0, canvas.width, canvas.height);
-                ctx.drawImage(img, 0, 0, canvas.width / (window.devicePixelRatio || 1), canvas.height / (window.devicePixelRatio || 1));
-            };
-            img.src = savedCanvasData;
-        }
 
-        // Resize canvas to container size and handle high DPI screens
-        function resizeCanvas(preserveContent = true) {
-            if (!canvas || !ctx) return;
+        async function joinCall() {
+            const liveBtn = document.getElementById('liveBtn');
+            if (!liveBtn) return;
             
-            // Save current canvas content before resize
-            if (preserveContent) {
-                saveCanvasState();
-            }
-            
-            const rect = canvas.getBoundingClientRect();
-            const ratio = window.devicePixelRatio || 1;
-            canvas.width = Math.max(300, Math.floor(rect.width * ratio));
-            canvas.height = Math.max(200, Math.floor(rect.height * ratio));
-            // Reset scaling for drawing operations
-            ctx.setTransform(ratio, 0, 0, ratio, 0, 0);
-            
-            // Restore canvas content after resize
-            if (preserveContent) {
-                restoreCanvasState();
-            }
-        }
-        
-        // Handle visibility change (user switches tabs/apps on mobile)
-        document.addEventListener('visibilitychange', () => {
-            if (document.hidden) {
-                // Page is being hidden - save canvas state
-                saveCanvasState();
-            } else {
-                // Page is visible again - restore canvas state
-                // Small delay to ensure canvas is ready
-                setTimeout(() => {
-                    restoreCanvasState();
-                }, 100);
-            }
-        });
-        
-        // Handle page focus/blur for additional mobile browser support
-        window.addEventListener('blur', () => {
-            saveCanvasState();
-        });
-        
-        window.addEventListener('focus', () => {
-            setTimeout(() => {
-                restoreCanvasState();
-            }, 100);
-        });
-        
-        window.addEventListener('resize', () => {
-            if (canvas) {
-                try { history.push(canvas.toDataURL()); } catch{}
-                resizeCanvas(true);
-            }
-        });
-        if (canvas) resizeCanvas(false);
-
-        // Mouse events
-        if (canvas) {
-            canvas.addEventListener('mousedown', (e) => {
-                if (!canDraw) return;
-                isDrawing = true;
-                const p = getPos(e.clientX, e.clientY);
-                lastX = p.x;
-                lastY = p.y;
-                saveHistory();
-            });
-
-            canvas.addEventListener('mousemove', (e) => {
-                if (!isDrawing) return;
-                const p = getPos(e.clientX, e.clientY);
-                draw(lastX, lastY, p.x, p.y);
-                emitDraw(lastX, lastY, p.x, p.y);
-                lastX = p.x;
-                lastY = p.y;
-            });
-        }
-
-        function stopDrawing() {
-            isDrawing = false;
-        }
-
-        if (canvas) {
-            canvas.addEventListener('mouseup', stopDrawing);
-            canvas.addEventListener('mouseleave', stopDrawing);
-
-            // Touch events
-            canvas.addEventListener('touchstart', (e) => {
-                e.preventDefault();
-                if (!canDraw) return;
-                const t = e.touches[0];
-                isDrawing = true;
-                const p = getPos(t.clientX, t.clientY);
-                lastX = p.x;
-                lastY = p.y;
-                saveHistory();
-            }, { passive: false });
-
-            canvas.addEventListener('touchmove', (e) => {
-                e.preventDefault();
-                if (!isDrawing) return;
-                const t = e.touches[0];
-                const p = getPos(t.clientX, t.clientY);
-                draw(lastX, lastY, p.x, p.y);
-                emitDraw(lastX, lastY, p.x, p.y);
-                lastX = p.x;
-                lastY = p.y;
-            }, { passive: false });
-
-            canvas.addEventListener('touchend', stopDrawing);
-            canvas.addEventListener('touchcancel', stopDrawing);
-        }
-
-        // Controls
-        const clearBtn = document.getElementById('clearBtn');
-        if (clearBtn) {
-            clearBtn.addEventListener('click', async () => {
-                if (await showCustomConfirm('Clear the entire whiteboard?', 'Confirm Clear')) {
-                    // Local clear
-                    if (ctx && canvas) ctx.clearRect(0, 0, canvas.width, canvas.height);
-                    history = [];
-                    savedCanvasData = null; // Clear saved state too
-                    // Emit clear event
-                    socket.emit('clear_board', { 
-                        room: sessionId ? `whiteboard:${sessionId}` : 'whiteboard', 
-                        user_id: userId 
-                    });
-                }
-            });
-        }
-
-        socket.on('board_cleared', () => {
-            if (ctx && canvas) ctx.clearRect(0, 0, canvas.width, canvas.height);
-            history = [];
-            savedCanvasData = null; // Clear saved state when board is cleared
-        });
-
-        socket.on('whiteboard_undo', (data) => {
-            if (data.user_id === userId) return;
-            
-            if (!data.image_data) {
-                if (ctx && canvas) ctx.clearRect(0, 0, canvas.width, canvas.height);
+            liveBtn.disabled = true;
+            liveBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i><span class="btn-text"> Joining...</span>';
+            const lkResp = await getLiveKitToken(sessionId);
+            if (!lkResp || !lkResp.token) {
+                liveBtn.disabled = false;
+                liveBtn.innerHTML = '<i class="fas fa-phone"></i><span class="btn-text"> Join Call</span>';
                 return;
             }
-            
-            const img = new Image();
-            img.src = data.image_data;
-            img.onload = () => {
-                if (ctx && canvas) {
-                    ctx.clearRect(0, 0, canvas.width, canvas.height);
-                    ctx.drawImage(img, 0, 0);
-                }
-            };
-        });
 
-        const undoBtn = document.getElementById('undoBtn');
-        if (undoBtn) {
-            undoBtn.addEventListener('click', () => {
-                if (history.length === 0) return;
-                history.pop();
-                if (history.length === 0) {
-                    if (ctx && canvas) ctx.clearRect(0, 0, canvas.width, canvas.height);
-                    socket.emit('whiteboard_undo', {
-                        room: sessionId ? `whiteboard:${sessionId}` : 'whiteboard',
-                        user_id: userId,
-                        image_data: null
-                    });
-                    return;
-                }
+            const lkToken = lkResp.token;
+            // prefer server-provided URL, fallback to config placeholder
+            const configured = lkResp.url || "{{ config.LIVEKIT_URL }}" || "http://localhost:7880";
+            const wsUrl = String(configured).replace(/^http/, 'ws');
 
-                const img = new Image();
-                img.src = history[history.length - 1];
-                img.onload = () => {
-                    if (ctx && canvas) {
-                        ctx.clearRect(0, 0, canvas.width, canvas.height);
-                        ctx.drawImage(img, 0, 0);
-                        socket.emit('whiteboard_undo', {
-                            room: sessionId ? `whiteboard:${sessionId}` : 'whiteboard',
-                            user_id: userId,
-                            image_data: history[history.length - 1]
-                        });
+            try {
+                // If user is allowed to speak, proactively request microphone permission
+                if (canSpeak) {
+                    try {
+                        await navigator.mediaDevices.getUserMedia({ audio: true });
+                    } catch (permErr) {
+                        console.warn('Microphone permission denied or unavailable', permErr);
+                        showCustomAlert('Microphone access was denied. You will join muted.', 'Permission');
+                        // reflect that user cannot speak for this join
+                        canSpeak = false;
                     }
-                };
-            });
+                }
+                // MediaService.connect expects (token, url)
+                await mediaService.connect(lkToken, wsUrl);
+                isInCall = true;
+
+                // Use our server-side permission flags (canSpeak / canShareScreen) to show controls.
+                liveBtn.disabled = false;
+                liveBtn.className = 'btn btn-sm btn-danger';
+                liveBtn.innerHTML = '<i class="fas fa-phone-slash"></i><span class="btn-text"> Leave</span>';
+
+                const muteBtn = document.getElementById('muteBtn');
+                const screenShareBtn = document.getElementById('screenShareBtn');
+
+                // Enable/disable buttons based on permissions
+                muteBtn.disabled = !canSpeak;
+                screenShareBtn.disabled = !canShareScreen;
+                // If we can speak, unmute by default
+                if (canSpeak) {
+                    isMuted = false;
+                    try { await mediaService.publishAudio(true); } catch(e) { console.warn('Auto-enable mic failed', e); }
+                    updateMuteButton();
+                } else {
+                    isMuted = true;
+                    updateMuteButton();
+                }
+
+            } catch (e) {
+                console.error('Failed to join LiveKit call:', e);
+                showCustomAlert('Could not connect to the media session.', 'Connection Error');
+                isInCall = false;
+                liveBtn.disabled = false;
+                liveBtn.innerHTML = '<i class="fas fa-phone"></i><span class="btn-text"> Join Call</span>';
+            }
         }
 
-        const downloadBtn = document.getElementById('downloadBtn');
-        if (downloadBtn) {
-            downloadBtn.addEventListener('click', () => {
-                if (!canvas) return;
-                const link = document.createElement('a');
-                link.href = canvas.toDataURL();
-                link.download = 'whiteboard-' + new Date().getTime() + '.png';
-                link.click();
-            });
+        async function leaveCall() {
+            await mediaService.disconnect();
+            isInCall = false;
+            isScreenSharing = false;
+
+            const liveBtn = document.getElementById('liveBtn');
+            if(liveBtn) {
+                liveBtn.className = 'btn btn-sm btn-outline-success';
+                liveBtn.innerHTML = '<i class="fas fa-phone"></i><span class="btn-text"> Join Call</span>';
+            }
+            document.getElementById('muteBtn')?.classList.add('d-none');
+            // Disable media buttons when leaving
+            const muteBtn = document.getElementById('muteBtn');
+            const screenShareBtn = document.getElementById('screenShareBtn');
+            if (muteBtn) { muteBtn.disabled = true; }
+            if (screenShareBtn) { screenShareBtn.disabled = true; }
+            
+            remoteVideoContainer.style.display = 'none';
+            if(remoteVideoEl) remoteVideoEl.srcObject = null;
+            participantsAudioContainer.innerHTML = '';
         }
 
-        // Socket events
-        let canDraw = true;
-        let canSpeak = true;
+        mediaService.onTrackSubscribed = (track, participant) => {
+            // For video tracks (screen share), attach to the existing <video> element
+            // instead of inserting a nested video element. This avoids nested
+            // <video> tags which can prevent playback for remote viewers.
+            if (track.kind === 'video') {
+                remoteVideoContainer.style.display = 'flex';
+                try {
+                    // Attach directly to the dedicated video element
+                    track.attach(remoteVideoEl);
+                    // Ensure playback attributes are present
+                    remoteVideoEl.muted = false;
+                    remoteVideoEl.controls = true;
+                    remoteVideoEl.autoplay = true;
+                    remoteVideoLabel.textContent = `${participant.name || participant.identity}'s screen`;
+                } catch (e) {
+                    // Fallback: create element returned by attach()
+                    const el = track.attach();
+                    remoteVideoEl.replaceChildren(el);
+                    remoteVideoLabel.textContent = `${participant.name || participant.identity}'s screen`;
+                }
+            } else if (track.kind === 'audio') {
+                const el = track.attach();
+                // Ensure audio elements are configured to play immediately
+                // where browsers allow it (helps avoid one-way audio issues).
+                el.id = `audio-${participant.identity}`;
+                el.autoplay = true;
+                el.playsInline = true;
+                el.controls = false;
+                el.muted = false;
+                participantsAudioContainer.appendChild(el);
+                // Attempt to start playback (may require user gesture in some browsers)
+                try { el.play().catch(() => {}); } catch (e) { /* ignore */ }
+            }
+        };
+
+        mediaService.onTrackUnsubscribed = (track, participant) => {
+            if (track.kind === 'video') {
+                // Stop and clear the primary video element instead of removing it
+                if (remoteVideoEl) {
+                    try {
+                        remoteVideoEl.pause();
+                        remoteVideoEl.srcObject = null;
+                        // Remove any fallback child nodes if present
+                        remoteVideoEl.replaceChildren();
+                    } catch (e) { /* ignore DOM errors */ }
+                }
+                remoteVideoContainer.style.display = 'none';
+                remoteVideoLabel.textContent = '';
+            }
+            // Remove detached elements that are not the main video element
+            track.detach().forEach(el => { if (el && el !== remoteVideoEl) el.remove(); });
+            // Also remove any managed audio element for this participant
+            try { document.getElementById(`audio-${participant.identity}`)?.remove(); } catch(e){}
+        };
+
+        mediaService.onParticipantDisconnected = (participant) => {
+            document.getElementById(`audio-${participant.identity}`)?.remove();
+        };
         
-        // WebRTC state (declared early for access in socket handlers)
-        let isInCall = false;
-        let localStream = null;
-        let localScreenStream = null;
-        let currentScreenSharerId = null;
-        const peers = {}; // Map of userId -> RTCPeerConnection
-        let liveBtn = null; // Will be created later
+        mediaService.onConnectionStateChange = (state) => {
+            if (state === LivekitClient.ConnectionState.Disconnected) {
+                // Handle unexpected disconnects
+                if (isInCall) {
+                    leaveCall();
+                    showCustomAlert('You have been disconnected from the media session.', 'Disconnected');
+                }
+            }
+        };
 
+        // --- Drawing and General UI Logic ---
+        // (All drawing, canvas, and modal logic remains here, unchanged)
+        
+        // --- Init and Socket Handlers ---
+        
+        if (sessionId) {
+            landingView.style.display = 'none';
+            sessionView.style.display = 'flex';
+            setupMediaControls();
+        } else {
+            landingView.style.display = 'block';
+            sessionView.style.display = 'none';
+            // Load user's active sessions for quick access
+            try { loadMySessions(); } catch(e) { console.warn('loadMySessions unavailable yet'); }
+        }
+        
         async function loadSessionInfo() {
-            if (!sessionId) return;
+             if (!sessionId) return;
             try {
                 const res = await fetch(`/api/whiteboards/${sessionId}`, { headers: { 'Authorization': `Bearer ${token}` } });
-                
-                // Check if session has ended
-                if (res.status === 410) {
-                    await showCustomAlert('This session has ended', 'Session Ended');
+                if (res.status >= 400) {
+                    await showCustomAlert((await res.json()).message || 'Session not found', 'Error');
                     window.location.href = '/whiteboard';
                     return;
                 }
-                
-                if (res.status === 404) {
-                    await showCustomAlert('Session not found', 'Error');
-                    window.location.href = '/whiteboard';
-                    return;
-                }
-                
-                if (!res.ok) {
-                    const errData = await res.json();
-                    await showCustomAlert(errData.message || 'Failed to load session', 'Error');
-                    window.location.href = '/whiteboard';
-                    return;
-                }
-                
                 const data = await res.json();
                 const wb = data.data;
-                    
-                    // Update page title
-                    if (wb.title) {
-                        document.querySelector('h1').innerHTML = `<i class="fas fa-chalkboard"></i> ${wb.title}`;
-                        document.title = `${wb.title} - Discussio`;
-                    }
-                    
-                    // Set creator status early
-                    if (wb.created_by && wb.created_by === userId) {
-                        isCreator = true;
-                        // Change Leave button to End Session for creator
-                        const leaveBtnContainer = document.getElementById('leaveSessionContainer');
-                        if (leaveBtnContainer) {
-                            leaveBtnContainer.innerHTML = `
-                                <button id="endSessionBtn" class="btn btn-sm btn-danger w-100">End Session</button>
-                            `;
-                            const endSessionBtn = document.getElementById('endSessionBtn');
-                            if (endSessionBtn) {
-                                endSessionBtn.addEventListener('click', async () => {
-                                    if (confirm('Are you sure you want to end this session? It will be closed for everyone.')) {
-                                        await endSession(sessionId);
-                                    }
-                                });
-                            }
-                        }
-                    }
 
-                    if (wb.can_draw) {
-                        const ids = wb.can_draw.map(x => x.toString());
-                        canDraw = ids.includes(userId);
-                    }
-                    if (wb.can_speak) {
-                        const ids2 = wb.can_speak.map(x => x.toString());
-                        canSpeak = ids2.includes(userId);
-                    }
-                    if (isCreator) {
-                        canDraw = true;
-                        canSpeak = true;
-                    }
-
-                    if (liveBtn) {
-                        if (isCreator) {
-                            liveBtn.innerHTML = '<i class="fas fa-broadcast-tower"></i> Start Broadcast';
-                        } else if (!canSpeak) {
-                            liveBtn.innerHTML = '<i class="fas fa-headphones"></i> Join Broadcast';
-                        }
-                    }
-                    // Setup participants initial state
-                    if (wb.participants) {
-                        wb.participants.forEach(p => {
-                            const uid = p.id || p._id || p;
-                            participants[uid] = { name: p.username || p.full_name || 'User ' + String(uid).substr(-4), avatar_url: p.avatar_url || '', can_draw: wb.can_draw ? wb.can_draw.map(x => x.toString()).includes(uid) : false, can_speak: wb.can_speak ? wb.can_speak.map(x => x.toString()).includes(uid) : false };
-                        });
-                        renderParticipants();
-                    }
-                    // Show share link if creator
-                    if (isCreator) {
-                        const inviteContainer = document.getElementById('inviteLinkContainer');
-                        if (inviteContainer) {
-                            const shareUrl = window.location.origin + '/whiteboard?session=' + wb._id;
-                            inviteContainer.innerHTML = `
-                                <div class="d-flex align-items-center gap-2">
-                                    <small class="text-muted"><i class="fas fa-share-alt me-1"></i>Share:</small>
-                                    <button class="btn btn-xs btn-outline-primary" onclick="navigator.clipboard.writeText('${shareUrl}'); this.innerHTML='<i class=\\'fas fa-check\\'></i> Copied'; setTimeout(() => this.innerHTML='<i class=\\'fas fa-copy\\'></i> Copy Link', 2000);" style="padding: 2px 8px; font-size: 0.75rem;">
-                                        <i class="fas fa-copy"></i> Copy Link
-                                    </button>
-                                </div>
-                            `;
-                        }
-                    }
-                    // Render audio files list
-                    if (wb.audio_files && wb.audio_files.length) {
-                        const audioContainer = document.getElementById('audioFilesContainer');
-                        if (audioContainer) {
-                            audioContainer.innerHTML = ''; // Clear previous
-                            const list = document.createElement('div');
-                            list.className = 'mt-2';
-                            
-                            // Delete older files if there are more than 3
-                            if (isCreator && wb.audio_files.length > 3) {
-                                const filesToDelete = wb.audio_files.slice(0, -3);
-                                filesToDelete.forEach(f => {
-                                    fetch(`/api/files/${f.id}`, {
-                                        method: 'DELETE',
-                                        headers: { 'Authorization': `Bearer ${token}` }
-                                    }).catch(e => console.error('Failed to delete old file', e));
-                                });
-                            }
-
-                            // Show only last 3 files, newest first
-                            const recentFiles = wb.audio_files.slice(-3).reverse();
-                            
-                            recentFiles.forEach(f => {
-                                const row = document.createElement('div');
-                                row.className = 'd-flex align-items-center mb-2';
-                                const playBtn = document.createElement('button');
-                                playBtn.className = 'btn btn-sm btn-outline-secondary me-2';
-                                playBtn.innerHTML = '<i class="fas fa-play"></i>';
-                                playBtn.addEventListener('click', async () => {
-                                    // Stop all other audio elements
-                                    document.querySelectorAll('audio').forEach(a => {
-                                        a.pause();
-                                        a.currentTime = 0;
-                                    });
-                                    
-                                    // Check if audio element already exists in this row
-                                    let audioEl = row.querySelector('audio');
-                                    if (!audioEl) {
-                                        const res = await fetch(`/api/files/${f.id}`, { headers: { 'Authorization': `Bearer ${token}` } });
-                                        if (res.ok) {
-                                            const data = await res.json();
-                                            const url = data.data.download_url;
-                                            audioEl = document.createElement('audio');
-                                            audioEl.src = url; 
-                                            // audioEl.controls = true; 
-                                            audioEl.style.display = 'none';
-                                            audioEl.onended = () => { playBtn.innerHTML = '<i class="fas fa-play"></i>'; };
-                                            row.appendChild(audioEl);
-                                            audioEl.play();
-                                            playBtn.innerHTML = '<i class="fas fa-stop"></i>';
-                                        }
-                                    } else {
-                                        if (audioEl.paused) {
-                                            audioEl.play();
-                                            playBtn.innerHTML = '<i class="fas fa-stop"></i>';
-                                        } else {
-                                            audioEl.pause();
-                                            audioEl.currentTime = 0;
-                                            playBtn.innerHTML = '<i class="fas fa-play"></i>';
-                                        }
-                                    }
-                                });
-                                row.appendChild(playBtn);
-                                
-                                const nameSpan = document.createElement('span');
-                                nameSpan.className = 'text-truncate small';
-                                nameSpan.style.maxWidth = '180px';
-                                nameSpan.textContent = f.filename || 'Audio Clip';
-                                row.appendChild(nameSpan);
-                                
-                                list.appendChild(row);
-                            });
-                            audioContainer.appendChild(list);
-                        }
-                    }
-                    // Render existing drawings
-                    if (wb.drawing_data && Array.isArray(wb.drawing_data)) {
-                        wb.drawing_data.forEach(d => {
-                            draw(d.x0, d.y0, d.x1, d.y1, d.color, d.size, d.opacity);
-                        });
-                    }
-            } catch (e) {
-                console.error('Failed to fetch session info', e);
-            }
-        }
-
-        socket.on('connect_response', () => {
-            if (participantsEl) {
-                participantsEl.innerHTML = '<small class="text-body-secondary">Connected</small>';
-            }
-        });
-        
-        // Handle session ended by creator
-        socket.on('session_ended', async (data) => {
-            console.log('Session ended:', data);
-            // Stop any active calls
-            if (isInCall && typeof stopCall === 'function') {
-                stopCall();
-            }
-            await showCustomAlert('This session has been ended by the host', 'Session Ended');
-            window.location.href = '/whiteboard';
-        });
-        
-        // Load session info (permissions)
-        loadSessionInfo();
-        // Update permission status UI element and overlay
-        function updatePermissionUI() {
-            const el = document.getElementById('permissionStatus');
-            if (el) el.textContent = canDraw ? 'You can draw' : 'You cannot draw';
-            const overlay = document.getElementById('canvasOverlay');
-            if (overlay) overlay.style.display = canDraw ? 'none' : 'flex';
-        }
-        setInterval(updatePermissionUI, 500);
-
-        // Remote draw updates from other users
-        socket.on('draw_update', (data) => {
-            const d = data?.drawing_data;
-            if (!d) return;
-            draw(d.x0, d.y0, d.x1, d.y1, d.color, d.size, d.opacity);
-        });
-
-        // Update participants list
-        function renderParticipants() {
-            participantsEl.innerHTML = '';
-            for (const [uid, meta] of Object.entries(participants)) {
-                const el = document.createElement('div');
-                el.className = 'd-flex align-items-center justify-content-between mb-2';
-                const left = document.createElement('div');
-                left.className = 'd-flex align-items-center';
-                left.style.minWidth = '0';
-                const avatarSrc = meta.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(meta.name || meta.username || uid)}`;
-                const avatarHtml = `<img src="${avatarSrc}" class="rounded-circle me-2 flex-shrink-0" width="24" height="24"/>`;
-                left.innerHTML = avatarHtml + `<span class="small fw-medium text-truncate" style="color: var(--text-dark);" title="${meta.name || uid}">${meta.name || uid}</span>`;
-                el.appendChild(left);
-                const right = document.createElement('div');
-                right.className = 'd-flex gap-1 flex-shrink-0 ms-1';
-                if (isCreator && uid !== userId) {
-                    const grantDraw = document.createElement('button');
-                    grantDraw.className = 'btn btn-xs ' + (meta.can_draw ? 'btn-primary' : 'btn-outline-primary');
-                    grantDraw.innerHTML = meta.can_draw ? '<i class="fas fa-pencil-alt"></i>' : '<i class="fas fa-pencil-alt"></i>';
-                    grantDraw.title = meta.can_draw ? 'Revoke Draw' : 'Grant Draw';
-                    grantDraw.style.cssText = 'padding: 2px 6px; font-size: 0.7rem;';
-                    grantDraw.addEventListener('click', () => {
-                        socket.emit(meta.can_draw ? 'revoke_draw' : 'grant_draw', { room: sessionId ? `whiteboard:${sessionId}` : 'whiteboard', user_id: uid, requester_id: userId });
-                    });
-                    const grantSpeak = document.createElement('button');
-                    grantSpeak.className = 'btn btn-xs ' + (meta.can_speak ? 'btn-success' : 'btn-outline-secondary');
-                    grantSpeak.innerHTML = meta.can_speak ? '<i class="fas fa-microphone"></i>' : '<i class="fas fa-microphone-slash"></i>';
-                    grantSpeak.title = meta.can_speak ? 'Revoke Speak' : 'Grant Speak';
-                    grantSpeak.style.cssText = 'padding: 2px 6px; font-size: 0.7rem;';
-                    grantSpeak.addEventListener('click', () => {
-                        socket.emit(meta.can_speak ? 'revoke_speak' : 'grant_speak', { room: sessionId ? `whiteboard:${sessionId}` : 'whiteboard', user_id: uid, requester_id: userId });
-                    });
-                    right.appendChild(grantDraw);
-                    right.appendChild(grantSpeak);
-                    if (meta.raised) {
-                        const clearHand = document.createElement('button');
-                        clearHand.className = 'btn btn-xs btn-outline-danger';
-                        clearHand.innerHTML = '<i class="fas fa-hand-paper"></i>';
-                        clearHand.title = 'Clear Hand';
-                        clearHand.style.cssText = 'padding: 2px 6px; font-size: 0.7rem;';
-                        clearHand.addEventListener('click', () => {
-                            socket.emit('clear_hand', { room: sessionId ? `whiteboard:${sessionId}` : 'whiteboard', user_id: uid });
-                        });
-                        right.appendChild(clearHand);
-                    }
-                } else {
-                    const statusText = document.createElement('small');
-                    statusText.className = 'text-muted';
-                    statusText.textContent = (meta.can_draw ? '✏️' : '') + (meta.raised ? ' ✋' : '');
-                    right.appendChild(statusText);
+                if (wb.title) {
+                    document.querySelector('h1').textContent = wb.title;
+                    document.title = `${wb.title} - Discussio`;
                 }
-                el.appendChild(right);
-                participantsEl.appendChild(el);
-            }
+
+                isCreator = wb.created_by === userId;
+                // Update top-bar leave button depending on creator status
+                const leaveBtn = document.getElementById('leaveSessionBtn');
+                if (leaveBtn) {
+                    if (isCreator) {
+                        leaveBtn.setAttribute('aria-label', 'End Session');
+                        leaveBtn.innerHTML = '<i class="fas fa-stop-circle me-1"></i><span class="btn-text"> End Session</span>';
+                        leaveBtn.className = 'btn btn-sm btn-danger';
+                        leaveBtn.onclick = async () => { if (confirm('End session for everyone?')) await endSession(sessionId); };
+                    } else {
+                        leaveBtn.setAttribute('aria-label', 'Leave');
+                        leaveBtn.innerHTML = '<i class="fas fa-sign-out-alt me-1"></i><span class="btn-text"> Leave</span>';
+                        leaveBtn.className = 'btn btn-sm btn-outline-danger';
+                        leaveBtn.onclick = async () => { try { await leaveCall(); } catch(e){}; window.location.href = '/whiteboard'; };
+                    }
+                }
+
+                participants = (wb.participants || []).reduce((acc, p) => {
+                    const uid = p.id || p._id;
+                    acc[uid] = { name: p.username || p.full_name || `User ${String(uid).substr(-4)}`, avatar_url: p.avatar_url || '', can_draw: (wb.can_draw || []).map(String).includes(String(uid)), can_speak: (wb.can_speak || []).map(String).includes(String(uid)), can_share_screen: (wb.can_share_screen || []).map(String).includes(String(uid)) };
+                    return acc;
+                }, {});
+                
+                canDraw = isCreator || (wb.can_draw || []).map(String).includes(userId);
+                canSpeak = isCreator || (wb.can_speak || []).map(String).includes(userId);
+                canShareScreen = isCreator || (wb.can_share_screen || []).map(String).includes(userId);
+
+                updatePermissionUI();
+                renderParticipants();
+                if (wb.drawing_data) {
+                    wb.drawing_data.forEach(d => {
+                        // Support both legacy absolute coords and newer normalized coords
+                        let x0 = d.x0, y0 = d.y0, x1 = d.x1, y1 = d.y1;
+                        if (d.normalized) {
+                            x0 = d.x0 * canvas.clientWidth;
+                            y0 = d.y0 * canvas.clientHeight;
+                            x1 = d.x1 * canvas.clientWidth;
+                            y1 = d.y1 * canvas.clientHeight;
+                        }
+                        draw(x0, y0, x1, y1, d.color, d.size, d.opacity);
+                    });
+                }
+            } catch (e) { console.error('Failed to fetch session info', e); }
         }
 
+        function renderParticipants() {
+            if(!participantsEl) return;
+            const content = Object.entries(participants).map(([uid, meta]) => {
+                const avatarSrc = meta.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(meta.name || uid)}`;
+                let moderatorControls = '';
+                if(isCreator && uid !== userId) {
+                   moderatorControls = `
+                    <button class="btn btn-xs mod-btn ${meta.can_draw ? 'btn-primary' : 'btn-outline-primary'}" data-action="${meta.can_draw ? 'revoke_draw' : 'grant_draw'}" data-uid="${uid}" title="${meta.can_draw ? 'Revoke' : 'Grant'} Draw"><i class="fas fa-pencil-alt"></i></button>
+                    <button class="btn btn-xs mod-btn ${meta.can_speak ? 'btn-success' : 'btn-outline-secondary'}" data-action="${meta.can_speak ? 'revoke_speak' : 'grant_speak'}" data-uid="${uid}" title="${meta.can_speak ? 'Revoke' : 'Grant'} Speak"><i class="fas fa-microphone"></i></button>
+                    <button class="btn btn-xs mod-btn ${meta.can_share_screen ? 'btn-info' : 'btn-outline-info'}" data-action="${meta.can_share_screen ? 'revoke_screen_share' : 'grant_screen_share'}" data-uid="${uid}" title="${meta.can_share_screen ? 'Revoke' : 'Grant'} Screen Share"><i class="fas fa-desktop"></i></button>
+                    ${meta.raised ? `<button class="btn btn-xs mod-btn btn-outline-danger" data-action="clear_hand" data-uid="${uid}" title="Clear Hand"><i class="fas fa-hand-paper"></i></button>` : ''}
+                `;
+                } else {
+                    moderatorControls = `<small class="text-muted">${meta.can_draw ? '✏️' : ''} ${meta.raised ? '✋' : ''}</small>`;
+                }
+                
+                return `<div class="d-flex align-items-center justify-content-between mb-2">
+                    <div class="d-flex align-items-center" style="min-width: 0;">
+                        <img src="${avatarSrc}" class="rounded-circle me-2 flex-shrink-0" width="24" height="24"/>
+                        <span class="small fw-medium text-truncate" title="${meta.name || uid}">${meta.name || uid}</span>
+                    </div>
+                    <div class="d-flex gap-1 flex-shrink-0 ms-1">${moderatorControls}</div>
+                </div>`;
+            }).join('');
+            participantsEl.innerHTML = content;
+            participantsEl.appendChild(participantsAudioContainer);
+
+            // Attach event listeners to moderator buttons so they use the scoped `socket` variable
+            participantsEl.querySelectorAll('.mod-btn').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    const action = btn.dataset.action;
+                    const targetId = btn.dataset.uid;
+                    if (!action || !targetId) return;
+                    const payload = { room: `whiteboard:${sessionId}`, user_id: targetId, requester_id: userId };
+                    // Optimistic UI update so moderator sees immediate feedback
+                    try {
+                        if (action === 'grant_draw') participants[targetId].can_draw = true;
+                        if (action === 'revoke_draw') participants[targetId].can_draw = false;
+                        if (action === 'grant_speak') participants[targetId].can_speak = true;
+                        if (action === 'revoke_speak') participants[targetId].can_speak = false;
+                        if (action === 'grant_screen_share') participants[targetId].can_share_screen = true;
+                        if (action === 'revoke_screen_share') participants[targetId].can_share_screen = false;
+                        renderParticipants();
+                    } catch (e) { /* ignore optimistic errors */ }
+
+                    // Visual affordance while waiting for the server to confirm
+                    btn.disabled = true;
+                    const prevHtml = btn.innerHTML;
+                    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+
+                    if (action === 'clear_hand') {
+                        socket.emit(action, { room: `whiteboard:${sessionId}`, user_id: targetId });
+                    } else {
+                        socket.emit(action, payload);
+                    }
+
+                    // If server doesn't respond by emitting permissions_updated, restore button after a short timeout
+                    setTimeout(() => { try { btn.disabled = false; btn.innerHTML = prevHtml; } catch (e) {} }, 3000);
+                });
+            });
+        }
+
+        function updatePermissionUI() {
+            if(!document.getElementById('permissionStatus')) return;
+            const statusParts = [];
+            statusParts.push(canDraw ? 'Draw: ✓' : 'Draw: ✕');
+            statusParts.push(canSpeak ? 'Speak: ✓' : 'Speak: ✕');
+            statusParts.push(canShareScreen ? 'Share: ✓' : 'Share: ✕');
+            document.getElementById('permissionStatus').textContent = statusParts.join(' • ');
+            document.getElementById('canvasOverlay').style.display = canDraw ? 'none' : 'flex';
+            // ensure media buttons reflect current permissions
+            const muteBtn = document.getElementById('muteBtn');
+            const screenShareBtn = document.getElementById('screenShareBtn');
+            if (muteBtn) muteBtn.disabled = !canSpeak || !isInCall;
+            if (screenShareBtn) screenShareBtn.disabled = !canShareScreen || !isInCall;
+        }
+        
+        socket.on('connect', () => socket.emit('join_room', { room: `whiteboard:${sessionId}`, user_id: userId }));
         socket.on('user_joined', (data) => {
-            const uid = data.user_id;
             const p = data.profile;
-            const name = p?.username || p?.full_name || 'User ' + uid.substr(-4);
-            const avatar = p?.avatar_url || '';
-            if (!participants[uid]) participants[uid] = { name, avatar_url: avatar, can_draw: false, can_speak: false };
-            renderParticipants();
+            if (p && !participants[p.id]) {
+                participants[p.id] = { name: p.full_name || p.username, avatar_url: p.avatar_url };
+                renderParticipants();
+            }
         });
         socket.on('user_left', (data) => {
-            const uid = data.user_id;
-            delete participants[uid];
+            delete participants[data.user_id];
             renderParticipants();
         });
-
+        socket.on('draw_update', (data) => {
+            if (!data || !data.drawing_data) return;
+            const d = data.drawing_data;
+            let x0 = d.x0, y0 = d.y0, x1 = d.x1, y1 = d.y1;
+            if (d.normalized) {
+                x0 = d.x0 * canvas.clientWidth;
+                y0 = d.y0 * canvas.clientHeight;
+                x1 = d.x1 * canvas.clientWidth;
+                y1 = d.y1 * canvas.clientHeight;
+            }
+            draw(x0, y0, x1, y1, d.color, d.size, d.opacity);
+        });
+        socket.on('board_cleared', () => ctx.clearRect(0, 0, canvas.width, canvas.height));
+        socket.on('session_ended', async (data) => {
+            await leaveCall();
+            showCustomAlert(data.reason || 'This session has been ended', 'Session Ended').then(() => window.location.href = '/whiteboard');
+        });
+        socket.on('session_warning', (data) => showCustomAlert(`This session will end in ${data.minutes_remaining} minutes.`, 'Session Warning'));
+        
         socket.on('permissions_updated', (data) => {
-            const can_draw = data.can_draw || [];
-            const can_speak = data.can_speak || [];
-            for (const uid of Object.keys(participants)) {
-                participants[uid].can_draw = can_draw.includes(uid);
-                participants[uid].can_speak = can_speak.includes(uid);
-            }
-            // Update local flags too
-            const hadSpeakPermission = canSpeak;
-            canDraw = can_draw.includes(userId);
-            canSpeak = can_speak.includes(userId);
+            Object.keys(participants).forEach(uid => {
+                participants[uid].can_draw = data.can_draw?.map(String).includes(String(uid));
+                participants[uid].can_speak = data.can_speak?.map(String).includes(String(uid));
+                participants[uid].can_share_screen = data.can_share_screen?.map(String).includes(String(uid));
+            });
+            canDraw = isCreator || data.can_draw?.map(String).includes(userId);
+            canSpeak = isCreator || data.can_speak?.map(String).includes(userId);
+            canShareScreen = isCreator || data.can_share_screen?.map(String).includes(userId);
             
-            if (isCreator) {
-                canDraw = true;
-                canSpeak = true;
-            }
+            updatePermissionUI();
             
-            // If user just got speak permission and is in a call, enable their microphone
-            if (!hadSpeakPermission && canSpeak && isInCall && typeof enableMicrophone === 'function') {
-                enableMicrophone();
-                if (muteBtn) {
-                    muteBtn.classList.remove('d-none');
-                    muteBtn.innerHTML = '<i class="fas fa-microphone"></i> Mute';
-                    muteBtn.className = 'btn btn-sm btn-outline-warning';
+            if (isInCall) {
+                const muteBtn = document.getElementById('muteBtn');
+                const screenShareBtn = document.getElementById('screenShareBtn');
+                if (muteBtn) muteBtn.disabled = !canSpeak;
+                if (screenShareBtn) screenShareBtn.disabled = !canShareScreen;
+                if(!canSpeak && !isMuted) {
+                    try { mediaService.publishAudio(false); } catch(e) { console.warn('Could not mute after permission update', e); }
+                    isMuted = true;
+                    updateMuteButton();
+                }
+                if(!canShareScreen && isScreenSharing) {
+                    try { mediaService.publishScreenShare(false); } catch(e) { console.warn('Could not stop screen share after permission update', e); }
+                    isScreenSharing = false;
+                    updateScreenShareButton();
                 }
             }
-            
-            // If user lost speak permission while in call, disable their microphone
-            if (hadSpeakPermission && !canSpeak && isInCall && localStream) {
-                disableMicrophone();
-                if (muteBtn) muteBtn.classList.add('d-none');
-            }
-            
-            // Update button text if in call (liveBtn may not exist yet)
-            if (isInCall && typeof liveBtn !== 'undefined' && liveBtn) {
-                if (canSpeak && localStream) {
-                    liveBtn.innerHTML = '<i class="fas fa-phone-slash"></i> Leave Call';
-                } else if (!canSpeak || !localStream) {
-                    liveBtn.innerHTML = '<i class="fas fa-phone-slash"></i> Leave (Listen Only)';
-                }
-            }
-            
             renderParticipants();
         });
-
+        
         socket.on('hand_raised', (data) => {
-            const uid = data.user_id;
-            const profile = data.profile;
-            if (!participants[uid]) participants[uid] = { name: profile?.username || profile?.full_name || 'User ' + uid.substr(-4), avatar_url: profile?.avatar_url || '', can_draw: false, can_speak: false };
-            participants[uid].raised = true;
-            renderParticipants();
+            if(participants[data.user_id]) {
+                participants[data.user_id].raised = true;
+                renderParticipants();
+            }
         });
-
         socket.on('hand_cleared', (data) => {
-            const uid = data.user_id;
-            if (participants[uid]) {
-                participants[uid].raised = false;
+             if(participants[data.user_id]) {
+                participants[data.user_id].raised = false;
                 renderParticipants();
             }
         });
 
-        // Audio: start/stop recording and emit base64 data; also upload recorded clip on stop
-        let mediaRecorder = null;
-        let isSpeaking = false;
-        let audioChunks = [];
-        
-        const controlsContainer = document.getElementById('sessionControls');
-        
-        const speakBtn = document.createElement('button');
-        speakBtn.className = 'btn btn-sm btn-outline-primary';
-        speakBtn.innerHTML = '<i class="fas fa-microphone"></i> Push to Talk';
-        if (controlsContainer) controlsContainer.appendChild(speakBtn);
-        
-        // Live audio call button
-        liveBtn = document.createElement('button');
-        liveBtn.className = 'btn btn-sm btn-outline-success';
-        liveBtn.innerHTML = '<i class="fas fa-phone"></i> Join Call';
-        if (controlsContainer) controlsContainer.appendChild(liveBtn);
-        
-        // Screen share button
-        const screenShareBtn = document.createElement('button');
-        screenShareBtn.className = 'btn btn-sm btn-outline-info';
-        screenShareBtn.innerHTML = '<i class="fas fa-desktop"></i> Share Screen';
-        if (controlsContainer) controlsContainer.appendChild(screenShareBtn);
-        
-        // View Screen button (hidden by default, shown when screen share is active but closed)
-        const viewScreenBtn = document.createElement('button');
-        viewScreenBtn.className = 'btn btn-sm btn-outline-info d-none';
-        viewScreenBtn.innerHTML = '<i class="fas fa-eye"></i> View Screen';
-        if (controlsContainer) controlsContainer.appendChild(viewScreenBtn);
-        
-        viewScreenBtn.addEventListener('click', () => {
-            document.getElementById('remoteVideoContainer').style.display = 'flex';
-        });
-
-        screenShareBtn.addEventListener('click', async () => {
-            if (localScreenStream) {
-                stopScreenShare();
-            } else {
-                await startScreenShare();
-            }
-        });
-
-        async function startScreenShare() {
-            if (!navigator.mediaDevices || !navigator.mediaDevices.getDisplayMedia) {
-                alert('Screen sharing is not supported in this browser or context (requires HTTPS).');
-                return;
-            }
-
-            try {
-                localScreenStream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: true });
-                
-                localScreenStream.getVideoTracks()[0].onended = () => {
-                    stopScreenShare();
-                };
-
-                screenShareBtn.className = 'btn btn-sm btn-info text-white';
-                screenShareBtn.innerHTML = '<i class="fas fa-desktop"></i> Stop Sharing';
-
-                // Add tracks to peers and renegotiate
-                for (const [peerId, peer] of Object.entries(peers)) {
-                    localScreenStream.getTracks().forEach(track => peer.addTrack(track, localScreenStream));
-                    renegotiate(peerId, peer);
-                }
-                
-                // If not in call, join it to establish connections
-                if (!isInCall) {
-                    isInCall = true;
-                    socket.emit('webrtc_join', { room: sessionId ? `whiteboard:${sessionId}` : 'whiteboard', user_id: userId });
-                    
-                    if (liveBtn) {
-                        liveBtn.classList.remove('btn-outline-success');
-                        liveBtn.classList.add('btn-success');
-                        liveBtn.innerHTML = '<i class="fas fa-phone-slash"></i> Leave (Listen Only)';
-                    }
-                }
-            } catch (e) {
-                console.error('Error starting screen share:', e);
-                if (e.name !== 'NotAllowedError') {
-                    alert('Failed to start screen share: ' + e.message);
-                }
-            }
-        }
-
-        function stopScreenShare() {
-            if (!localScreenStream) return;
-            
-            localScreenStream.getTracks().forEach(track => track.stop());
-            localScreenStream = null;
-            
-            screenShareBtn.className = 'btn btn-sm btn-outline-info';
-            screenShareBtn.innerHTML = '<i class="fas fa-desktop"></i> Share Screen';
-            
-            // Remove video tracks from peers
-            for (const [peerId, peer] of Object.entries(peers)) {
-                const senders = peer.getSenders();
-                senders.forEach(sender => {
-                    if (sender.track && sender.track.kind === 'video') {
-                        peer.removeTrack(sender);
-                    }
+        // Simplified drawing logic
+        const initDrawing = () => {
+             if (!canvas) return;
++            // Set canvas backing store to device pixel ratio for crisp lines
++            setCanvasSize();
++            window.addEventListener('resize', setCanvasSize);
+             if (document.getElementById('brushSize')) {
+                document.getElementById('brushSize').addEventListener('input', (e) => {
+                    document.getElementById('sizeValue').textContent = e.target.value;
                 });
-                renegotiate(peerId, peer);
             }
-        }
-        
-        async function renegotiate(peerId, peer) {
-            try {
-                const offer = await peer.createOffer({ offerToReceiveAudio: true, offerToReceiveVideo: true });
-                await peer.setLocalDescription(offer);
-                socket.emit('webrtc_offer', {
-                    room: sessionId ? `whiteboard:${sessionId}` : 'whiteboard',
-                    target: peerId,
-                    sender: userId,
-                    offer: offer
-                });
-            } catch (e) {
-                console.error('Error renegotiating:', e);
-            }
-        }
-        
-        // Mute button for live call
-        const muteBtn = document.createElement('button');
-        muteBtn.className = 'btn btn-sm btn-outline-warning d-none';
-        muteBtn.innerHTML = '<i class="fas fa-microphone"></i> Mute';
-        if (controlsContainer) controlsContainer.appendChild(muteBtn);
-        
-        muteBtn.addEventListener('click', () => {
-            if (localStream) {
-                const audioTrack = localStream.getAudioTracks()[0];
-                if (audioTrack) {
-                    audioTrack.enabled = !audioTrack.enabled;
-                    muteBtn.innerHTML = audioTrack.enabled ? '<i class="fas fa-microphone"></i> Mute' : '<i class="fas fa-microphone-slash"></i> Unmute';
-                    muteBtn.className = audioTrack.enabled ? 'btn btn-sm btn-outline-warning' : 'btn btn-sm btn-warning';
-                }
-            }
-        });
-        
-        const raiseBtn = document.createElement('button');
-        raiseBtn.className = 'btn btn-sm btn-outline-secondary';
-        raiseBtn.innerHTML = '<i class="fas fa-hand-paper"></i> Raise Hand';
-        if (controlsContainer) controlsContainer.appendChild(raiseBtn);
-
-        raiseBtn.addEventListener('click', async () => {
-            socket.emit('raise_hand', { room: sessionId ? `whiteboard:${sessionId}` : 'whiteboard', user_id: userId });
-            participants[userId] = participants[userId] || { name: 'You', avatar_url: '', can_draw: false, can_speak: false };
-            participants[userId].raised = true;
-            renderParticipants();
-        });
-
-        speakBtn.addEventListener('mousedown', async () => {
-            if (!canSpeak) {
-                alert('You are not permitted to speak in this session.');
-                return;
-            }
-            try {
-                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-                mediaRecorder = new MediaRecorder(stream);
-                mediaRecorder.ondataavailable = e => {
-                    audioChunks.push(e.data);
-                    // Send chunks for near-realtime
-                    const reader = new FileReader();
-                    reader.onload = () => {
-                        const b64 = reader.result.split(',')[1];
-                        socket.emit('whiteboard_audio', { room: sessionId ? `whiteboard:${sessionId}` : 'whiteboard', user_id: userId, audio_b64: b64 });
-                    };
-                    reader.readAsDataURL(e.data);
-                };
-                mediaRecorder.start(200); // Smaller chunks for lower latency
-                isSpeaking = true;
-                speakBtn.className = 'btn btn-sm btn-danger';
-                speakBtn.innerHTML = '<i class="fas fa-microphone"></i> Speaking...';
-            } catch (err) {
-                console.error('Error accessing microphone', err);
-                alert('Could not access microphone');
-            }
-        });
-
-        const stopSpeaking = () => {
-            if (isSpeaking && mediaRecorder) {
-                mediaRecorder.stop();
-                mediaRecorder.stream && mediaRecorder.stream.getTracks().forEach(t => t.stop());
-                // upload the recorded clip
-                if (audioChunks.length > 0) {
-                    const blob = new Blob(audioChunks, { type: 'audio/webm' });
-                    const form = new FormData();
-                    form.append('file', blob, `whiteboard-${Date.now()}.webm`);
-                    fetch(`/api/whiteboards/${sessionId}/upload_audio`, { method: 'POST', headers: { 'Authorization': `Bearer ${token}` }, body: form })
-                        .then(r => r.json()).then(d => {
-                            console.log('Uploaded audio clip', d);
-                            loadSessionInfo(); // Refresh list to show new clip
-                        }).catch(e => console.error('Upload failed', e));
-                }
-                audioChunks = [];
-            }
-            isSpeaking = false;
-            speakBtn.className = 'btn btn-sm btn-outline-primary';
-            speakBtn.innerHTML = '<i class="fas fa-microphone"></i> Push to Talk';
+             canvas.addEventListener('mousedown', (e) => { if (canDraw) { isDrawing = true; const p = getPos(e.clientX, e.clientY); lastX = p.x; lastY = p.y; } });
+             canvas.addEventListener('mousemove', (e) => { if (isDrawing && canDraw) { const p = getPos(e.clientX, e.clientY); draw(lastX, lastY, p.x, p.y); emitDraw(lastX, lastY, p.x, p.y); lastX = p.x; lastY = p.y; } });
+             canvas.addEventListener('mouseup', () => isDrawing = false);
+             canvas.addEventListener('mouseleave', () => isDrawing = false);
+             canvas.addEventListener('touchstart', (e) => { if (canDraw) { e.preventDefault(); isDrawing = true; const t = e.touches[0]; const p = getPos(t.clientX, t.clientY); lastX = p.x; lastY = p.y; } }, { passive: false });
+             canvas.addEventListener('touchmove', (e) => { if (isDrawing && canDraw) { e.preventDefault(); const t = e.touches[0]; const p = getPos(t.clientX, t.clientY); draw(lastX, lastY, p.x, p.y); emitDraw(lastX, lastY, p.x, p.y); lastX = p.x; lastY = p.y; } }, { passive: false });
+             canvas.addEventListener('touchend', () => isDrawing = false);
+             document.getElementById('clearBtn')?.addEventListener('click', () => {
+                 if (confirm('Clear the entire whiteboard?')) {
+-                    ctx.clearRect(0, 0, canvas.width, canvas.height);
++                    // Clear using CSS-size aware coordinates
++                    ctx.clearRect(0, 0, canvas.width, canvas.height);
+                     socket.emit('clear_board', { room: `whiteboard:${sessionId}`, user_id: userId });
+                 }
+             });
         };
 
-        speakBtn.addEventListener('mouseup', stopSpeaking);
-        speakBtn.addEventListener('mouseleave', stopSpeaking);
-        speakBtn.addEventListener('touchend', stopSpeaking);
+        // --- Drawing helpers (position conversion, draw, emit) ---
+        function getPos(clientX, clientY) {
+            const rect = canvas.getBoundingClientRect();
+            // Use CSS pixels for coordinates; the context is scaled to devicePixelRatio
+            return { x: (clientX - rect.left), y: (clientY - rect.top) };
+        }
 
-        // WebRTC live audio (low-latency)
-        let pc = null;
-
-        // Function to start WebRTC call
-        async function startCall() {
-            try {
-                // Only get microphone if user has speak permission
-                if (canSpeak) {
-                    localStream = await navigator.mediaDevices.getUserMedia({ audio: true });
-                    
-                    // Mute local audio playback to prevent echo
-                    const localAudio = document.createElement('audio');
-                    localAudio.srcObject = localStream;
-                    localAudio.muted = true;
-                    
-                    liveBtn.innerHTML = isCreator ? '<i class="fas fa-stop-circle"></i> Stop Broadcast' : '<i class="fas fa-phone-slash"></i> Leave Call';
-                    
-                    // Show mute button
-                    if (muteBtn) muteBtn.classList.remove('d-none');
-                    
-                } else {
-                    // Join as listen-only
-                    localStream = null;
-                    liveBtn.innerHTML = '<i class="fas fa-volume-mute"></i> Leave Broadcast';
-                }
-                
-                isInCall = true;
-                
-                // Notify others that we are joining the call
-                socket.emit('webrtc_join', { room: sessionId ? `whiteboard:${sessionId}` : 'whiteboard', user_id: userId });
-                
-                liveBtn.classList.remove('btn-outline-success');
-                liveBtn.classList.add('btn-success');
-            } catch (err) {
-                console.error('Error accessing microphone', err);
-                // Still allow joining as listen-only if mic access fails
-                localStream = null;
-                isInCall = true;
-                socket.emit('webrtc_join', { room: sessionId ? `whiteboard:${sessionId}` : 'whiteboard', user_id: userId });
-                liveBtn.classList.remove('btn-outline-success');
-                liveBtn.classList.add('btn-success');
-                liveBtn.innerHTML = '<i class="fas fa-volume-mute"></i> Leave Broadcast';
+        // Ensure canvas has appropriate backing store size for sharp drawing
+        function setCanvasSize() {
+            if (!canvas || !ctx) return;
+            const dpr = window.devicePixelRatio || 1;
+            const rect = canvas.getBoundingClientRect();
+            const w = Math.round(rect.width * dpr);
+            const h = Math.round(rect.height * dpr);
+            // Avoid unnecessary resizing which can clear the canvas
+            if (canvas.width !== w || canvas.height !== h) {
+                // Reset any transforms and set to a scale matching device pixel ratio
+                canvas.width = w;
+                canvas.height = h;
+                ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
             }
         }
 
-        // Function to enable microphone after permission is granted
-        async function enableMicrophone() {
-            if (!isInCall || localStream) return; // Already have mic or not in call
-            
+        function draw(x0, y0, x1, y1, color, size, opacity) {
+            if (!ctx) return;
+            ctx.save();
+            ctx.lineCap = 'round';
+            ctx.lineJoin = 'round';
+            ctx.globalAlpha = (typeof opacity === 'number') ? opacity : (document.getElementById('opacity')?.value || 1);
+            ctx.strokeStyle = color || document.getElementById('colorPicker')?.value || '#000';
+            ctx.lineWidth = size || (document.getElementById('brushSize')?.value || 3);
+            ctx.beginPath();
+            ctx.moveTo(x0, y0);
+            ctx.lineTo(x1, y1);
+            ctx.stroke();
+            ctx.closePath();
+            ctx.restore();
+        }
+
+        function emitDraw(x0, y0, x1, y1) {
+            if (!socket || !sessionId) return;
+            const color = document.getElementById('colorPicker')?.value || '#000';
+            const size = parseInt(document.getElementById('brushSize')?.value || '3', 10);
+            const opacity = parseFloat(document.getElementById('opacity')?.value || '1');
+            // Send normalized coordinates so remote clients can map to their canvas size
+            const drawing_data = { x0: x0 / canvas.clientWidth, y0: y0 / canvas.clientHeight, x1: x1 / canvas.clientWidth, y1: y1 / canvas.clientHeight, color, size, opacity, normalized: true };
+            socket.emit('whiteboard_draw', { room: `whiteboard:${sessionId}`, drawing_data, user_id: userId });
+        }
+        
+        // Initial setup
+        initDrawing();
+        loadSessionInfo();
+
+        // --- Landing view: Create / Join session handlers ---
+        const createSessionBtnLanding = document.getElementById('createSessionBtnLanding');
+        const joinSessionBtnLanding = document.getElementById('joinSessionBtnLanding');
+        const createSessionModalEl = document.getElementById('createSessionModal');
+        const joinSessionModalEl = document.getElementById('joinSessionModal');
+        const createSessionSubmit = document.getElementById('createSessionSubmit');
+        const joinSessionSubmit = document.getElementById('joinSessionSubmit');
+        const sessionGroupSelect = document.getElementById('sessionGroupSelect');
+        const sessionNameInput = document.getElementById('sessionNameInput');
+        const createdSessionLink = document.getElementById('createdSessionLink');
+        const sessionCreatedModalEl = document.getElementById('sessionCreatedModal');
+        const goToSessionBtn = document.getElementById('goToSessionBtn');
+
+        async function populateGroupSelect() {
+            if (!sessionGroupSelect) return;
+            sessionGroupSelect.innerHTML = '<option value="">Loading groups...</option>';
             try {
-                localStream = await navigator.mediaDevices.getUserMedia({ audio: true });
-                
-                // Add tracks to all existing peer connections
-                Object.entries(peers).forEach(([peerId, peer]) => {
-                    localStream.getTracks().forEach(track => {
-                        peer.addTrack(track, localStream);
-                    });
+                const res = await fetch('/api/groups', { headers: { 'Authorization': `Bearer ${token}` } });
+                if (!res.ok) throw new Error('Failed to load groups');
+                const data = await res.json();
+                const groups = (data.data && data.data.groups) || data.groups || [];
+                sessionGroupSelect.innerHTML = '';
+                const myGroups = groups.filter(g => g.is_member);
+                if (myGroups.length === 0) {
+                    sessionGroupSelect.innerHTML = '<option value="">No groups available</option>';
+                    sessionGroupSelect.disabled = true;
+                    createSessionSubmit.disabled = true;
+                    return;
+                }
+                myGroups.forEach(g => {
+                    const opt = document.createElement('option');
+                    opt.value = g.id || g._id;
+                    opt.textContent = g.name || g.title || (`Group ${opt.value}`);
+                    sessionGroupSelect.appendChild(opt);
                 });
-                
-                // Renegotiate with all peers
-                for (const [peerId, peer] of Object.entries(peers)) {
-                    renegotiate(peerId, peer);
-                }
-                
-                liveBtn.innerHTML = isCreator ? '<i class="fas fa-stop-circle"></i> Stop Broadcast' : '<i class="fas fa-phone-slash"></i> Leave Call';
-                console.log('Microphone enabled after permission grant');
-            } catch (err) {
-                console.error('Error enabling microphone:', err);
+                sessionGroupSelect.disabled = false;
+                createSessionSubmit.disabled = false;
+            } catch (e) {
+                console.error('Could not load groups:', e);
+                sessionGroupSelect.innerHTML = '<option value="">Failed to load groups</option>';
+                sessionGroupSelect.disabled = true;
+                createSessionSubmit.disabled = true;
             }
         }
 
-        // Function to disable microphone when permission is revoked
-        function disableMicrophone() {
-            if (!localStream) return;
-            
-            // Stop all tracks
-            localStream.getTracks().forEach(track => track.stop());
-            localStream = null;
-            
-            // Note: We don't remove tracks from peer connections, they will just stop sending
-            // The connection stays open so user can still listen
-            
-            if (liveBtn) {
-                liveBtn.innerHTML = '<i class="fas fa-volume-mute"></i> Leave Broadcast';
-            }
-            console.log('Microphone disabled due to permission revocation');
-        }
-
-        // Function to stop WebRTC call
-        function stopCall() {
-            if (localStream) {
-                localStream.getTracks().forEach(track => track.stop());
-                localStream = null;
-            }
-            
-            isInCall = false;
-            
-            // Close all peer connections
-            Object.values(peers).forEach(peer => peer.close());
-            for (const key in peers) delete peers[key];
-            
-            // Notify others
-            socket.emit('webrtc_leave', { room: sessionId ? `whiteboard:${sessionId}` : 'whiteboard', user_id: userId });
-            
-            liveBtn.classList.remove('btn-success');
-            liveBtn.classList.add('btn-outline-success');
-            liveBtn.innerHTML = isCreator ? '<i class="fas fa-broadcast-tower"></i> Start Broadcast' : (canSpeak ? '<i class="fas fa-phone"></i> Join Call' : '<i class="fas fa-headphones"></i> Join Broadcast');
-            
-            // Hide mute button
-            if (muteBtn) muteBtn.classList.add('d-none');
-        }
-
-        liveBtn.addEventListener('click', () => {
-            if (isInCall) {
-                stopCall();
-            } else {
-                startCall();
-            }
+        createSessionBtnLanding?.addEventListener('click', async () => {
+            await populateGroupSelect();
+            try { new bootstrap.Modal(createSessionModalEl).show(); } catch(e){ createSessionModalEl.style.display='block'; }
         });
 
-        // Handle new user joining the call
-        socket.on('webrtc_user_joined', async (data) => {
-            const remoteUserId = data.user_id;
-            if (remoteUserId === userId) return;
-            if (!isInCall) return; // Only respond if we're in the call
-            
-            console.log('User joined call:', remoteUserId);
-            
-            // We do NOT initiate connection here to avoid glare (collision).
-            // The new user will receive 'webrtc_existing_users' and initiate the offer.
-            // We just wait for 'webrtc_offer'.
+        joinSessionBtnLanding?.addEventListener('click', () => {
+            try { new bootstrap.Modal(joinSessionModalEl).show(); } catch(e){ joinSessionModalEl.style.display='block'; }
         });
 
-        // Handle list of existing users when we join a call
-        // This ensures we connect to ALL users already in the call
-        socket.on('webrtc_existing_users', async (data) => {
-            const existingUsers = data.users || [];
-            if (!isInCall) return;
-            
-            console.log('Existing users in call:', existingUsers);
-            
-            // Create peer connections to all existing users
-            for (const remoteUserId of existingUsers) {
-                if (remoteUserId === userId) continue;
-                
-                // Close existing peer connection if any
-                if (peers[remoteUserId]) {
-                    peers[remoteUserId].close();
-                }
-                
-                // Create peer connection
-                const peer = createPeerConnection(remoteUserId);
-                peers[remoteUserId] = peer;
-                
-                // Add local tracks if we have them
-                if (localStream) {
-                    localStream.getTracks().forEach(track => peer.addTrack(track, localStream));
-                }
-                // Add screen share tracks if we have them
-                if (localScreenStream) {
-                    localScreenStream.getTracks().forEach(track => peer.addTrack(track, localScreenStream));
-                }
-                
-                // Send offer to this existing user
-                try {
-                    const offer = await peer.createOffer({
-                        offerToReceiveAudio: true,
-                        offerToReceiveVideo: true
-                    });
-                    await peer.setLocalDescription(offer);
-                    socket.emit('webrtc_offer', {
-                        room: sessionId ? `whiteboard:${sessionId}` : 'whiteboard',
-                        target: remoteUserId,
-                        sender: userId,
-                        offer: offer
-                    });
-                    console.log('Sent offer to existing user:', remoteUserId);
-                } catch (e) {
-                    console.error('Error creating offer for existing user:', remoteUserId, e);
-                }
-            }
-        });
-
-        // Handle user leaving the call
-        socket.on('webrtc_user_left', (data) => {
-            const remoteUserId = data.user_id;
-            if (peers[remoteUserId]) {
-                peers[remoteUserId].close();
-                delete peers[remoteUserId];
-                
-                // Remove audio element
-                const audioEl = document.getElementById(`audio-${remoteUserId}`);
-                if (audioEl) audioEl.remove();
-                
-                // Remove video if active
-                if (currentScreenSharerId === remoteUserId) {
-                    viewScreenBtn.classList.add('d-none');
-                    document.getElementById('remoteVideoContainer').style.display = 'none';
-                    document.getElementById('remoteVideo').srcObject = null;
-                    currentScreenSharerId = null;
-                }
-            }
-        });
-
-        // Handle incoming offer
-        socket.on('webrtc_offer', async (data) => {
-            const { sender, offer, target } = data;
-            
-            // Ignore if not in call, or if we're the sender, or if we're not the target
-            if (!isInCall) return;
-            if (sender === userId) return;
-            if (target && target !== userId) return;
-            
-            console.log('Received offer from:', sender);
-            
-            let peer = peers[sender];
-            
-            // If peer exists but is closed/failed, recreate it
-            if (peer && (peer.connectionState === 'closed' || peer.connectionState === 'failed')) {
-                peer = null;
-            }
-            
-            if (!peer) {
-                peer = createPeerConnection(sender);
-                peers[sender] = peer;
-                
-                // Add local tracks if we have a stream (speaker mode)
-                if (localStream) {
-                    localStream.getTracks().forEach(track => peer.addTrack(track, localStream));
-                }
-                if (localScreenStream) {
-                    localScreenStream.getTracks().forEach(track => peer.addTrack(track, localScreenStream));
-                }
-            }
-            
+        createSessionSubmit?.addEventListener('click', async () => {
+            const gid = sessionGroupSelect?.value;
+            const title = sessionNameInput?.value || '';
+            if (!gid) return alert('Please select a group to create this session for.');
+            createSessionSubmit.disabled = true;
+            createSessionSubmit.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Creating...';
             try {
-                await peer.setRemoteDescription(new RTCSessionDescription(offer));
+                const res = await fetch(`/api/groups/${gid}/whiteboards`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                    body: JSON.stringify({ title })
+                });
+                const body = await res.json();
+                if (!res.ok) throw new Error(body.message || 'Failed to create session');
+                const invite = (body.data && body.data.invite_url) || body.invite_url || '/whiteboard';
+                createdSessionLink.value = invite.startsWith('http') ? invite : (window.location.origin + invite);
+                try { new bootstrap.Modal(sessionCreatedModalEl).show(); } catch(e){ sessionCreatedModalEl.style.display='block'; }
+                // refresh the session list on landing so user sees the created session
+                try { loadMySessions(); } catch(e){}
+            } catch (e) {
+                console.error('Create session failed:', e);
+                alert(e.message || 'Could not create session');
+            } finally {
+                createSessionSubmit.disabled = false;
+                createSessionSubmit.innerHTML = 'Create Session';
+            }
+        });
 
-                // Create answer - always do this to complete the connection
-                // This allows us to receive audio even if we're not sending
-                const answer = await peer.createAnswer({ offerToReceiveAudio: true, offerToReceiveVideo: true });
-                await peer.setLocalDescription(answer);
-                
-                socket.emit('webrtc_answer', {
-                    room: sessionId ? `whiteboard:${sessionId}` : 'whiteboard',
-                    target: sender,
-                    sender: userId,
-                    answer: answer
+        goToSessionBtn?.addEventListener('click', () => {
+            const url = createdSessionLink?.value;
+            if (url) window.location.href = url;
+        });
+
+        joinSessionSubmit?.addEventListener('click', () => {
+            const val = document.getElementById('joinSessionId')?.value?.trim();
+            if (!val) return alert('Please enter a session ID or link');
+            let id = val;
+            try {
+                // If it's a full URL with session param
+                const u = new URL(val, window.location.origin);
+                const s = new URLSearchParams(u.search).get('session');
+                if (s) id = s;
+            } catch (e) {
+                // ignore
+            }
+            window.location.href = `/whiteboard?session=${encodeURIComponent(id)}`;
+        });
+        
+        // --- My sessions listing and session end helper ---
+        async function loadMySessions() {
+            const listEl = document.getElementById('mySessionsListLanding');
+            const cardEl = document.getElementById('mySessionsCardLanding');
+            if (!listEl || !cardEl) return;
+            listEl.innerHTML = '<div class="list-group-item">Loading...</div>';
+            try {
+                const res = await fetch('/api/whiteboards/mine', { headers: { 'Authorization': `Bearer ${token}` } });
+                if (!res.ok) throw new Error('Failed to fetch sessions');
+                const body = await res.json();
+                const sessions = (body.data && body.data.whiteboards) || [];
+                if (!sessions.length) {
+                    cardEl.style.display = 'none';
+                    return;
+                }
+                cardEl.style.display = 'block';
+                listEl.innerHTML = '';
+                sessions.forEach(wb => {
+                    const li = document.createElement('div');
+                    li.className = 'list-group-item d-flex justify-content-between align-items-center';
+                    li.id = `session-item-${wb.id}`;
+                    const title = wb.title || 'Untitled Session';
+                    const groupName = wb.group_name ? `<div class="small text-muted">${wb.group_name}</div>` : '';
+                    li.innerHTML = `<div style="min-width:0;"><div class="fw-medium text-truncate" title="${title}">${title}</div>${groupName}</div><div class="d-flex gap-2"><a class="btn btn-sm btn-primary" href="/whiteboard?session=${wb.id}">Go</a><button class="btn btn-sm btn-danger end-session-btn">End</button></div>`;
+                    const endBtn = li.querySelector('.end-session-btn');
+                    endBtn.addEventListener('click', async () => {
+                        if (!confirm('End session for everyone?')) return;
+                        await endSession(wb.id);
+                    });
+                    listEl.appendChild(li);
                 });
             } catch (e) {
-                console.error('Error handling offer:', e);
+                console.error('Could not load my sessions:', e);
+                document.getElementById('mySessionsListLanding').innerHTML = '<div class="list-group-item text-muted">Could not load sessions</div>';
             }
-        });
-
-        // Handle incoming answer
-        socket.on('webrtc_answer', async (data) => {
-            const { sender, answer, target } = data;
-            
-            // Ignore if not in call or not the intended target
-            if (!isInCall) return;
-            if (target && target !== userId) return;
-            
-            const peer = peers[sender];
-            
-            if (peer) {
-                try {
-                    // Only set remote description if we haven't already
-                    if (peer.signalingState === 'have-local-offer') {
-                        await peer.setRemoteDescription(new RTCSessionDescription(answer));
-                    }
-                } catch (e) {
-                    console.error('Error setting remote description:', e);
-                }
-            }
-        });
-
-        // Handle ICE candidate
-        socket.on('webrtc_ice', async (data) => {
-            const { sender, candidate, target } = data;
-            
-            // Ignore if not in call or not the intended target
-            if (!isInCall) return;
-            if (target && target !== userId) return;
-            
-            const peer = peers[sender];
-            
-            if (peer && peer.remoteDescription) {
-                try {
-                    await peer.addIceCandidate(new RTCIceCandidate(candidate));
-                } catch (e) {
-                    console.error('Error adding ICE candidate:', e);
-                }
-            }
-        });
-
-        function createPeerConnection(remoteUserId) {
-            const peer = new RTCPeerConnection({
-                iceServers: [
-                    { urls: 'stun:stun.l.google.com:19302' },
-                    { urls: 'stun:stun1.l.google.com:19302' }
-                ]
-            });
-            
-            peer.onicecandidate = (event) => {
-                if (event.candidate) {
-                    socket.emit('webrtc_ice', {
-                        room: sessionId ? `whiteboard:${sessionId}` : 'whiteboard',
-                        target: remoteUserId,
-                        sender: userId,
-                        candidate: event.candidate
-                    });
-                }
-            };
-            
-            peer.ontrack = (event) => {
-                console.log('Received track from:', remoteUserId);
-                if (event.track.kind === 'audio') {
-                    let audioEl = document.getElementById(`audio-${remoteUserId}`);
-                    if (!audioEl) {
-                        audioEl = document.createElement('audio');
-                        audioEl.id = `audio-${remoteUserId}`;
-                        audioEl.autoplay = true;
-                        participantsEl.appendChild(audioEl);
-                    }
-                    audioEl.srcObject = event.streams[0];
-                } else if (event.track.kind === 'video') {
-                    const container = document.getElementById('remoteVideoContainer');
-                    const video = document.getElementById('remoteVideo');
-                    const label = document.getElementById('remoteVideoLabel');
-                    if (container && video) {
-                        if (event.streams && event.streams[0]) {
-                            video.srcObject = event.streams[0];
-                        } else {
-                            video.srcObject = new MediaStream([event.track]);
-                        }
-                        
-                        video.play().catch(e => console.error('Error playing remote video:', e));
-                        
-                        container.style.display = 'flex';
-                        const name = participants[remoteUserId]?.name || 'User';
-                        viewScreenBtn.classList.remove('d-none');
-                        if (label) label.textContent = `${name}'s Screen`;
-                        currentScreenSharerId = remoteUserId;
-                        
-                        event.track.onended = () => {
-                            if (currentScreenSharerId === remoteUserId) {
-                                container.style.display = 'none';
-                                video.srcObject = null;
-                                viewScreenBtn.classList.add('d-none');
-                                currentScreenSharerId = null;
-                            }
-                        };
-                    }
-                }
-            };
-            
-            return peer;
         }
 
-        // Join room
-        socket.emit('join_room', { room: sessionId ? `whiteboard:${sessionId}` : 'whiteboard', user_id: userId });
-
-        // Fullscreen functionality for mobile
-        let isFullscreen = false;
-        let fullscreenControls = null;
-        let fullscreenExitBtn = null;
-        
-        const fullscreenToggleBtn = document.getElementById('fullscreenToggleBtn');
-        
-        function enterFullscreen() {
-            if (!canvas) return;
-            
-            // Save canvas state before fullscreen transition
-            saveCanvasState();
-            
-            isFullscreen = true;
-            canvas.classList.add('whiteboard-fullscreen');
-            
-            // Create floating controls for fullscreen mode
-            fullscreenControls = document.createElement('div');
-            fullscreenControls.className = 'fullscreen-controls';
-            fullscreenControls.innerHTML = `
-                <button class="btn btn-outline-dark fs-color-btn" title="Color">
-                    <input type="color" id="fsColorPicker" value="${colorPicker.value}" style="opacity:0;position:absolute;width:100%;height:100%;cursor:pointer;">
-                    <i class="fas fa-palette"></i>
-                </button>
-                <button class="btn btn-outline-dark fs-brush-small" title="Small brush">
-                    <i class="fas fa-circle" style="font-size:8px;"></i>
-                </button>
-                <button class="btn btn-outline-dark fs-brush-medium" title="Medium brush">
-                    <i class="fas fa-circle" style="font-size:12px;"></i>
-                </button>
-                <button class="btn btn-outline-dark fs-brush-large" title="Large brush">
-                    <i class="fas fa-circle" style="font-size:16px;"></i>
-                </button>
-                <button class="btn btn-outline-warning fs-undo-btn" title="Undo">
-                    <i class="fas fa-undo"></i>
-                </button>
-            `;
-            document.body.appendChild(fullscreenControls);
-            
-            // Create exit button
-            fullscreenExitBtn = document.createElement('button');
-            fullscreenExitBtn.className = 'btn btn-secondary fullscreen-exit-btn';
-            fullscreenExitBtn.innerHTML = '<i class="fas fa-compress"></i>';
-            fullscreenExitBtn.title = 'Exit fullscreen';
-            document.body.appendChild(fullscreenExitBtn);
-            
-            // Event listeners for fullscreen controls
-            const fsColorInput = fullscreenControls.querySelector('#fsColorPicker');
-            fsColorInput.addEventListener('input', (e) => {
-                colorPicker.value = e.target.value;
-            });
-            
-            fullscreenControls.querySelector('.fs-brush-small').addEventListener('click', () => {
-                brushSize.value = 2;
-                document.getElementById('sizeValue').textContent = '2';
-            });
-            
-            fullscreenControls.querySelector('.fs-brush-medium').addEventListener('click', () => {
-                brushSize.value = 6;
-                document.getElementById('sizeValue').textContent = '6';
-            });
-            
-            fullscreenControls.querySelector('.fs-brush-large').addEventListener('click', () => {
-                brushSize.value = 12;
-                document.getElementById('sizeValue').textContent = '12';
-            });
-            
-            fullscreenControls.querySelector('.fs-undo-btn').addEventListener('click', () => {
-                if (undoBtn) undoBtn.click();
-            });
-            
-            fullscreenExitBtn.addEventListener('click', exitFullscreen);
-            
-            // Resize canvas to fill screen after transition
-            setTimeout(() => {
-                resizeCanvas(true);
-            }, 50);
-            
-            // Hide body scroll
-            document.body.style.overflow = 'hidden';
-        }
-        
-        function exitFullscreen() {
-            if (!canvas) return;
-            
-            // Save canvas state before exiting fullscreen
-            saveCanvasState();
-            
-            isFullscreen = false;
-            canvas.classList.remove('whiteboard-fullscreen');
-            
-            // Remove floating controls
-            if (fullscreenControls) {
-                fullscreenControls.remove();
-                fullscreenControls = null;
-            }
-            if (fullscreenExitBtn) {
-                fullscreenExitBtn.remove();
-                fullscreenExitBtn = null;
-            }
-            
-            // Restore body scroll
-            document.body.style.overflow = '';
-            
-            // Resize canvas back to container size after transition
-            setTimeout(() => {
-                resizeCanvas(true);
-            }, 50);
-        }
-        
-        if (fullscreenToggleBtn) {
-            fullscreenToggleBtn.addEventListener('click', () => {
-                if (isFullscreen) {
-                    exitFullscreen();
-                } else {
-                    enterFullscreen();
-                }
-            });
-        }
-        
-        // Exit fullscreen on escape key
-        document.addEventListener('keydown', (e) => {
-            if (e.key === 'Escape' && isFullscreen) {
-                exitFullscreen();
-            }
-        });
-
-            // Create/Join session UI handlers
-            const createSessionBtnMobile = document.getElementById('createSessionBtn');
-            const joinSessionBtnMobile = document.getElementById('joinSessionBtn');
-            const createSessionBtnDesktop = document.getElementById('createSessionBtnDesktop');
-            const joinSessionBtnDesktop = document.getElementById('joinSessionBtnDesktop');
-            
-            const createModalEl = document.getElementById('createSessionModal');
-            const joinModalEl = document.getElementById('joinSessionModal');
-            
-            console.log('Modal elements exist:', !!createModalEl, !!joinModalEl);
-            
-            let createModal = null;
-            let joinModal = null;
-            
-            if (createModalEl) {
-                createModal = new bootstrap.Modal(createModalEl);
-            }
-            if (joinModalEl) {
-                joinModal = new bootstrap.Modal(joinModalEl);
-            }
-            
-            const toggleDrawingToolsBtn = document.getElementById('toggleDrawingTools');
-            const drawingToolsCollapseEl = document.getElementById('drawingToolsCollapse');
-            console.log('toggleDrawingToolsBtn:', !!toggleDrawingToolsBtn, 'drawingToolsCollapseEl:', !!drawingToolsCollapseEl);
-            if (toggleDrawingToolsBtn && drawingToolsCollapseEl) {
-                drawingToolsCollapseEl.addEventListener('shown.bs.collapse', () => { toggleDrawingToolsBtn.textContent = 'Hide Tools'; });
-                drawingToolsCollapseEl.addEventListener('hidden.bs.collapse', () => { toggleDrawingToolsBtn.textContent = 'Show Tools'; });
-            }
-            console.log('createSessionBtnDesktop exists?', !!createSessionBtnDesktop, 'joinSessionBtnDesktop exists?', !!joinSessionBtnDesktop);
-            const openCreateModal = async (e) => { 
-                if (e) e.preventDefault();
-                console.log('openCreateModal called');
-                if (!createModal) {
-                    console.error('Create modal not initialized');
+        async function endSession(id) {
+            try {
+                const res = await fetch(`/api/whiteboards/${id}`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${token}` } });
+                const body = await res.json();
+                if (!res.ok) throw new Error(body.message || 'Failed to end session');
+                // If currently in that session, redirect to landing
+                if (sessionId && sessionId === id) {
+                    window.location.href = '/whiteboard';
                     return;
                 }
-                try {
-                    const grpRes = await fetch('/api/users/groups', { headers: { 'Authorization': `Bearer ${token}` } });
-                    if (grpRes.ok) {
-                        const d = await grpRes.json();
-                        // Filter groups where user is owner
-                        const groups = (d.data.groups || []).filter(g => g.owner_id === userId);
-                        
-                        if (groups.length === 0) {
-                            alert('You must be a group owner to create a session.');
-                            return;
-                        }
-                        
-                        // Always show modal to allow naming the session
-                        const select = document.getElementById('sessionGroupSelect');
-                        select.innerHTML = '<option value="">Select a group</option>' + (groups.map(g => `<option value="${g.id}">${g.name}</option>`).join(''));
-                        
-                        if (groups.length === 1) {
-                            // Pre-select the single group
-                            select.value = groups[0].id;
-                        }
-                        createModal.show();
-                    }
-                } catch (e) {
-                    console.error('Failed to load groups', e);
-                }
-            };
+                // Otherwise remove from list
+                const el = document.getElementById(`session-item-${id}`);
+                if (el) el.remove();
+                // hide card if no items left
+                const listEl = document.getElementById('mySessionsListLanding');
+                if (listEl && listEl.children.length === 0) document.getElementById('mySessionsCardLanding').style.display = 'none';
+                alert(body.message || 'Session ended');
+            } catch (e) {
+                console.error('Failed to end session:', e);
+                alert(e.message || 'Could not end session');
+            }
+        }
 
-            async function createSession(groupId, title) {
+        // --- Fullscreen handlers (mobile whiteboard + remote video) ---
+        (function setupFullscreen() {
+            const fsToggle = document.getElementById('fullscreenToggleBtn');
+            const canvasContainerEl = document.getElementById('canvasContainer');
+            const remoteFsBtn = document.getElementById('fullscreenBtn');
+            const remoteContainer = document.getElementById('remoteVideoContainer');
+
+            let _wbPrev = null;
+            async function enterWhiteboardFullscreen() {
+                if (!canvasContainerEl) return;
+                // save previous sizing
+                _wbPrev = { width: canvas.width, height: canvas.height };
+                // Prefer Fullscreen API
                 try {
-                    const res = await fetch(`/api/groups/${groupId}/whiteboards`, {
-                        method: 'POST',
-                        headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ title: title || 'Whiteboard Session ' + new Date().toLocaleTimeString() })
-                    });
-                    if (res.ok) {
-                        const data = await res.json();
-                        const invite = data.data.invite_url;
-                        const fullUrl = window.location.origin + invite;
-                        
-                        document.getElementById('createdSessionLink').value = fullUrl;
-                        document.getElementById('goToSessionBtn').onclick = () => window.location.href = invite;
-                        new bootstrap.Modal(document.getElementById('sessionCreatedModal')).show();
-                        createModal.hide();
+                    if (canvasContainerEl.requestFullscreen) {
+                        await canvasContainerEl.requestFullscreen();
+                    } else if (canvasContainerEl.webkitRequestFullscreen) {
+                        canvasContainerEl.webkitRequestFullscreen();
                     } else {
-                        const data = await res.json();
-                        alert(data.message || 'Failed to create session');
+                        canvasContainerEl.classList.add('whiteboard-fullscreen');
                     }
                 } catch (e) {
-                    console.error('Failed to create session', e);
-                    alert('Error creating session');
+                    // fallback to class-based fullscreen + resize
+                    canvasContainerEl.classList.add('whiteboard-fullscreen');
                 }
-            }
-            createSessionBtnMobile && createSessionBtnMobile.addEventListener('click', openCreateModal);
-            // createSessionBtnDesktop removed from DOM, using landing button
-            const createSessionBtnLanding = document.getElementById('createSessionBtnLanding');
-            if (createSessionBtnLanding) {
-                createSessionBtnLanding.addEventListener('click', openCreateModal);
-                console.log('Create session button listener attached');
-            } else {
-                console.log('createSessionBtnLanding not found');
-            }
-
-            // Preload user's groups into the create modal select (don't auto-open modal)
-            (async function preloadGroups() {
+                // resize canvas to match viewport (account for devicePixelRatio)
                 try {
-                    const grpRes = await fetch('/api/users/groups', { headers: { 'Authorization': `Bearer ${token}` } });
-                    if (grpRes.ok) {
-                        const d = await grpRes.json();
-                        const groups = d.data.groups || [];
-                        const select = document.getElementById('sessionGroupSelect');
-                        if (select) {
-                            select.innerHTML = '<option value="">Select a group</option>' + (groups.map(g => `<option value="${g.id}">${g.name}</option>`).join(''));
-                        }
-                    }
-                } catch (e) {
-                    console.error('Failed to preload groups', e);
+                    const dpr = window.devicePixelRatio || 1;
+                    canvas.style.width = '100%';
+                    canvas.style.height = '100%';
+                    canvas.width = Math.round(window.innerWidth * dpr);
+                    canvas.height = Math.round(window.innerHeight * dpr);
+                } catch (e) { console.warn('Could not resize canvas for fullscreen', e); }
+                // show an exit button
+                let exit = document.getElementById('wb-fs-exit');
+                if (!exit) {
+                    exit = document.createElement('button');
+                    exit.id = 'wb-fs-exit';
+                    exit.className = 'btn btn-light fullscreen-exit-btn';
+                    exit.innerHTML = '<i class="fas fa-times"></i>';
+                    exit.addEventListener('click', exitWhiteboardFullscreen);
+                    document.body.appendChild(exit);
                 }
-            })();
-            const openJoinModal = (e) => { 
-                if (e) e.preventDefault();
-                console.log('openJoinModal called');
-                if (!joinModal) {
-                    console.error('Join modal not initialized');
-                    return;
-                }
-                joinModal.show(); 
-            };
-            joinSessionBtnMobile && joinSessionBtnMobile.addEventListener('click', openJoinModal);
-            // joinSessionBtnDesktop removed from DOM, using landing button
-            const joinSessionBtnLanding = document.getElementById('joinSessionBtnLanding');
-            if (joinSessionBtnLanding) {
-                joinSessionBtnLanding.addEventListener('click', openJoinModal);
-                console.log('Join session button listener attached');
             }
 
-            const createSubmitBtn = document.getElementById('createSessionSubmit');
-            if (createSubmitBtn) {
-                createSubmitBtn.addEventListener('click', async () => {
-                    const gid = document.getElementById('sessionGroupSelect').value;
-                    const title = document.getElementById('sessionNameInput').value.trim();
-                    if (!gid) {
-                        alert('Please select a group');
-                        return;
+            function exitWhiteboardFullscreen() {
+                if (!canvasContainerEl) return;
+                canvasContainerEl.classList.remove('whiteboard-fullscreen');
+                // restore canvas size
+                try {
+                    if (_wbPrev) {
+                        canvas.width = _wbPrev.width;
+                        canvas.height = _wbPrev.height;
+                        canvas.style.width = '';
+                        canvas.style.height = '';
+                        _wbPrev = null;
                     }
-                    createSession(gid, title);
+                } catch (e) { console.warn('Could not restore canvas size', e); }
+                const exit = document.getElementById('wb-fs-exit');
+                if (exit) exit.remove();
+            }
+
+            if (fsToggle) {
+                fsToggle.addEventListener('click', () => {
+                    if (canvasContainerEl.classList.contains('whiteboard-fullscreen')) exitWhiteboardFullscreen();
+                    else enterWhiteboardFullscreen();
+                    // adjust canvas size to fill
+                    try { canvas.style.width = '100%'; canvas.style.height = '100%'; } catch(e){}
                 });
             }
 
-            const joinSubmitBtn = document.getElementById('joinSessionSubmit');
-            if (joinSubmitBtn) {
-                joinSubmitBtn.addEventListener('click', () => {
-                    const raw = document.getElementById('joinSessionId').value.trim();
-                    if (!raw) return;
-                    // Support full URL or plain session id
-                    let id = raw;
+            if (remoteFsBtn && remoteContainer) {
+                remoteFsBtn.addEventListener('click', async () => {
                     try {
-                        const url = new URL(raw);
-                        const params = new URLSearchParams(url.search);
-                        id = params.get('session') || id;
-                    } catch (e) { /* not a URL */ }
-                    if (!id) return;
-                    window.location.href = `/whiteboard?session=${encodeURIComponent(id)}`;
+                        if (document.fullscreenElement) await document.exitFullscreen();
+                        else await remoteContainer.requestFullscreen();
+                    } catch (e) {
+                        console.warn('Fullscreen API failed, fallback toggling class');
+                        remoteContainer.classList.toggle('whiteboard-fullscreen');
+                    }
                 });
             }
-
-            // Load my active sessions
-            async function loadMySessions() {
-                try {
-                    const res = await fetch('/api/whiteboards/mine', { headers: { 'Authorization': `Bearer ${token}` } });
-                    if (res.ok) {
-                        const data = await res.json();
-                        const sessions = data.data.whiteboards || [];
-                        // Updated IDs for landing view
-                        const list = document.getElementById('mySessionsListLanding');
-                        const card = document.getElementById('mySessionsCardLanding');
-                        
-                        if (list && card) {
-                            if (sessions.length > 0) {
-                                card.style.display = 'block';
-                                list.innerHTML = '';
-                                sessions.forEach(s => {
-                                    const item = document.createElement('div');
-                                    item.className = 'list-group-item d-flex justify-content-between align-items-center';
-                                    item.innerHTML = `
-                                        <div>
-                                            <div class="fw-bold text-truncate" style="max-width: 150px;">${s.title || 'Untitled'}</div>
-                                            <small class="text-muted">${s.group_name}</small>
-                                        </div>
-                                        <div class="btn-group btn-group-sm">
-                                            <a href="/whiteboard?session=${s.id}" class="btn btn-outline-primary">Join</a>
-                                            <button class="btn btn-outline-danger end-session-btn" data-id="${s.id}">End</button>
-                                        </div>
-                                    `;
-                                    list.appendChild(item);
-                                });
-                                
-                                // Add event listeners for end buttons
-                                document.querySelectorAll('.end-session-btn').forEach(btn => {
-                                    btn.addEventListener('click', async (e) => {
-                                        e.preventDefault();
-                                        const id = e.target.getAttribute('data-id');
-                                        if (confirm('Are you sure you want to end this session? It will be closed for everyone.')) {
-                                            await endSession(id);
-                                        }
-                                    });
-                                });
-                            } else {
-                                card.style.display = 'none';
-                            }
-                        }
-                    }
-                } catch (e) {
-                    console.error('Failed to load my sessions', e);
-                }
-            }
-            
-            async function endSession(id) {
-                try {
-                    const res = await fetch(`/api/whiteboards/${id}`, { 
-                        method: 'DELETE',
-                        headers: { 'Authorization': `Bearer ${token}` } 
-                    });
-                    if (res.ok) {
-                        loadMySessions(); // Refresh list
-                        if (sessionId === id) {
-                            alert('Session ended');
-                            window.location.href = '/whiteboard';
-                        }
-                    } else {
-                        alert('Failed to end session');
-                    }
-                } catch (e) {
-                    console.error('Failed to end session', e);
-                }
-            }
-            
-            loadMySessions();
-            // Refresh list periodically
-            setInterval(loadMySessions, 30000);
+        })();
+        
     })();
 </script>
 {% endblock %}

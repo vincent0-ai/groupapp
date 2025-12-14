@@ -47,3 +47,5 @@ htmlcov/
 scripts/
 docker-compose.override.yml
 .pytest_cache
+test*
+tests/

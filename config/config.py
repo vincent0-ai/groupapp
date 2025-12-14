@@ -21,6 +21,11 @@ class Config:
     MINIO_ROOT_PASSWORD = os.getenv('MINIO_ROOT_PASSWORD', 'minioadmin')
     MINIO_BUCKET = os.getenv('MINIO_BUCKET', 'Discussio')
     MINIO_USE_SSL = os.getenv('MINIO_USE_SSL', 'False') == 'True'
+
+    # LiveKit
+    LIVEKIT_URL = os.getenv('LIVEKIT_URL', 'http://localhost:7880')
+    LIVEKIT_API_KEY = os.getenv('LIVEKIT_API_KEY', '')
+    LIVEKIT_API_SECRET = os.getenv('LIVEKIT_API_SECRET', '')
     
     # Meilisearch
     MEILISEARCH_URL = os.getenv('MEILISEARCH_URL', 'http://localhost:7700')
@@ -30,6 +35,7 @@ class Config:
     APP_URL = os.getenv('APP_URL', 'http://localhost:5000')
     MAX_CONTENT_LENGTH = 104857600  # 100MB
     UPLOAD_FOLDER = 'uploads'
+    MAX_PARTICIPANTS_PER_ROOM = int(os.getenv('MAX_PARTICIPANTS_PER_ROOM', '10'))
     
     # Flask-SocketIO
     SOCKETIO_CORS_ALLOWED_ORIGINS = '*'

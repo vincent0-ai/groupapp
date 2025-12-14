@@ -204,3 +204,95 @@ def upload_audio(wb_id):
     db.update_one('files', {'_id': ObjectId(file_id)}, {'whiteboard_id': wb_obj_id})
     db.push_to_array('whiteboards', {'_id': wb_obj_id}, 'audio_files', ObjectId(file_id))
     return success_response({'file_id': str(file_id)}, 'Audio uploaded', 201)
+
+
+from app.services.livekit_service import LiveKitService, VideoGrants
+from livekit import api
+
+@whiteboards_bp.route('/<wb_id>/livekit-token', methods=['POST'])
+@require_auth
+def get_livekit_token(wb_id):
+    """Generate a LiveKit access token for a user joining a whiteboard."""
+    try:
+        wb_obj_id = ObjectId(wb_id)
+    except Exception:
+        return error_response('Invalid whiteboard ID format', 400)
+
+    db = Database()
+    wb = db.find_one('whiteboards', {'_id': wb_obj_id})
+    if not wb:
+        return error_response('Whiteboard session not found', 404)
+
+    if not wb.get('is_active', True):
+        return error_response('This session has already ended', 410)
+
+    user_id = g.user_id
+    user = db.find_one('users', {'_id': ObjectId(user_id)})
+    if not user:
+        return error_response('User not found', 404)
+        
+    # Enforce participant limit
+    try:
+        livekit_service = LiveKitService()
+        room_name = f'whiteboard:{wb_id}'
+        # Use sync helper which will run the underlying coroutine on the appropriate loop
+        participants = livekit_service.list_participants(room_name)
+        max_participants = current_app.config['MAX_PARTICIPANTS_PER_ROOM']
+
+        # Check if the user is already in the room before checking the limit
+        is_already_in_room = any(getattr(p, 'identity', None) == user_id for p in participants)
+
+        if not is_already_in_room and len(participants) >= max_participants:
+            return error_response(f'This session is full (max {max_participants} participants).', 429)
+
+    except Exception as e:
+        # If the room doesn't exist on LiveKit server, list_participants will fail.
+        # This is fine, it just means the room is not full.
+        print(f"Could not check participant list (room may not exist yet): {e}")
+        try:
+            livekit_service.maybe_close_session()
+        except Exception:
+            pass
+
+
+    # Determine permissions from the whiteboard document
+    is_creator = str(wb.get('created_by')) == user_id
+    can_speak = is_creator or user_id in [str(uid) for uid in wb.get('can_speak', [])]
+    can_share_screen = is_creator or user_id in [str(uid) for uid in wb.get('can_share_screen', [])]
+
+    # Define LiveKit permissions based on app logic
+    # can_publish allows audio/video, can_publish_data for things like chat
+    lk_permissions = VideoGrants(
+        room_join=True,
+        room=f'whiteboard:{wb_id}',
+        can_publish=can_speak or can_share_screen,
+        can_publish_data=True,
+        can_subscribe=True # Always allow users to subscribe to others
+    )
+
+    try:
+        # Re-instance service in case of previous error
+        livekit_service = LiveKitService()
+        token = livekit_service.create_access_token(
+            user_id=user_id,
+            user_name=user.get('full_name', 'Anonymous'),
+            room_name=f'whiteboard:{wb_id}',
+            permissions=lk_permissions
+        )
+        # For debugging: decode token payload (no signature verification) when app in debug
+        try:
+            import jwt as _jwt
+            payload = _jwt.decode(token, options={"verify_signature": False})
+        except Exception as e:
+            print(f"Could not decode token payload for debug: {e}")
+        return success_response({'token': token, 'url': current_app.config['LIVEKIT_URL']}, 'LiveKit token generated', 200)
+    except ValueError as e:
+        # This catches the API key/secret not being set
+        print(f"LiveKit config error: {e}")
+        return error_response(f'Media server is not configured: {e}', 503)
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        print(f"Error generating LiveKit token: {e}")
+        return error_response(f'Failed to connect to media server: {e}', 500)
+
