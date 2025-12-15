@@ -147,7 +147,7 @@ def update_permissions(wb_id):
     creator_id = str(wb.get('created_by'))
     group_id = wb.get('group_id')
     db_group = db.find_one('groups', {'_id': group_id}) if group_id else None
-    is_owner = db_group and str(db_group.get('owner')) == g.user_id
+    is_owner = db_group and str(db_group.get('owner_id')) == g.user_id
     # Allow update if requester is either the session creator OR the group owner
     if creator_id != g.user_id and not is_owner:
         return error_response('Only the group owner (session creator) can update permissions', 403)
@@ -280,7 +280,8 @@ def get_livekit_token(wb_id):
         room=f'whiteboard:{wb_id}',
         can_publish=can_speak or can_share_screen,
         can_publish_data=True,
-        can_subscribe=True # Always allow users to subscribe to others
+        can_subscribe=True, # Always allow users to subscribe to others
+        hidden=not can_speak # Hide participant if they don't have speaking perms
     )
 
     try:
