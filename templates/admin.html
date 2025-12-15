@@ -50,21 +50,9 @@
                         <input type="text" class="form-control" id="userSearch" placeholder="Search users..." style="padding-left: 38px; border-radius: 10px; min-width: 250px;">
                     </div>
                 </div>
-                <div class="table-responsive">
-                    <table class="table table-hover mb-0">
-                        <thead style="background: #f8f9fa;">
-                            <tr>
-                                <th style="border-top: none; font-weight: 600;">User</th>
-                                <th style="border-top: none; font-weight: 600;">Email</th>
-                                <th style="border-top: none; font-weight: 600;">Status</th>
-                                <th style="border-top: none; font-weight: 600;">Joined</th>
-                                <th style="border-top: none; font-weight: 600;">Actions</th>
-                            </tr>
-                        </thead>
-                        <tbody id="usersTableBody">
-                            <!-- Users will be loaded here -->
-                        </tbody>
-                    </table>
+                <!-- List view (replaces table for normal display) -->
+                <div id="usersList" class="list-group">
+                    <div class="list-group-item text-center py-4 text-muted">Loading users...</div>
                 </div>
             </div>
         </div>
@@ -84,21 +72,9 @@
                         <input type="text" class="form-control" id="groupSearch" placeholder="Search groups..." style="padding-left: 38px; border-radius: 10px; min-width: 250px;">
                     </div>
                 </div>
-                <div class="table-responsive">
-                    <table class="table table-hover mb-0">
-                        <thead style="background: #f8f9fa;">
-                            <tr>
-                                <th style="border-top: none; font-weight: 600;">Name</th>
-                                <th style="border-top: none; font-weight: 600;">Owner</th>
-                                <th style="border-top: none; font-weight: 600;">Members</th>
-                                <th style="border-top: none; font-weight: 600;">Created</th>
-                                <th style="border-top: none; font-weight: 600;">Actions</th>
-                            </tr>
-                        </thead>
-                        <tbody id="groupsTableBody">
-                            <!-- Groups will be loaded here -->
-                        </tbody>
-                    </table>
+                <!-- List view (replaces table for normal display) -->
+                <div id="groupsList" class="list-group">
+                    <div class="list-group-item text-center py-4 text-muted">Loading groups...</div>
                 </div>
             </div>
         </div>
@@ -114,20 +90,9 @@
                 <div class="d-flex justify-content-between align-items-center mb-3">
                     <h5 class="mb-0 fw-semibold"><i class="fas fa-hashtag text-primary me-2"></i>Channel Management</h5>
                 </div>
-                <div class="table-responsive">
-                    <table class="table table-hover mb-0">
-                        <thead style="background: #f8f9fa;">
-                            <tr>
-                                <th style="border-top: none; font-weight: 600;">Name</th>
-                                <th style="border-top: none; font-weight: 600;">Description</th>
-                                <th style="border-top: none; font-weight: 600;">Groups</th>
-                                <th style="border-top: none; font-weight: 600;">Actions</th>
-                            </tr>
-                        </thead>
-                        <tbody id="channelsTableBody">
-                            <!-- Channels will be loaded here -->
-                        </tbody>
-                    </table>
+                <!-- List view (replaces table for normal display) -->
+                <div id="channelsList" class="list-group">
+                    <div class="list-group-item text-center py-4 text-muted">Loading channels...</div>
                 </div>
             </div>
         </div>
@@ -214,37 +179,36 @@ async function loadStats() {
 async function loadUsers(page = 1, search = '') {
     const res = await apiCall(`/users?page=${page}&search=${search}`);
     if (res.status === 'success') {
-        const tbody = document.getElementById('usersTableBody');
-        tbody.innerHTML = res.data.users.map(user => `
-            <tr>
-                <td>
+        const container = document.getElementById('usersList');
+        const users = res.data.users || [];
+
+        if (users.length === 0) {
+            container.innerHTML = '<div class="list-group-item text-center text-muted">No users found</div>';
+        } else {
+            container.innerHTML = users.map(user => `
+                <div class="list-group-item d-flex align-items-center justify-content-between">
                     <div class="d-flex align-items-center">
-                        <img src="${user.avatar_url}" class="rounded-circle me-2" width="32" height="32">
+                        <img src="${user.avatar_url || 'https://api.dicebear.com/7.x/avataaars/svg?seed=' + user.username}" class="rounded-circle me-3" width="48" height="48">
                         <div>
-                            <div class="fw-bold">${user.username}</div>
-                            <div class="small text-muted">${user.full_name}</div>
+                            <div class="fw-bold">${user.username} ${user.is_admin ? '<span class="badge bg-primary ms-2">Admin</span>' : ''}</div>
+                            <div class="small text-muted">${user.full_name || ''} · ${user.email || ''}</div>
                         </div>
                     </div>
-                </td>
-                <td>${user.email}</td>
-                <td>
-                    <span class="badge bg-${user.is_active ? 'success' : 'danger'}">
-                        ${user.is_active ? 'Active' : 'Banned'}
-                    </span>
-                    ${user.is_admin ? '<span class="badge bg-primary">Admin</span>' : ''}
-                </td>
-                <td>${new Date(user.created_at).toLocaleDateString()}</td>
-                <td>
-                    ${!user.is_admin ? `
-                        <button class="btn btn-sm btn-${user.is_active ? 'danger' : 'success'}" 
-                                onclick="toggleBan('${user._id}', ${user.is_active})">
-                            ${user.is_active ? 'Ban' : 'Unban'}
-                        </button>
-                    ` : ''}
-                </td>
-            </tr>
-        `).join('');
-        
+                    <div class="text-end">
+                        <div class="mb-1">
+                            <span class="badge bg-${user.is_active ? 'success' : 'danger'}">${user.is_active ? 'Active' : 'Banned'}</span>
+                        </div>
+                        <div class="small text-muted">Joined ${new Date(user.created_at).toLocaleDateString()}</div>
+                    </div>
+                    <div class="ms-3">
+                        ${!user.is_admin ? `
+                            <button class="btn btn-sm btn-${user.is_active ? 'danger' : 'success'}" onclick="toggleBan('${user._id}', ${user.is_active})">${user.is_active ? 'Ban' : 'Unban'}</button>
+                        ` : ''}
+                    </div>
+                </div>
+            `).join('');
+        }
+
         renderPagination('userPagination', res.data.page, res.data.pages, (p) => loadUsers(p, search));
     }
 }
@@ -265,26 +229,31 @@ async function toggleBan(userId, isActive) {
 async function loadGroups(page = 1, search = '') {
     const res = await apiCall(`/groups?page=${page}&search=${search}`);
     if (res.status === 'success') {
-        const tbody = document.getElementById('groupsTableBody');
-        tbody.innerHTML = res.data.groups.map(group => `
-            <tr>
-                <td>
+        const container = document.getElementById('groupsList');
+        const groups = res.data.groups || [];
+
+        if (groups.length === 0) {
+            container.innerHTML = '<div class="list-group-item text-center text-muted">No groups found</div>';
+        } else {
+            container.innerHTML = groups.map(group => `
+                <div class="list-group-item d-flex align-items-center justify-content-between">
                     <div class="d-flex align-items-center">
-                        <img src="${group.avatar_url}" class="rounded-circle me-2" width="32" height="32">
-                        ${group.name}
+                        <img src="${group.avatar_url || 'https://api.dicebear.com/7.x/identicon/svg?seed=' + group.name}" class="rounded-circle me-3" width="48" height="48">
+                        <div>
+                            <div class="fw-bold">${group.name}</div>
+                            <div class="small text-muted">Owner: ${group.owner_id || '-'} · Members: ${group.members?.length || 0}</div>
+                        </div>
                     </div>
-                </td>
-                <td>${group.owner_id}</td> <!-- Ideally fetch owner name -->
-                <td>${group.members.length}</td>
-                <td>${new Date(group.created_at).toLocaleDateString()}</td>
-                <td>
-                    <button class="btn btn-sm btn-danger" onclick="deleteGroup('${group._id}')">
-                        Delete
-                    </button>
-                </td>
-            </tr>
-        `).join('');
-        
+                    <div class="text-end">
+                        <div class="small text-muted">Created ${new Date(group.created_at).toLocaleDateString()}</div>
+                    </div>
+                    <div class="ms-3">
+                        <button class="btn btn-sm btn-danger" onclick="deleteGroup('${group._id}')">Delete</button>
+                    </div>
+                </div>
+            `).join('');
+        }
+
         renderPagination('groupPagination', res.data.page, res.data.pages, (p) => loadGroups(p, search));
     }
 }
@@ -304,19 +273,25 @@ async function deleteGroup(groupId) {
 async function loadChannels() {
     const res = await apiCall('/channels');
     if (res.status === 'success') {
-        const tbody = document.getElementById('channelsTableBody');
-        tbody.innerHTML = res.data.map(channel => `
-            <tr>
-                <td>${channel.name}</td>
-                <td>${channel.description}</td>
-                <td>${channel.group_count || 0}</td>
-                <td>
-                    <button class="btn btn-sm btn-danger" onclick="deleteChannel('${channel._id}')">
-                        Delete
-                    </button>
-                </td>
-            </tr>
-        `).join('');
+        const container = document.getElementById('channelsList');
+        const channels = res.data || [];
+
+        if (channels.length === 0) {
+            container.innerHTML = '<div class="list-group-item text-center text-muted">No channels found</div>';
+        } else {
+            container.innerHTML = channels.map(channel => `
+                <div class="list-group-item d-flex align-items-center justify-content-between">
+                    <div>
+                        <div class="fw-bold">${channel.name}</div>
+                        <div class="small text-muted">${channel.description || ''}</div>
+                    </div>
+                    <div class="text-end small text-muted">Groups: ${channel.group_count || 0}</div>
+                    <div class="ms-3">
+                        <button class="btn btn-sm btn-danger" onclick="deleteChannel('${channel._id}')">Delete</button>
+                    </div>
+                </div>
+            `).join('');
+        }
     }
 }
 
