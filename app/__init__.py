@@ -42,24 +42,126 @@ def create_app(config_name='development'):
     from app.routes.admin import admin_bp
     from app.routes.notifications import notifications_bp
     from app.routes.dm import dm_bp
-    from app.routes.main import main_bp
+    
+    app.register_blueprint(auth_bp)
+    app.register_blueprint(groups_bp)
+    app.register_blueprint(messages_bp)
+    app.register_blueprint(competitions_bp)
+    app.register_blueprint(files_bp)
+    app.register_blueprint(users_bp)
+    app.register_blueprint(whiteboards_bp)
+    app.register_blueprint(admin_bp)
+    app.register_blueprint(notifications_bp)
+    app.register_blueprint(dm_bp)
+    
+    # Serve service worker from root with proper scope header
+    @app.route('/service-worker.js')
+    def service_worker():
+        """Serve service worker from root to allow full scope"""
+        response = app.send_static_file('js/service-worker.js')
+        response.headers['Service-Worker-Allowed'] = '/'
+        response.headers['Content-Type'] = 'application/javascript'
+        return response
+    
+    # Serve manifest from root for PWA
+    @app.route('/manifest.json')
+    def manifest():
+        """Serve manifest from root"""
+        return app.send_static_file('manifest.json')
+    
+    # Page routes (serving templates)
 
-    for bp in [
-        auth_bp, groups_bp, messages_bp, competitions_bp,
-        files_bp, users_bp, whiteboards_bp, admin_bp,
-        notifications_bp, dm_bp, main_bp
-    ]:
-        app.register_blueprint(bp)
+    
+    @app.route('/auth')
+    def auth_page():
+        """Serve auth page"""
+        return render_template('auth.html', google_client_id=os.environ.get('GOOGLE_CLIENT_ID'))
+    
+    @app.route('/admin')
+    def admin_page():
+        """Serve admin page"""
+        return render_template('admin.html')
+    
+    @app.route('/dashboard')
+    @app.route('/')
+    def dashboard():
+        """Serve dashboard"""
+        return render_template('dashboard.html')
+    
+    @app.route('/groups')
+    def groups_page():
+        """Serve groups page"""
+        return render_template('groups.html')
+    
+    @app.route('/messages')
+    def messages_page():
+        """Serve messages page"""
+        return render_template('messages.html')
+    
+    @app.route('/dm')
+    def dm_page():
+        """Serve direct messages page"""
+        return render_template('dm.html')
+    
+    @app.route('/competitions')
+    def competitions_page():
+        """Serve competitions page"""
+        return render_template('competitions.html')
+    
+    @app.route('/files')
+    def files_page():
+        """Serve files page"""
+        return render_template('files.html')
+    
+    @app.route('/profile')
+    def profile_page():
+        """Serve profile page"""
+        return render_template('profile.html')
+    
+    @app.route('/whiteboard')
+    def whiteboard_page():
+        """Serve whiteboard page"""
+        return render_template('whiteboard.html')
+    
+    @app.route('/leaderboard')
+    def leaderboard_page():
+        """Serve leaderboard page"""
+        return render_template('leaderboard.html')
 
-    connected_users = {}     # {user_id: sid}
-    online_users = {}        # {room: {user_id: {...}}}
-    room_timers = {}
-    room_timers_lock = threading.Lock()
-
-    from app.services.livekit_service import LiveKitService
-
-    livekit_service = LiveKitService()
-    livekit_service.init_app(app)
+    @app.route('/test/footer')
+    def test_footer():
+        """Dev-only: preview footer at different mobile widths"""
+        return render_template('test_footer.html')
+    
+    @app.route('/terms')
+    def terms_page():
+        """Serve terms and conditions page"""
+        return render_template('terms.html')
+    
+    # Error handlers
+    @app.errorhandler(404)
+    def not_found(error):
+        return jsonify({'status': 'error', 'message': 'Not found'}), 404
+    
+    @app.errorhandler(500)
+    def internal_error(error):
+        return jsonify({'status': 'error', 'message': 'Internal server error'}), 500
+    
+    # Health check endpoint
+    @app.route('/health', methods=['GET'])
+    def health_check():
+        return jsonify({'status': 'healthy', 'timestamp': datetime.utcnow().isoformat()}), 200
+    
+    # Socket.IO events for real-time communication
+    connected_users = {}  # Store user connections {user_id: sid}
+    online_users = {}  # Track online users per room {room: {user_id: {profile, last_seen}}}
+    room_timers = {} # {room_id: {'start_time': datetime, 'warned': boolean}}
+    
+    # Import necessary modules for LiveKit integration
+    import threading
+    import time
+    import asyncio
+    from app.services.livekit_service import LiveKitService, VideoGrants
 
     def run_async_from_sync(coro):
         socketio.start_background_task(asyncio.run, coro)

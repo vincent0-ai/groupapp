@@ -1583,3 +1583,40 @@ table, th, td, .table, .table-responsive * {
 .table td, .table th {
     min-width: 40px;
 }
+
+/* Mobile footer nav fixes: keep labels on one line and prevent wrapping */
+#mobileBottomNav {
+    z-index: 9999;
+}
+
+#mobileBottomNav .footer-nav-link {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 2px;
+    padding: 6px 8px !important;
+    min-width: 0;
+    white-space: nowrap !important;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+#mobileBottomNav .footer-nav-link i {
+    font-size: 1.1rem;
+    display: block;
+    margin-bottom: 2px;
+}
+
+#mobileBottomNav .footer-nav-link small {
+    display: block;
+    white-space: nowrap !important;
+    font-size: 0.68rem;
+    line-height: 1;
+}
+
+@media (max-width: 420px) {
+    /* tighten a bit more on narrow phones */
+    #mobileBottomNav .footer-nav-link { padding: 6px 6px !important; }
+    #mobileBottomNav .footer-nav-link i { font-size: 1rem; }
+}
