@@ -11,7 +11,7 @@ from flask_limiter.util import get_remote_address
 import threading
 import time
 import asyncio
-
+from app.services.livekit_service import LiveKitService
 limiter = Limiter(
     key_func=get_remote_address,
     default_limits=[],
@@ -201,7 +201,3 @@ def create_app(config_name='development'):
 
     return app, socketio
 
-
-if __name__ == '__main__':
-    app, socketio = create_app(os.getenv('FLASK_ENV', 'development'))
-    socketio.run(app, host='0.0.0.0', port=5000, debug=True)
