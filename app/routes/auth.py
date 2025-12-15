@@ -192,7 +192,7 @@ def verify_email(token):
         {"$set": {"is_verified": True}, "$unset": {"verification_token": ""}}
     )
     
-    return redirect(url_for('auth_page', verified='true'))
+    return redirect(url_for('main.auth_page', verified='true'))
 
 
 @auth_bp.route("/google", methods=["GET", "POST"])
