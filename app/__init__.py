@@ -213,7 +213,7 @@ def create_app(config_name='development'):
                         start_time = timer_data['start_time']
                         session_duration = (now - start_time).total_seconds()
 
-                        if elapsed > 1200:
+                        if session_duration > 1200:
                             wb_id = room.split(':', 1)[1]
                             try:
                                 db = Database()
@@ -257,31 +257,30 @@ def create_app(config_name='development'):
         if not room or not user_id:
             return
 
-        join_room(room)
-        connected_users[user_id] = request.sid
-
+        # Handle whiteboard session bookkeeping in a try/except
         if room.startswith('whiteboard:'):
-            wb_id = room.split(':', 1)[1]
-            if _is_valid_object_id(wb_id):
-                db = Database()
-                with room_timers_lock:
-                    if room not in room_timers:
-                        room_timers[room] = {'start_time': datetime.utcnow(), 'warned': False}
-                        print(f"Started session timer for room: {room}")
+            try:
+                wb_id = room.split(':', 1)[1]
+                if _is_valid_object_id(wb_id):
+                    db = Database()
+                    with room_timers_lock:
+                        if room not in room_timers:
+                            room_timers[room] = {'start_time': datetime.utcnow(), 'warned': False}
+                            print(f"Started session timer for room: {room}")
 
                     # Only push participant if user_id looks like a valid ObjectId
                     if _is_valid_object_id(user_id):
                         db.push_to_array('whiteboards', {'_id': ObjectId(wb_id)}, 'participants', ObjectId(user_id))
-                except Exception as e:
-                    print(f"Error joining whiteboard: {e}")
-                    pass
+            except Exception as e:
+                print(f"Error joining whiteboard: {e}")
+                pass
 
-            try:
-                join_room(room)
-            except KeyError as e:
-                # This can happen if the Engine.IO session mapping is lost due to a disconnect.
-                print(f"Warning: could not join room {room} for sid {request.sid}: {e}")
-                emit('error', {'message': 'Could not join room due to transient connection error'})
+        # Join the room (handle transient Engine.IO mapping errors)
+        try:
+            join_room(room)
+        except KeyError as e:
+            print(f"Warning: could not join room {room} for sid {request.sid}: {e}")
+            emit('error', {'message': 'Could not join room due to transient connection error'})
 
             # Track connection (support multiple tabs/sids per user)
             uid = str(user_id)
