@@ -16,32 +16,30 @@ class LiveKitService:
     Service for interacting with the LiveKit API.
     Provides methods for creating access tokens and managing rooms/participants.
     """
-    def __init__(self, api_key=None, api_secret=None, url=None):
-        self.api_key = api_key or current_app.config['LIVEKIT_API_KEY']
-        self.api_secret = api_secret or current_app.config['LIVEKIT_API_SECRET']
-        self.url = url or current_app.config['LIVEKIT_URL']
-        
-        if not self.api_key or not self.api_secret:
-            raise ValueError("LIVEKIT_API_KEY and LIVEKIT_API_SECRET must be set.")
-        # Defer creating the LiveKitAPI client until we have a running loop.
-        # Try to create it now; if this fails due to no running event loop,
-        # start a background loop thread and create the client there.
+    def __init__(self):
+        self.api_key = None
+        self.api_secret = None
+        self.url = None
         self._loop = None
         self._loop_thread = None
         self.lkapi = None
 
+    def init_app(self, app):
+        self.api_key = app.config.get('LIVEKIT_API_KEY')
+        self.api_secret = app.config.get('LIVEKIT_API_SECRET')
+        self.url = app.config.get('LIVEKIT_URL')
+
+        if not self.api_key or not self.api_secret:
+            raise ValueError("LIVEKIT_API_KEY and LIVEKIT_API_SECRET must be set in config.")
+
         if hasattr(api, 'LiveKitAPI'):
             try:
-                # Attempt to instantiate client (may require a running loop due to aiohttp)
                 self.lkapi = api.LiveKitAPI(self.url, self.api_key, self.api_secret)
-            except RuntimeError as e:
-                # Likely: "no running event loop" from aiohttp.ClientSession
-                # Start a background event loop and create the client there.
+            except RuntimeError:
                 self._start_background_loop()
                 fut = asyncio.run_coroutine_threadsafe(self._create_client_coro(), self._loop)
                 self.lkapi = fut.result(timeout=10)
         else:
-            import types
             self.lkapi = types.SimpleNamespace(room=types.SimpleNamespace())
 
     def _start_background_loop(self):

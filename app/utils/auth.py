@@ -2,7 +2,9 @@ import bcrypt
 from datetime import datetime, timedelta
 import jwt
 import os
-from flask import current_app
+from flask import current_app, request
+from app.services import Database
+from bson import ObjectId
 
 def hash_password(password: str) -> str:
     """Hash a password using bcrypt"""
@@ -55,3 +57,28 @@ def generate_refresh_token(user_id: str, expires_in: int = 604800) -> str:
         algorithm=current_app.config['JWT_ALGORITHM']
     )
     return token
+
+def get_current_user():
+    """Get the current user from the JWT token in the request header"""
+    token = None
+    if 'Authorization' in request.headers and request.headers['Authorization'].startswith('Bearer '):
+        token = request.headers['Authorization'].split(' ')[1]
+
+    if not token:
+        # Check for token in cookies as a fallback
+        token = request.cookies.get('token')
+
+    if not token:
+        return None
+
+    payload = verify_token(token)
+    if 'error' in payload or 'user_id' not in payload:
+        return None
+
+    user_id = payload['user_id']
+    try:
+        db = Database()
+        user = db.find_one('users', {'_id': ObjectId(user_id)})
+        return user
+    except Exception:
+        return None
