@@ -133,6 +133,11 @@ def create_app(config_name='development'):
     def leaderboard_page():
         """Serve leaderboard page"""
         return render_template('leaderboard.html')
+
+    @app.route('/test/footer')
+    def test_footer():
+        """Dev-only: preview footer at different mobile widths"""
+        return render_template('test_footer.html')
     
     @app.route('/terms')
     def terms_page():
