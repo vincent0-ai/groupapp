@@ -530,7 +530,7 @@
             if(!muteBtn) return;
             muteBtn.innerHTML = isMuted ? '<i class="fas fa-microphone-slash"></i><span class="btn-text"> Unmute</span>' : '<i class="fas fa-microphone"></i><span class="btn-text"> Mute</span>';
             muteBtn.className = isMuted ? 'btn btn-sm btn-warning' : 'btn btn-sm btn-outline-warning';
-            muteBtn.disabled = !isInCall || !canSpeak;
+            muteBtn.disabled = !isInCall;
         }
 
         function updateScreenShareButton() {
@@ -538,7 +538,7 @@
             if(!screenShareBtn) return;
             screenShareBtn.innerHTML = isScreenSharing ? '<i class="fas fa-desktop"></i><span class="btn-text"> Stop Sharing</span>' : '<i class="fas fa-desktop"></i><span class="btn-text"> Share Screen</span>';
             screenShareBtn.className = isScreenSharing ? 'btn btn-sm btn-info text-white' : 'btn btn-sm btn-outline-info';
-            screenShareBtn.disabled = !isInCall || !canShareScreen;
+            screenShareBtn.disabled = !isInCall;
         }
 
         async function getLiveKitToken(lkSessionId) {
@@ -583,15 +583,11 @@
 
             try {
                 // If user is allowed to speak, proactively request microphone permission
-                if (canSpeak) {
-                    try {
-                        await navigator.mediaDevices.getUserMedia({ audio: true });
-                    } catch (permErr) {
-                        console.warn('Microphone permission denied or unavailable', permErr);
-                        showCustomAlert('Microphone access was denied. You will join muted.', 'Permission');
-                        // reflect that user cannot speak for this join
-                        canSpeak = false;
-                    }
+                try {
+                    await navigator.mediaDevices.getUserMedia({ audio: true });
+                } catch (permErr) {
+                    console.warn('Microphone permission denied or unavailable', permErr);
+                    showCustomAlert('Microphone access was denied. You will join muted.', 'Permission');
                 }
                 // MediaService.connect expects (token, url)
                 await mediaService.connect(lkToken, wsUrl);
@@ -605,18 +601,17 @@
                 const muteBtn = document.getElementById('muteBtn');
                 const screenShareBtn = document.getElementById('screenShareBtn');
 
-                // Enable/disable buttons based on permissions
-                muteBtn.disabled = !canSpeak;
-                screenShareBtn.disabled = !canShareScreen;
                 // If we can speak, unmute by default
                 if (canSpeak) {
                     isMuted = false;
                     try { await mediaService.publishAudio(true); } catch(e) { console.warn('Auto-enable mic failed', e); }
-                    updateMuteButton();
                 } else {
-                    isMuted = true;
-                    updateMuteButton();
+                    // even if user cant speak to OTHERS, we can still publish audio
+                    // so they can hear themselves. They will be hidden from others.
+                    isMuted = false; 
+                    try { await mediaService.publishAudio(true); } catch(e) { console.warn('Auto-enable mic failed', e); }
                 }
+                updateMuteButton();
 
             } catch (e) {
                 console.error('Failed to join LiveKit call:', e);
@@ -869,8 +864,8 @@
             // ensure media buttons reflect current permissions
             const muteBtn = document.getElementById('muteBtn');
             const screenShareBtn = document.getElementById('screenShareBtn');
-            if (muteBtn) muteBtn.disabled = !canSpeak || !isInCall;
-            if (screenShareBtn) screenShareBtn.disabled = !canShareScreen || !isInCall;
+            if (muteBtn) muteBtn.disabled = !isInCall;
+            if (screenShareBtn) screenShareBtn.disabled = !isInCall || !canShareScreen;
         }
         
         socket.on('connect', () => socket.emit('join_room', { room: `whiteboard:${sessionId}`, user_id: userId }));
@@ -919,7 +914,7 @@
             if (isInCall) {
                 const muteBtn = document.getElementById('muteBtn');
                 const screenShareBtn = document.getElementById('screenShareBtn');
-                if (muteBtn) muteBtn.disabled = !canSpeak;
+                if (muteBtn) muteBtn.disabled = !isInCall;
                 if (screenShareBtn) screenShareBtn.disabled = !canShareScreen;
                 if(!canSpeak && !isMuted) {
                     try { mediaService.publishAudio(false); } catch(e) { console.warn('Could not mute after permission update', e); }
@@ -975,9 +970,9 @@
         // Simplified drawing logic
         const initDrawing = () => {
              if (!canvas) return;
-+            // Set canvas backing store to device pixel ratio for crisp lines
-+            setCanvasSize();
-+            window.addEventListener('resize', setCanvasSize);
+            // Set canvas backing store to device pixel ratio for crisp lines
+            setCanvasSize();
+            window.addEventListener('resize', setCanvasSize);
              if (document.getElementById('brushSize')) {
                 document.getElementById('brushSize').addEventListener('input', (e) => {
                     document.getElementById('sizeValue').textContent = e.target.value;
@@ -992,9 +987,8 @@
              canvas.addEventListener('touchend', () => isDrawing = false);
              document.getElementById('clearBtn')?.addEventListener('click', () => {
                  if (confirm('Clear the entire whiteboard?')) {
--                    ctx.clearRect(0, 0, canvas.width, canvas.height);
-+                    // Clear using CSS-size aware coordinates
-+                    ctx.clearRect(0, 0, canvas.width, canvas.height);
+                    // Clear using CSS-size aware coordinates
+                    ctx.clearRect(0, 0, canvas.width, canvas.height);
                      socket.emit('clear_board', { room: `whiteboard:${sessionId}`, user_id: userId });
                  }
              });
