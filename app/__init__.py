@@ -42,11 +42,12 @@ def create_app(config_name='development'):
     from app.routes.admin import admin_bp
     from app.routes.notifications import notifications_bp
     from app.routes.dm import dm_bp
+    from app.routes.main import main_bp
 
     for bp in [
         auth_bp, groups_bp, messages_bp, competitions_bp,
         files_bp, users_bp, whiteboards_bp, admin_bp,
-        notifications_bp, dm_bp
+        notifications_bp, dm_bp, main_bp
     ]:
         app.register_blueprint(bp)
 
