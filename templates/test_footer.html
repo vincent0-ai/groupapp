@@ -1,0 +1,166 @@
+{% extends "base.html" %}
+
+{% block title %}Footer Test - Discussio{% endblock %}
+
+{% block head %}
+<style>
+    /* Hide the real fixed-bottom footer to avoid duplication */
+    #mobileBottomNav { display: none !important; }
+
+    .preview-grid {
+        display: flex;
+        gap: 1rem;
+        flex-wrap: wrap;
+        align-items: flex-start;
+    }
+
+    .preview-box {
+        border: 1px solid var(--border-color);
+        border-radius: 12px;
+        padding: 12px;
+        background: var(--card-bg);
+        width: 360px;
+        box-shadow: var(--shadow-sm);
+    }
+
+    .preview-box.small { width: 320px; }
+    .preview-box.medium { width: 360px; }
+    .preview-box.large { width: 412px; }
+
+    .preview-title { font-weight: 700; margin-bottom: 8px; }
+
+    /* Use same footer nav styles but not fixed-bottom */
+    .preview-footer {
+        display: block;
+        background: rgba(255,255,255,0.98);
+        padding: 8px 6px;
+        border-radius: 10px;
+    }
+
+    .preview-footer .footer-nav-link {
+        display: inline-flex;
+        width: 20%;
+        min-width: 0;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 2px;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        padding: 6px 6px !important;
+    }
+
+    .preview-controls { margin-bottom: 12px; }
+    .preview-controls button { margin-right: 6px; }
+</style>
+{% endblock %}
+
+{% block content %}
+    <div class="mb-4">
+        <h1 class="mb-2">Footer Preview</h1>
+        <p class="text-muted">Preview the mobile footer at common widths (320, 360, 412px).</p>
+    </div>
+
+    <div class="preview-controls mb-3">
+        <button class="btn btn-sm btn-outline-primary" onclick="setAll('small')">320px</button>
+        <button class="btn btn-sm btn-outline-primary" onclick="setAll('medium')">360px</button>
+        <button class="btn btn-sm btn-outline-primary" onclick="setAll('large')">412px</button>
+        <button class="btn btn-sm btn-outline-secondary" onclick="resetAll()">Reset</button>
+    </div>
+
+    <div class="preview-grid" id="previewGrid">
+        <div class="preview-box small">
+            <div class="preview-title">Small (320px)</div>
+            <div class="preview-footer">
+                <a class="footer-nav-link text-center text-decoration-none" href="#">
+                    <i class="fas fa-home"></i>
+                    <small class="d-block">Home</small>
+                </a>
+                <a class="footer-nav-link text-center text-decoration-none" href="#">
+                    <i class="fas fa-users"></i>
+                    <small class="d-block">Groups</small>
+                </a>
+                <a class="footer-nav-link text-center text-decoration-none" href="#">
+                    <i class="fas fa-envelope"></i>
+                    <small class="d-block">DMs</small>
+                </a>
+                <a class="footer-nav-link text-center text-decoration-none" href="#">
+                    <i class="fas fa-user-circle"></i>
+                    <small class="d-block">Profile</small>
+                </a>
+                <a class="footer-nav-link text-center text-decoration-none" href="#">
+                    <i class="fas fa-ellipsis-h"></i>
+                    <small class="d-block">More</small>
+                </a>
+            </div>
+        </div>
+
+        <div class="preview-box medium">
+            <div class="preview-title">Medium (360px)</div>
+            <div class="preview-footer">
+                <a class="footer-nav-link text-center text-decoration-none" href="#">
+                    <i class="fas fa-home"></i>
+                    <small class="d-block">Home</small>
+                </a>
+                <a class="footer-nav-link text-center text-decoration-none" href="#">
+                    <i class="fas fa-users"></i>
+                    <small class="d-block">Groups</small>
+                </a>
+                <a class="footer-nav-link text-center text-decoration-none" href="#">
+                    <i class="fas fa-envelope"></i>
+                    <small class="d-block">DMs</small>
+                </a>
+                <a class="footer-nav-link text-center text-decoration-none" href="#">
+                    <i class="fas fa-user-circle"></i>
+                    <small class="d-block">Profile</small>
+                </a>
+                <a class="footer-nav-link text-center text-decoration-none" href="#">
+                    <i class="fas fa-ellipsis-h"></i>
+                    <small class="d-block">More</small>
+                </a>
+            </div>
+        </div>
+
+        <div class="preview-box large">
+            <div class="preview-title">Large (412px)</div>
+            <div class="preview-footer">
+                <a class="footer-nav-link text-center text-decoration-none" href="#">
+                    <i class="fas fa-home"></i>
+                    <small class="d-block">Home</small>
+                </a>
+                <a class="footer-nav-link text-center text-decoration-none" href="#">
+                    <i class="fas fa-users"></i>
+                    <small class="d-block">Groups</small>
+                </a>
+                <a class="footer-nav-link text-center text-decoration-none" href="#">
+                    <i class="fas fa-envelope"></i>
+                    <small class="d-block">DMs</small>
+                </a>
+                <a class="footer-nav-link text-center text-decoration-none" href="#">
+                    <i class="fas fa-user-circle"></i>
+                    <small class="d-block">Profile</small>
+                </a>
+                <a class="footer-nav-link text-center text-decoration-none" href="#">
+                    <i class="fas fa-ellipsis-h"></i>
+                    <small class="d-block">More</small>
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function setAll(size) {
+            document.querySelectorAll('.preview-box').forEach(box => {
+                box.classList.remove('small','medium','large');
+                box.classList.add(size);
+            });
+        }
+        function resetAll() {
+            document.querySelectorAll('.preview-box').forEach(box => {
+                box.classList.remove('small','medium','large');
+                box.classList.add('medium');
+            });
+        }
+    </script>
+{% endblock %}
