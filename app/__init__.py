@@ -58,6 +58,7 @@ def create_app(config_name='development'):
     from app.services.livekit_service import LiveKitService
 
     livekit_service = LiveKitService()
+    livekit_service.init_app(app)
 
     def run_async_from_sync(coro):
         socketio.start_background_task(asyncio.run, coro)
