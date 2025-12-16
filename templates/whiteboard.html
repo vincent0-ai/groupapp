@@ -366,6 +366,8 @@
         const remoteVideoLabel = document.getElementById('remoteVideoLabel');
         const participantsAudioContainer = document.createElement('div');
         participantsAudioContainer.id = 'participantsAudioContainer';
+        // Map to hold AudioContext source/gain nodes for remote audio fallbacks
+        const remoteAudioNodes = new Map();
 
         // --- LiveKit Service ---
         class MediaService {
@@ -752,8 +754,40 @@
                 el.controls = false;
                 el.muted = false;
                 participantsAudioContainer.appendChild(el);
-                // Attempt to start playback (may require user gesture in some browsers)
-                try { el.play().catch(() => { console.debug('Playback prevented by browser autoplay policy'); }); } catch (e) { /* ignore */ }
+
+                // Attempt to start playback (may require user gesture in some browsers).
+                // If autoplay is blocked, attempt to stream via a resumed AudioContext as a fallback.
+                try {
+                    const p = el.play();
+                    if (p && typeof p.then === 'function') {
+                        p.catch(async (err) => {
+                            console.debug('Audio element play blocked, attempting AudioContext fallback', err);
+                            try {
+                                if (!window.__audioContext) {
+                                    await primeAudio();
+                                } else {
+                                    try { await window.__audioContext.resume(); } catch(e){}
+                                }
+                                const ctx = window.__audioContext;
+                                // Some SDKs expose the underlying MediaStreamTrack
+                                const mst = track.mediaStreamTrack || (track.track && track.track.mediaStreamTrack) || null;
+                                if (ctx && mst) {
+                                    const ms = new MediaStream([mst]);
+                                    const src = ctx.createMediaStreamSource(ms);
+                                    const gain = ctx.createGain();
+                                    gain.gain.value = 1;
+                                    src.connect(gain).connect(ctx.destination);
+                                    remoteAudioNodes.set(participant.identity, { src, gain });
+                                    console.debug('AudioContext fallback attached for', participant.identity);
+                                }
+                            } catch (ex) {
+                                console.debug('AudioContext fallback failed', ex);
+                            }
+                        });
+                    }
+                } catch (e) {
+                    console.debug('Audio element play attempt failed', e);
+                }
             }
         };
 
@@ -775,8 +809,16 @@
             }
             // Remove detached elements that are not the main video element
             track.detach().forEach(el => { if (el && el !== remoteVideoEl) el.remove(); });
-            // Also remove any managed audio element for this participant
-            try { document.getElementById(`audio-${participant.identity}`)?.remove(); } catch(e){}
+            // Also remove any managed audio element for this participant and cleanup AudioContext nodes
+            try {
+                const node = remoteAudioNodes.get(participant.identity);
+                if (node) {
+                    try { node.src.disconnect(); } catch(e){}
+                    try { node.gain.disconnect(); } catch(e){}
+                    remoteAudioNodes.delete(participant.identity);
+                }
+                document.getElementById(`audio-${participant.identity}`)?.remove();
+            } catch(e){}
         };
 
         mediaService.onParticipantDisconnected = (participant) => {
