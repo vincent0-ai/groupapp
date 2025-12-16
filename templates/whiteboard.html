@@ -462,6 +462,13 @@
             screenShareBtn.disabled = true;
             screenShareBtn.innerHTML = '<i class="fas fa-desktop"></i><span class="btn-text"> Share Screen</span>';
             
+            const watchScreenBtn = document.createElement('button');
+            watchScreenBtn.id = 'watchScreenBtn';
+            watchScreenBtn.className = 'btn btn-sm btn-outline-primary';
+            watchScreenBtn.setAttribute('aria-label', 'Watch Screen');
+            watchScreenBtn.disabled = true;
+            watchScreenBtn.innerHTML = '<i class="fas fa-eye"></i><span class="btn-text"> Watch Screen</span>';
+
             const raiseBtn = document.createElement('button');
             raiseBtn.id = 'raiseBtn';
             raiseBtn.className = 'btn btn-sm btn-outline-secondary';
@@ -478,13 +485,33 @@
             controlsContainer.appendChild(liveBtn);
             controlsContainer.appendChild(muteBtn);
             controlsContainer.appendChild(screenShareBtn);
+            controlsContainer.appendChild(watchScreenBtn);
             controlsContainer.appendChild(raiseBtn);
             controlsContainer.appendChild(leaveSessionBtn);
 
+            watchScreenBtn.addEventListener('click', async () => {
+                const remoteContainer = document.getElementById('remoteVideoContainer');
+                if (!remoteContainer || remoteContainer.style.display === 'none') return showCustomAlert('No active screen share to watch.', 'Screen Share');
+                try {
+                    if (document.fullscreenElement && document.fullscreenElement !== remoteContainer) await document.exitFullscreen();
+                    await remoteContainer.requestFullscreen();
+                } catch (e) {
+                    // fallback: toggle class if fullscreen API not available
+                    remoteContainer.classList.toggle('whiteboard-fullscreen');
+                }
+            });
             liveBtn.addEventListener('click', () => isInCall ? leaveCall() : joinCall());
             muteBtn.addEventListener('click', async () => {
                 // only allow toggling while connected
                 if (!isInCall) return showCustomAlert('Join the call first to toggle microphone.', 'Not In Call');
+                // If attempting to unmute but moderator revoked speak, prevent unmuting
+                if (isMuted) {
+                    // user is trying to unmute
+                    if (!canSpeak) {
+                        showCustomAlert('You have been muted by the moderator. You cannot unmute until permission is granted.', 'Muted');
+                        return;
+                    }
+                }
                 isMuted = !isMuted;
                 try { await mediaService.publishAudio(!isMuted); } catch (e) { console.error('Failed to toggle audio', e); }
                 updateMuteButton();
@@ -530,7 +557,10 @@
             if(!muteBtn) return;
             muteBtn.innerHTML = isMuted ? '<i class="fas fa-microphone-slash"></i><span class="btn-text"> Unmute</span>' : '<i class="fas fa-microphone"></i><span class="btn-text"> Mute</span>';
             muteBtn.className = isMuted ? 'btn btn-sm btn-warning' : 'btn btn-sm btn-outline-warning';
-            muteBtn.disabled = !isInCall;
+            // Disable when not in call or if attempting to unmute while moderator revoked speak
+            muteBtn.disabled = !isInCall || (isMuted && !canSpeak);
+            // Update ARIA pressed for accessibility
+            muteBtn.setAttribute('aria-pressed', String(!isMuted));
         }
 
         function updateScreenShareButton() {
@@ -640,6 +670,7 @@
             if (screenShareBtn) { screenShareBtn.disabled = true; }
             
             remoteVideoContainer.style.display = 'none';
+            try { document.getElementById('watchScreenBtn')?.setAttribute('disabled', 'true'); } catch(e){}
             if(remoteVideoEl) remoteVideoEl.srcObject = null;
             participantsAudioContainer.innerHTML = '';
         }
@@ -664,6 +695,9 @@
                     remoteVideoEl.replaceChildren(el);
                     remoteVideoLabel.textContent = `${participant.name || participant.identity}'s screen`;
                 }
+                // Enable "Watch Screen" control when a remote screen share is active
+                try { document.getElementById('watchScreenBtn')?.removeAttribute('disabled'); } catch(e){}
+                
             } else if (track.kind === 'audio') {
                 const el = track.attach();
                 // Ensure audio elements are configured to play immediately
@@ -692,6 +726,8 @@
                 }
                 remoteVideoContainer.style.display = 'none';
                 remoteVideoLabel.textContent = '';
+                // Disable "Watch Screen" control when remote share ends
+                try { document.getElementById('watchScreenBtn')?.setAttribute('disabled', 'true'); } catch(e){}
             }
             // Remove detached elements that are not the main video element
             track.detach().forEach(el => { if (el && el !== remoteVideoEl) el.remove(); });
@@ -864,7 +900,7 @@
             // ensure media buttons reflect current permissions
             const muteBtn = document.getElementById('muteBtn');
             const screenShareBtn = document.getElementById('screenShareBtn');
-            if (muteBtn) muteBtn.disabled = !isInCall;
+            if (muteBtn) muteBtn.disabled = !isInCall || (isMuted && !canSpeak);
             if (screenShareBtn) screenShareBtn.disabled = !isInCall || !canShareScreen;
         }
         
@@ -1221,6 +1257,10 @@
                 if (!canvasContainerEl) return;
                 // save previous sizing
                 _wbPrev = { width: canvas.width, height: canvas.height };
+                // snapshot current canvas to preserve drawing content
+                let _wbSnapshot = null;
+                try { _wbSnapshot = canvas.toDataURL(); } catch(e) { console.warn('Could not snapshot canvas', e); }
+
                 // Prefer Fullscreen API
                 try {
                     if (canvasContainerEl.requestFullscreen) {
@@ -1241,6 +1281,19 @@
                     canvas.style.height = '100%';
                     canvas.width = Math.round(window.innerWidth * dpr);
                     canvas.height = Math.round(window.innerHeight * dpr);
+
+                    // restore snapshot scaled to new size
+                    if (_wbSnapshot) {
+                        const img = new Image();
+                        img.onload = () => {
+                            try {
+                                ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+                                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                                ctx.drawImage(img, 0, 0, canvas.width / dpr, canvas.height / dpr);
+                            } catch(e) { console.warn('Could not restore canvas snapshot', e); }
+                        };
+                        img.src = _wbSnapshot;
+                    }
                 } catch (e) { console.warn('Could not resize canvas for fullscreen', e); }
                 // show an exit button
                 let exit = document.getElementById('wb-fs-exit');
@@ -1256,15 +1309,33 @@
 
             function exitWhiteboardFullscreen() {
                 if (!canvasContainerEl) return;
+                // snapshot current fullscreen canvas so we can restore it at previous size
+                let _wbSnapshot = null;
+                try { _wbSnapshot = canvas.toDataURL(); } catch(e) { console.warn('Could not snapshot canvas before exit', e); }
+
                 canvasContainerEl.classList.remove('whiteboard-fullscreen');
                 // restore canvas size
                 try {
                     if (_wbPrev) {
+                        const dpr = window.devicePixelRatio || 1;
                         canvas.width = _wbPrev.width;
                         canvas.height = _wbPrev.height;
                         canvas.style.width = '';
                         canvas.style.height = '';
                         _wbPrev = null;
+
+                        // restore snapshot scaled back to previous size
+                        if (_wbSnapshot) {
+                            const img = new Image();
+                            img.onload = () => {
+                                try {
+                                    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+                                    ctx.clearRect(0, 0, canvas.width, canvas.height);
+                                    ctx.drawImage(img, 0, 0, canvas.width / dpr, canvas.height / dpr);
+                                } catch(e) { console.warn('Could not restore canvas snapshot on exit', e); }
+                            };
+                            img.src = _wbSnapshot;
+                        }
                     }
                 } catch (e) { console.warn('Could not restore canvas size', e); }
                 const exit = document.getElementById('wb-fs-exit');
