@@ -418,8 +418,19 @@
             }
 
             async publishAudio(enabled) {
-                if (!this.room?.localParticipant) return;
-                return await this.room.localParticipant.setMicrophoneEnabled(enabled);
+                if (!this.room?.localParticipant) {
+                    console.debug('[MediaService] publishAudio called but no localParticipant', enabled);
+                    return;
+                }
+                console.debug('[MediaService] publishAudio ->', enabled);
+                try {
+                    const res = await this.room.localParticipant.setMicrophoneEnabled(enabled);
+                    console.debug('[MediaService] publishAudio result ->', res);
+                    return res;
+                } catch (e) {
+                    console.error('[MediaService] publishAudio failed ->', e);
+                    throw e;
+                }
             }
 
             async publishScreenShare(enabled) {
@@ -435,6 +446,8 @@
         let participants = {}, isCreator = false;
         let canDraw = true, canSpeak = true, canShareScreen = true;
         let isInCall = false, isMuted = false, isScreenSharing = false;
+        // Track when a moderator forced a mute so we can allow auto-unmute when permission is restored
+        let mutedByModerator = false;
         const socket = io();
 
         // --- Media Call Logic ---
@@ -513,7 +526,10 @@
                     }
                 }
                 isMuted = !isMuted;
+                console.debug('User toggled mute ->', isMuted ? 'muted' : 'unmuted');
                 try { await mediaService.publishAudio(!isMuted); } catch (e) { console.error('Failed to toggle audio', e); }
+                // If the user explicitly unmuted, clear moderator-forced flag
+                if (!isMuted) mutedByModerator = false;
                 updateMuteButton();
             });
             screenShareBtn.addEventListener('click', async () => {
@@ -634,12 +650,12 @@
                 // If we can speak, unmute by default
                 if (canSpeak) {
                     isMuted = false;
-                    try { await mediaService.publishAudio(true); } catch(e) { console.warn('Auto-enable mic failed', e); }
+                    try { await mediaService.publishAudio(true); console.debug('Auto-enabled mic for user (canSpeak)'); } catch(e) { console.warn('Auto-enable mic failed', e); }
                 } else {
                     // even if user cant speak to OTHERS, we can still publish audio
                     // so they can hear themselves. They will be hidden from others.
                     isMuted = false; 
-                    try { await mediaService.publishAudio(true); } catch(e) { console.warn('Auto-enable mic failed', e); }
+                    try { await mediaService.publishAudio(true); console.debug('Auto-enabled mic for user (no canSpeak)'); } catch(e) { console.warn('Auto-enable mic failed', e); }
                 }
                 updateMuteButton();
 
@@ -699,6 +715,7 @@
                 try { document.getElementById('watchScreenBtn')?.removeAttribute('disabled'); } catch(e){}
                 
             } else if (track.kind === 'audio') {
+                console.debug('[Media] audio track subscribed from', participant.identity);
                 const el = track.attach();
                 // Ensure audio elements are configured to play immediately
                 // where browsers allow it (helps avoid one-way audio issues).
@@ -709,7 +726,7 @@
                 el.muted = false;
                 participantsAudioContainer.appendChild(el);
                 // Attempt to start playback (may require user gesture in some browsers)
-                try { el.play().catch(() => {}); } catch (e) { /* ignore */ }
+                try { el.play().catch(() => { console.debug('Playback prevented by browser autoplay policy'); }); } catch (e) { /* ignore */ }
             }
         };
 
@@ -943,6 +960,7 @@
                 participants[uid].can_speak = data.can_speak?.map(String).includes(String(uid));
                 participants[uid].can_share_screen = data.can_share_screen?.map(String).includes(String(uid));
             });
+            const prevCanSpeak = canSpeak;
             canDraw = isCreator || data.can_draw?.map(String).includes(userId);
             canSpeak = isCreator || data.can_speak?.map(String).includes(userId);
             canShareScreen = isCreator || data.can_share_screen?.map(String).includes(userId);
@@ -952,12 +970,23 @@
             if (isInCall) {
                 const muteBtn = document.getElementById('muteBtn');
                 const screenShareBtn = document.getElementById('screenShareBtn');
-                if (muteBtn) muteBtn.disabled = !isInCall;
+                if (muteBtn) muteBtn.disabled = !isInCall || (isMuted && !canSpeak);
                 if (screenShareBtn) screenShareBtn.disabled = !canShareScreen;
                 if(!canSpeak && !isMuted) {
                     try { mediaService.publishAudio(false); } catch(e) { console.warn('Could not mute after permission update', e); }
                     isMuted = true;
+                    // mark that moderator forced this mute so we can auto-unmute if permissions return
+                    mutedByModerator = true;
                     updateMuteButton();
+                }
+                // If moderator restored speak permission and we were muted by moderator, try to auto-unmute
+                if (canSpeak && mutedByModerator && isMuted) {
+                    console.debug('Permissions restored: attempting to auto-unmute since mute was moderator-forced');
+                    try { mediaService.publishAudio(true).catch(() => {}); } catch (e) { console.warn('Auto-unmute failed', e); }
+                    isMuted = false;
+                    mutedByModerator = false;
+                    updateMuteButton();
+                    try { showCustomAlert('Your microphone was unmuted because speak permission was restored.', 'Permission'); } catch(e){}
                 }
                 if(!canShareScreen && isScreenSharing) {
                     try { mediaService.publishScreenShare(false); } catch(e) { console.warn('Could not stop screen share after permission update', e); }
