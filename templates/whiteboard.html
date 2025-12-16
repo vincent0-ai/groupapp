@@ -408,6 +408,37 @@
                     .on(LivekitClient.RoomEvent.ConnectionStateChanged, (state) => this.onConnectionStateChange?.(state));
                 
                 console.log('Connected to LiveKit room:', this.room.name);
+
+                // Ensure audio system is primed and attach any already-published tracks so
+                // participants who join later get the remote audio/video immediately.
+                try {
+                    await primeAudio();
+                } catch (e) { /* ignore */ }
+
+                try {
+                    // Iterate over existing participants and their track publications, calling
+                    // the same handler as the SDK would for newly-published tracks.
+                    if (this.room && this.room.participants) {
+                        try {
+                            for (const participant of this.room.participants.values()) {
+                                // Prefer getTracks() if available (returns track publications)
+                                if (typeof participant.getTracks === 'function') {
+                                    participant.getTracks().forEach(pub => { if (pub && pub.track) this.onTrackSubscribed?.(pub.track, participant); });
+                                } else {
+                                    // Fallback to checking common arrays/maps
+                                    try { participant.tracks?.forEach(pub => { if (pub && pub.track) this.onTrackSubscribed?.(pub.track, participant); }); } catch(e){}
+                                    try { participant.audioTracks?.forEach(pub => { if (pub && pub.track) this.onTrackSubscribed?.(pub.track, participant); }); } catch(e){}
+                                    try { participant.videoTracks?.forEach(pub => { if (pub && pub.track) this.onTrackSubscribed?.(pub.track, participant); }); } catch(e){}
+                                }
+                            }
+                        } catch (e) {
+                            console.debug('Error while attaching existing remote tracks:', e);
+                        }
+                    }
+                } catch (e) {
+                    console.debug('Failed to process existing participant tracks', e);
+                }
+
                 return this.room;
             }
 
