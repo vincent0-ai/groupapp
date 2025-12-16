@@ -104,9 +104,10 @@ class LiveKitService:
                 can_publish = _get_attr(p, 'can_publish', 'canPublish', default=False)
                 can_publish_data = _get_attr(p, 'can_publish_data', 'canPublishData', default=False)
                 can_subscribe = _get_attr(p, 'can_subscribe', 'canSubscribe', default=True)
+                hidden = _get_attr(p, 'hidden', 'hidden', default=False)
 
-                video_kwargs_snake = dict(room_join=room_join, room=room, can_publish=can_publish, can_publish_data=can_publish_data, can_subscribe=can_subscribe)
-                video_kwargs_camel = dict(roomJoin=room_join, room=room, canPublish=can_publish, canPublishData=can_publish_data, canSubscribe=can_subscribe)
+                video_kwargs_snake = dict(room_join=room_join, room=room, can_publish=can_publish, can_publish_data=can_publish_data, can_subscribe=can_subscribe, hidden=hidden)
+                video_kwargs_camel = dict(roomJoin=room_join, room=room, canPublish=can_publish, canPublishData=can_publish_data, canSubscribe=can_subscribe, hidden=hidden)
 
                 prepared = None
                 # Try constructing an SDK VideoGrant/VideoGrants in multiple ways
@@ -168,6 +169,7 @@ class LiveKitService:
                             'canPublish': getattr(native_permissions, 'can_publish', True) if not isinstance(native_permissions, dict) else (native_permissions.get('can_publish') if native_permissions.get('can_publish') is not None else True),
                             'canPublishData': getattr(native_permissions, 'can_publish_data', True) if not isinstance(native_permissions, dict) else (native_permissions.get('can_publish_data') if native_permissions.get('can_publish_data') is not None else True),
                             'canSubscribe': getattr(native_permissions, 'can_subscribe', True) if not isinstance(native_permissions, dict) else (native_permissions.get('can_subscribe') if native_permissions.get('can_subscribe') is not None else True),
+                            'hidden': getattr(native_permissions, 'hidden', False) if not isinstance(native_permissions, dict) else (native_permissions.get('hidden') if native_permissions.get('hidden') is not None else False),
                         },
                         'metadata': ''
                     }
@@ -340,14 +342,17 @@ class VideoGrants:
     """Compatibility wrapper for LiveKit grant/permission objects.
 
     Builds an SDK-native grant when available (`api.VideoGrant` or
-    `api.ParticipantPermission`) and otherwise falls back to a dict.
+    `api.ParticipantPermission`) and otherwise falls back to a dict-like
+    object. Newer code may pass a `hidden` flag to hide a participant
+    (for example, so a non-speaking participant does not appear to others).
     """
-    def __init__(self, *, room_join: bool = False, room: str | None = None, can_publish: bool = False, can_publish_data: bool = False, can_subscribe: bool = True):
+    def __init__(self, *, room_join: bool = False, room: str | None = None, can_publish: bool = False, can_publish_data: bool = False, can_subscribe: bool = True, hidden: bool = False):
         self.room_join = room_join
         self.room = room
         self.can_publish = can_publish
         self.can_publish_data = can_publish_data
         self.can_subscribe = can_subscribe
+        self.hidden = hidden
 
     def to_api(self):
         # Prefer api.VideoGrants (newer SDK) then api.VideoGrant (older naming)
@@ -361,6 +366,7 @@ class VideoGrants:
                         can_publish=self.can_publish,
                         can_publish_data=self.can_publish_data,
                         can_subscribe=self.can_subscribe,
+                        hidden=self.hidden,
                     )
                 except TypeError:
                     return api.VideoGrants(
@@ -369,6 +375,7 @@ class VideoGrants:
                         canPublish=self.can_publish,
                         canPublishData=self.can_publish_data,
                         canSubscribe=self.can_subscribe,
+                        hidden=self.hidden,
                     )
             except Exception:
                 pass
@@ -382,6 +389,7 @@ class VideoGrants:
                         can_publish=self.can_publish,
                         can_publish_data=self.can_publish_data,
                         can_subscribe=self.can_subscribe,
+                        hidden=self.hidden,
                     )
                 except TypeError:
                     return api.VideoGrant(
@@ -390,6 +398,7 @@ class VideoGrants:
                         canPublish=self.can_publish,
                         canPublishData=self.can_publish_data,
                         canSubscribe=self.can_subscribe,
+                        hidden=self.hidden,
                     )
             except Exception:
                 pass
@@ -397,20 +406,32 @@ class VideoGrants:
         # Fallback to ParticipantPermission if present
         if hasattr(api, 'ParticipantPermission'):
             try:
-                return api.ParticipantPermission(
-                    can_publish=self.can_publish,
-                    can_publish_data=self.can_publish_data,
-                )
+                # Some SDKs accept a `hidden` flag here too; try to provide it.
+                try:
+                    return api.ParticipantPermission(
+                        can_publish=self.can_publish,
+                        can_publish_data=self.can_publish_data,
+                        hidden=self.hidden,
+                    )
+                except TypeError:
+                    # Fallback if the parameter name or support differs
+                    return api.ParticipantPermission(
+                        can_publish=self.can_publish,
+                        can_publish_data=self.can_publish_data,
+                    )
             except Exception:
                 pass
 
-        # Final fallback: return an object that will be wrapped as `video` grant
+        # Final fallback: include `hidden` attribute so callers that read the
+        # prepared object can observe the intent even when SDK integration is
+        # not available.
         return types.SimpleNamespace(
             room_join=self.room_join,
             room=self.room,
             can_publish=self.can_publish,
             can_publish_data=self.can_publish_data,
             can_subscribe=self.can_subscribe,
+            hidden=self.hidden,
         )
 
 def get_livekit_service():

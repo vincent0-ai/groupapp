@@ -44,3 +44,17 @@ def test_create_token_with_compat_grant():
     svc = mod.LiveKitService(api_key='k', api_secret='s', url='u')
     token = svc.create_access_token('u1', 'name', 'r', vg)
     assert token == 'dummy.jwt'
+
+
+def test_video_grants_accepts_hidden_flag():
+    _make_dummy_livekit()
+    file_path = Path('app/services/livekit_service.py')
+    spec = importlib.util.spec_from_file_location('livekit_service_test2', file_path)
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+
+    # Ensure passing `hidden` does not raise and still produces a token
+    vg = mod.VideoGrants(room_join=True, room='r', can_publish=False, hidden=True)
+    svc = mod.LiveKitService(api_key='k', api_secret='s', url='u')
+    token = svc.create_access_token('u2', 'name2', 'r', vg)
+    assert token == 'dummy.jwt'
