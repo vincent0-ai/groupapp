@@ -346,7 +346,7 @@ class VideoGrants:
     object. Newer code may pass a `hidden` flag to hide a participant
     (for example, so a non-speaking participant does not appear to others).
     """
-    def __init__(self, *, room_join: bool = False, room: str | None = None, can_publish: bool = False, can_publish_data: bool = False, can_subscribe: bool = True, hidden: bool = False):
+    def __init__(self, *, room_join: bool = True, room: str | None = None, can_publish: bool = True, can_publish_data: bool = False, can_subscribe: bool = True, hidden: bool = False):
         self.room_join = room_join
         self.room = room
         self.can_publish = can_publish
