@@ -19,6 +19,7 @@ wheels/
 .installed.cfg
 *.egg
 *.md
+!README.md
 .venv
 venv/
 ENV/
