@@ -1463,7 +1463,8 @@
                     exit.className = 'btn btn-light fullscreen-exit-btn';
                     exit.innerHTML = '<i class="fas fa-times"></i>';
                     exit.addEventListener('click', exitWhiteboardFullscreen);
-                    document.body.appendChild(exit);
+                    // Append inside the whiteboard container so it is visible in native fullscreen
+                    canvasContainerEl.appendChild(exit);
                 }
 
                 // Create fullscreen floating controls (clear, undo, brush toggle)
@@ -1495,7 +1496,8 @@
                     fsControls.appendChild(undoBtnFs);
                     fsControls.appendChild(brushToggleFs);
 
-                    document.body.appendChild(fsControls);
+                    // Append inside the whiteboard container so controls are visible in native fullscreen
+                    canvasContainerEl.appendChild(fsControls);
 
                     // Attach handlers
                     clearBtnFs.addEventListener('click', () => document.getElementById('clearBtn')?.click());
