@@ -245,8 +245,10 @@
             <div class="card-body overflow-auto text-center" id="canvasContainer" style="background: linear-gradient(180deg, #f8f9fa 0%, #e9ecef 100%); padding: 1rem;">
                 <div style="position:relative; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 20px rgba(0,0,0,0.1);">
                     <canvas id="whiteboard" style="width:100%;height:50vh;display:block; background: white;" width="1200" height="600"></canvas>
-                    <div id="canvasOverlay" style="position:absolute;inset:0;display:none;align-items:center;justify-content:center;background:rgba(255,255,255,0.85); backdrop-filter: blur(4px);">
-                        <div class="text-muted"><i class="fas fa-lock me-2"></i>You don't have permission to draw in this session</div>
+                    
+                    <!-- FIX: Replaced blur with a non-intrusive View Only badge -->
+                    <div id="canvasOverlay" style="position:absolute; top: 12px; right: 12px; display:none; pointer-events: none; z-index: 10;">
+                        <span class="badge bg-secondary shadow-sm"><i class="fas fa-eye me-1"></i> View Only</span>
                     </div>
                 </div>
             </div>
@@ -366,15 +368,20 @@
         const remoteVideoLabel = document.getElementById('remoteVideoLabel');
         const participantsAudioContainer = document.createElement('div');
         participantsAudioContainer.id = 'participantsAudioContainer';
-        // Keep the audio container out of sight but in the DOM so some mobile
-        // browsers allow playback of dynamically-created audio elements.
-        participantsAudioContainer.style.display = 'none';
-        participantsAudioContainer.setAttribute('aria-hidden', 'true');
-        try { document.body.appendChild(participantsAudioContainer); } catch (e) { console.warn('Failed to append participantsAudioContainer early', e); }
+        // We do NOT hide this with display:none because some browsers won't play audio from hidden elements.
+        // Instead we make it size 0/0.
+        participantsAudioContainer.style.width = '0px';
+        participantsAudioContainer.style.height = '0px';
+        participantsAudioContainer.style.overflow = 'hidden';
+        document.body.appendChild(participantsAudioContainer);
+
         // Detect whether screen sharing is supported by the browser/device.
         const supportsDisplayMedia = !!(navigator.mediaDevices && navigator.mediaDevices.getDisplayMedia);
         // Map to hold AudioContext source/gain nodes for remote audio fallbacks
         const remoteAudioNodes = new Map();
+
+        // FIX: Local history for resizing
+        let drawHistory = [];
 
         // --- LiveKit Service ---
         class MediaService {
@@ -404,6 +411,7 @@
                         videoEncoding: { maxBitrate: 1_500_000, maxFramerate: 30 },
                     },
                     adaptiveStream: true,
+                    dynacast: true,
                 });
 
                 await this.room.connect(url, token);
@@ -416,30 +424,23 @@
                 
                 console.log('Connected to LiveKit room:', this.room.name);
 
-                // Ensure audio system is primed and attach any already-published tracks so
-                // participants who join later get the remote audio/video immediately.
+                // FIX: Ensure audio system is primed
                 try {
                     await primeAudio();
                 } catch (e) { /* ignore */ }
 
                 try {
-                    // Iterate over existing participants and their track publications, calling
-                    // the same handler as the SDK would for newly-published tracks.
+                    // FIX: Iterate over existing participants and their track publications
+                    // This fixes the issue where you can't hear people who joined *before* you.
                     if (this.room && this.room.participants) {
-                        try {
-                            for (const participant of this.room.participants.values()) {
-                                // Prefer getTracks() if available (returns track publications)
-                                if (typeof participant.getTracks === 'function') {
-                                    participant.getTracks().forEach(pub => { if (pub && pub.track) this.onTrackSubscribed?.(pub.track, participant); });
-                                } else {
-                                    // Fallback to checking common arrays/maps
-                                    try { participant.tracks?.forEach(pub => { if (pub && pub.track) this.onTrackSubscribed?.(pub.track, participant); }); } catch(e){}
-                                    try { participant.audioTracks?.forEach(pub => { if (pub && pub.track) this.onTrackSubscribed?.(pub.track, participant); }); } catch(e){}
-                                    try { participant.videoTracks?.forEach(pub => { if (pub && pub.track) this.onTrackSubscribed?.(pub.track, participant); }); } catch(e){}
+                        for (const participant of this.room.participants.values()) {
+                            // Check track publications
+                            const publications = participant.getTracks();
+                            publications.forEach(pub => {
+                                if (pub && pub.track) {
+                                    this.onTrackSubscribed?.(pub.track, participant);
                                 }
-                            }
-                        } catch (e) {
-                            console.debug('Error while attaching existing remote tracks:', e);
+                            });
                         }
                     }
                 } catch (e) {
@@ -458,14 +459,9 @@
             }
 
             async publishAudio(enabled) {
-                if (!this.room?.localParticipant) {
-                    console.debug('[MediaService] publishAudio called but no localParticipant', enabled);
-                    return;
-                }
-                console.debug('[MediaService] publishAudio ->', enabled);
+                if (!this.room?.localParticipant) return;
                 try {
                     const res = await this.room.localParticipant.setMicrophoneEnabled(enabled);
-                    console.debug('[MediaService] publishAudio result ->', res);
                     return res;
                 } catch (e) {
                     console.error('[MediaService] publishAudio failed ->', e);
@@ -501,7 +497,6 @@
 
             const muteBtn = document.createElement('button');
             muteBtn.id = 'muteBtn';
-            // Show mute button but disable until in-call; visibility communicates capability to users
             muteBtn.className = 'btn btn-sm btn-outline-warning';
             muteBtn.setAttribute('aria-label', 'Mute');
             muteBtn.disabled = true;
@@ -509,13 +504,10 @@
 
             const screenShareBtn = document.createElement('button');
             screenShareBtn.id = 'screenShareBtn';
-            // Show share button but disable until in-call; will enable only if permission allows
             screenShareBtn.className = 'btn btn-sm btn-outline-info';
             screenShareBtn.setAttribute('aria-label', 'Share Screen');
             screenShareBtn.disabled = true;
             screenShareBtn.innerHTML = '<i class="fas fa-desktop"></i><span class="btn-text"> Share Screen</span>';
-            // If the browser/device does not support getDisplayMedia (common on iOS and many mobile browsers)
-            // keep the control disabled and provide an explanatory tooltip.
             if (!supportsDisplayMedia) {
                 screenShareBtn.disabled = true;
                 screenShareBtn.title = 'Screen sharing not supported on this device or browser';
@@ -555,47 +547,34 @@
                     if (document.fullscreenElement && document.fullscreenElement !== remoteContainer) await document.exitFullscreen();
                     await remoteContainer.requestFullscreen();
                 } catch (e) {
-                    // fallback: toggle class if fullscreen API not available
                     remoteContainer.classList.toggle('whiteboard-fullscreen');
                 }
             });
             liveBtn.addEventListener('click', () => isInCall ? leaveCall() : joinCall());
             muteBtn.addEventListener('click', async () => {
-                // only allow toggling while connected
                 if (!isInCall) return showCustomAlert('Join the call first to toggle microphone.', 'Not In Call');
-                // If attempting to unmute but moderator revoked speak, prevent unmuting
                 if (isMuted) {
-                    // user is trying to unmute
                     if (!canSpeak) {
-                        showCustomAlert('You have been muted by the moderator. You cannot unmute until permission is granted.', 'Muted');
+                        showCustomAlert('You have been muted by the moderator.', 'Muted');
                         return;
                     }
                 }
                 isMuted = !isMuted;
-                console.debug('User toggled mute ->', isMuted ? 'muted' : 'unmuted');
                 try { await mediaService.publishAudio(!isMuted); } catch (e) { console.error('Failed to toggle audio', e); }
-                // If the user explicitly unmuted, clear moderator-forced flag
                 if (!isMuted) mutedByModerator = false;
                 updateMuteButton();
             });
             screenShareBtn.addEventListener('click', async () => {
                 if (!isInCall) return showCustomAlert('Join the call first to share your screen.', 'Not In Call');
-                // Check for platform/browser support first
-                if (!supportsDisplayMedia) return showCustomAlert('Screen sharing is not supported by your browser or device. Many mobile browsers (especially iOS Safari) do not allow screen sharing.', 'Screen Share');
-                // Only allow if server-side permission says user may share
-                if (!canShareScreen) return showCustomAlert('You do not have permission to share your screen in this session.', 'Permission');
+                if (!supportsDisplayMedia) return showCustomAlert('Screen sharing is not supported by your browser.', 'Screen Share');
+                if (!canShareScreen) return showCustomAlert('You do not have permission to share your screen.', 'Permission');
                 isScreenSharing = !isScreenSharing;
                 try {
                     await mediaService.publishScreenShare(isScreenSharing);
                 } catch(e) {
                      console.error('Screen share failed:', e);
                      isScreenSharing = false;
-                     // Provide a clearer hint for mobile where getDisplayMedia is often unsupported
-                     if (!supportsDisplayMedia) {
-                         showCustomAlert('Screen sharing is not available on this device/browser.', 'Screen Share');
-                     } else {
-                         showCustomAlert('Could not start screen sharing. Make sure you allowed the browser to share your screen.', 'Screen Share');
-                     }
+                     showCustomAlert('Could not start screen sharing.', 'Screen Share');
                 }
                 updateScreenShareButton();
             });
@@ -605,17 +584,14 @@
                  renderParticipants();
             });
 
-            // Hide left-column leave control (we provide a top-bar button now)
             try { document.getElementById('leaveSessionContainer').style.display = 'none'; } catch(e){}
 
             leaveSessionBtn.addEventListener('click', async () => {
-                // If creator, confirm and end session; otherwise just leave
                 if (isCreator) {
                     if (!confirm('End session for everyone?')) return;
                     await endSession(sessionId);
                     return;
                 }
-                // leave: ensure we disconnect from media and go back
                 try { await leaveCall(); } catch(e){}
                 window.location.href = '/whiteboard';
             });
@@ -626,9 +602,7 @@
             if(!muteBtn) return;
             muteBtn.innerHTML = isMuted ? '<i class="fas fa-microphone-slash"></i><span class="btn-text"> Unmute</span>' : '<i class="fas fa-microphone"></i><span class="btn-text"> Mute</span>';
             muteBtn.className = isMuted ? 'btn btn-sm btn-warning' : 'btn btn-sm btn-outline-warning';
-            // Disable when not in call or if attempting to unmute while moderator revoked speak
             muteBtn.disabled = !isInCall || (isMuted && !canSpeak);
-            // Update ARIA pressed for accessibility
             muteBtn.setAttribute('aria-pressed', String(!isMuted));
         }
 
@@ -650,10 +624,8 @@
                 let json = null;
                 try { json = JSON.parse(text); } catch(e) { /* not JSON */ }
                 if (!res.ok) {
-                    console.error('LiveKit token endpoint error', res.status, text);
                     throw new Error((json && (json.message || json.error)) || text || 'Failed to get media token');
                 }
-                // return both token and optional url from server
                 return { token: json?.data?.token || json?.token, url: json?.data?.url || json?.url };
             } catch (e) {
                 console.error('getLiveKitToken failed:', e);
@@ -662,16 +634,13 @@
             }
         }
 
-        // Resume/resume audio context to prime autoplay on browsers (fixes remote audio being blocked)
         async function primeAudio() {
             try {
                 if (window.__audioPrimed) return;
                 const AudioCtx = window.AudioContext || window.webkitAudioContext;
                 if (!AudioCtx) return;
                 const ctx = new AudioCtx();
-                // resume must be called from a user gesture - join button is a gesture
                 await ctx.resume();
-                // generate a silent burst so some browsers consider the audio system active
                 const osc = ctx.createOscillator();
                 const gain = ctx.createGain();
                 gain.gain.value = 0;
@@ -679,7 +648,6 @@
                 osc.start();
                 osc.stop(ctx.currentTime + 0.01);
                 window.__audioPrimed = true;
-                // keep the context around so it doesn't get GC'd
                 window.__audioContext = ctx;
             } catch (e) {
                 console.warn('Audio priming failed', e);
@@ -700,42 +668,31 @@
             }
 
             const lkToken = lkResp.token;
-            // prefer server-provided URL, fallback to config placeholder
             const configured = lkResp.url || "{{ config.LIVEKIT_URL }}" || "http://localhost:7880";
             const wsUrl = String(configured).replace(/^http/, 'ws');
 
             try {
-                // Prime audio system (must be run as a user gesture) to avoid browsers blocking remote audio playback
                 await primeAudio();
-
-                // If user is allowed to speak, proactively request microphone permission
                 try {
                     await navigator.mediaDevices.getUserMedia({ audio: true });
                 } catch (permErr) {
-                    console.warn('Microphone permission denied or unavailable', permErr);
+                    console.warn('Microphone permission denied', permErr);
                     showCustomAlert('Microphone access was denied. You will join muted.', 'Permission');
                 }
-                // MediaService.connect expects (token, url)
+                
                 await mediaService.connect(lkToken, wsUrl);
                 isInCall = true;
 
-                // Use our server-side permission flags (canSpeak / canShareScreen) to show controls.
                 liveBtn.disabled = false;
                 liveBtn.className = 'btn btn-sm btn-danger';
                 liveBtn.innerHTML = '<i class="fas fa-phone-slash"></i><span class="btn-text"> Leave</span>';
 
-                const muteBtn = document.getElementById('muteBtn');
-                const screenShareBtn = document.getElementById('screenShareBtn');
-
-                // If we can speak, unmute by default
                 if (canSpeak) {
                     isMuted = false;
-                    try { await mediaService.publishAudio(true); console.debug('Auto-enabled mic for user (canSpeak)'); } catch(e) { console.warn('Auto-enable mic failed', e); }
+                    try { await mediaService.publishAudio(true); } catch(e) { console.warn('Auto-enable mic failed', e); }
                 } else {
-                    // even if user cant speak to OTHERS, we can still publish audio
-                    // so they can hear themselves. They will be hidden from others.
                     isMuted = false; 
-                    try { await mediaService.publishAudio(true); console.debug('Auto-enabled mic for user (no canSpeak)'); } catch(e) { console.warn('Auto-enable mic failed', e); }
+                    try { await mediaService.publishAudio(true); } catch(e) { }
                 }
                 updateMuteButton();
 
@@ -759,7 +716,6 @@
                 liveBtn.innerHTML = '<i class="fas fa-phone"></i><span class="btn-text"> Join Call</span>';
             }
             document.getElementById('muteBtn')?.classList.add('d-none');
-            // Disable media buttons when leaving
             const muteBtn = document.getElementById('muteBtn');
             const screenShareBtn = document.getElementById('screenShareBtn');
             if (muteBtn) { muteBtn.disabled = true; }
@@ -772,110 +728,64 @@
         }
 
         mediaService.onTrackSubscribed = (track, participant) => {
-            // For video tracks (screen share), attach to the existing <video> element
-            // instead of inserting a nested video element. This avoids nested
-            // <video> tags which can prevent playback for remote viewers.
             if (track.kind === 'video') {
                 remoteVideoContainer.style.display = 'flex';
                 try {
-                    // Attach directly to the dedicated video element
                     track.attach(remoteVideoEl);
-                    // Ensure playback attributes are present
                     remoteVideoEl.muted = false;
                     remoteVideoEl.controls = true;
                     remoteVideoEl.autoplay = true;
                     remoteVideoLabel.textContent = `${participant.name || participant.identity}'s screen`;
                 } catch (e) {
-                    // Fallback: create element returned by attach()
                     const el = track.attach();
                     remoteVideoEl.replaceChildren(el);
                     remoteVideoLabel.textContent = `${participant.name || participant.identity}'s screen`;
                 }
-                // Enable "Watch Screen" control when a remote screen share is active
                 try { document.getElementById('watchScreenBtn')?.removeAttribute('disabled'); } catch(e){}
                 
             } else if (track.kind === 'audio') {
                 console.debug('[Media] audio track subscribed from', participant.identity);
+                // FIX: Attach directly to document body (hidden) to prevent browser auto-pause on cleanup
                 const el = track.attach();
-                // Ensure audio elements are configured to play immediately
-                // where browsers allow it (helps avoid one-way audio issues).
                 el.id = `audio-${participant.identity}`;
                 el.autoplay = true;
                 el.playsInline = true;
-                el.setAttribute('playsinline', 'true');
-                el.setAttribute('webkit-playsinline', 'true');
-                el.controls = false;
-                el.muted = false;
-                // Keep the element visually hidden but present in DOM to satisfy
-                // certain mobile autoplay policies.
-                el.style.display = 'none';
-                el.volume = 1;
-                participantsAudioContainer.appendChild(el);
-
-                // Attempt to start playback (may require user gesture in some browsers).
-                // If autoplay is blocked, attempt to stream via a resumed AudioContext as a fallback.
-                try {
-                    const p = el.play();
-                    if (p && typeof p.then === 'function') {
-                        p.catch(async (err) => {
-                            console.debug('Audio element play blocked, attempting AudioContext fallback', err);
-                            try {
-                                if (!window.__audioContext) {
-                                    await primeAudio();
-                                } else {
-                                    try { await window.__audioContext.resume(); } catch(e){}
-                                }
-                                const ctx = window.__audioContext;
-                                // Some SDKs expose the underlying MediaStreamTrack
-                                const mst = track.mediaStreamTrack || (track.track && track.track.mediaStreamTrack) || null;
-                                if (ctx && mst) {
-                                    const ms = new MediaStream([mst]);
-                                    const src = ctx.createMediaStreamSource(ms);
-                                    const gain = ctx.createGain();
-                                    gain.gain.value = 1;
-                                    src.connect(gain).connect(ctx.destination);
-                                    remoteAudioNodes.set(participant.identity, { src, gain });
-                                    console.debug('AudioContext fallback attached for', participant.identity);
-                                }
-                            } catch (ex) {
-                                console.debug('AudioContext fallback failed', ex);
-                            }
-                        });
+                document.body.appendChild(el); // Explicit DOM append
+                
+                // Aggressive play attempt for mobile
+                const attemptPlay = async () => {
+                    try {
+                        el.muted = false;
+                        await el.play();
+                    } catch (err) {
+                        console.warn('Audio play blocked, attempting fallback', err);
+                        // If blocked, prime and try again
+                        if (window.__audioContext && window.__audioContext.state === 'suspended') {
+                            try { await window.__audioContext.resume(); } catch(e) {}
+                            try { await el.play(); } catch(e) {}
+                        }
                     }
-                } catch (e) {
-                    console.debug('Audio element play attempt failed', e);
-                }
+                };
+                attemptPlay();
             }
         };
 
         mediaService.onTrackUnsubscribed = (track, participant) => {
             if (track.kind === 'video') {
-                // Stop and clear the primary video element instead of removing it
                 if (remoteVideoEl) {
                     try {
                         remoteVideoEl.pause();
                         remoteVideoEl.srcObject = null;
-                        // Remove any fallback child nodes if present
                         remoteVideoEl.replaceChildren();
-                    } catch (e) { /* ignore DOM errors */ }
+                    } catch (e) { }
                 }
                 remoteVideoContainer.style.display = 'none';
                 remoteVideoLabel.textContent = '';
-                // Disable "Watch Screen" control when remote share ends
                 try { document.getElementById('watchScreenBtn')?.setAttribute('disabled', 'true'); } catch(e){}
             }
-            // Remove detached elements that are not the main video element
-            track.detach().forEach(el => { if (el && el !== remoteVideoEl) el.remove(); });
-            // Also remove any managed audio element for this participant and cleanup AudioContext nodes
-            try {
-                const node = remoteAudioNodes.get(participant.identity);
-                if (node) {
-                    try { node.src.disconnect(); } catch(e){}
-                    try { node.gain.disconnect(); } catch(e){}
-                    remoteAudioNodes.delete(participant.identity);
-                }
-                document.getElementById(`audio-${participant.identity}`)?.remove();
-            } catch(e){}
+            track.detach().forEach(el => el.remove());
+            const specificEl = document.getElementById(`audio-${participant.identity}`);
+            if (specificEl) specificEl.remove();
         };
 
         mediaService.onParticipantDisconnected = (participant) => {
@@ -884,7 +794,6 @@
         
         mediaService.onConnectionStateChange = (state) => {
             if (state === LivekitClient.ConnectionState.Disconnected) {
-                // Handle unexpected disconnects
                 if (isInCall) {
                     leaveCall();
                     showCustomAlert('You have been disconnected from the media session.', 'Disconnected');
@@ -892,9 +801,6 @@
             }
         };
 
-        // --- Drawing and General UI Logic ---
-        // (All drawing, canvas, and modal logic remains here, unchanged)
-        
         // --- Init and Socket Handlers ---
         
         if (sessionId) {
@@ -904,7 +810,6 @@
         } else {
             landingView.style.display = 'block';
             sessionView.style.display = 'none';
-            // Load user's active sessions for quick access
             try { loadMySessions(); } catch(e) { console.warn('loadMySessions unavailable yet'); }
         }
         
@@ -926,7 +831,6 @@
                 }
 
                 isCreator = wb.created_by === userId;
-                // Update top-bar leave button depending on creator status
                 const leaveBtn = document.getElementById('leaveSessionBtn');
                 if (leaveBtn) {
                     if (isCreator) {
@@ -954,26 +858,17 @@
 
                 updatePermissionUI();
                 renderParticipants();
+
+                // FIX: Populate Draw History locally
                 if (wb.drawing_data) {
-                    wb.drawing_data.forEach(d => {
-                        // Support both legacy absolute coords and newer normalized coords
-                        let x0 = d.x0, y0 = d.y0, x1 = d.x1, y1 = d.y1;
-                        if (d.normalized) {
-                            x0 = d.x0 * canvas.clientWidth;
-                            y0 = d.y0 * canvas.clientHeight;
-                            x1 = d.x1 * canvas.clientWidth;
-                            y1 = d.y1 * canvas.clientHeight;
-                        }
-                        draw(x0, y0, x1, y1, d.color, d.size, d.opacity);
-                    });
+                    drawHistory = wb.drawing_data;
+                    redrawHistory();
                 }
             } catch (e) { console.error('Failed to fetch session info', e); }
         }
 
         function renderParticipants() {
             if(!participantsEl) return;
-            // Debug: log participant count and ids to help diagnose missing entries
-            try { console.debug('renderParticipants: count=', Object.keys(participants).length, 'ids=', Object.keys(participants)); } catch (e) {}
             const content = Object.entries(participants).map(([uid, meta]) => {
                 const avatarSrc = meta.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(meta.name || uid)}`;
                 let moderatorControls = '';
@@ -997,16 +892,14 @@
                 </div>`;
             }).join('');
             participantsEl.innerHTML = content;
-            participantsEl.appendChild(participantsAudioContainer);
-
-            // Attach event listeners to moderator buttons so they use the scoped `socket` variable
+            
             participantsEl.querySelectorAll('.mod-btn').forEach(btn => {
                 btn.addEventListener('click', (e) => {
                     const action = btn.dataset.action;
                     const targetId = btn.dataset.uid;
                     if (!action || !targetId) return;
                     const payload = { room: `whiteboard:${sessionId}`, user_id: targetId, requester_id: userId };
-                    // Optimistic UI update so moderator sees immediate feedback
+                    
                     try {
                         if (action === 'grant_draw') participants[targetId].can_draw = true;
                         if (action === 'revoke_draw') participants[targetId].can_draw = false;
@@ -1015,9 +908,8 @@
                         if (action === 'grant_screen_share') participants[targetId].can_share_screen = true;
                         if (action === 'revoke_screen_share') participants[targetId].can_share_screen = false;
                         renderParticipants();
-                    } catch (e) { /* ignore optimistic errors */ }
+                    } catch (e) { }
 
-                    // Visual affordance while waiting for the server to confirm
                     btn.disabled = true;
                     const prevHtml = btn.innerHTML;
                     btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
@@ -1028,7 +920,6 @@
                         socket.emit(action, payload);
                     }
 
-                    // If server doesn't respond by emitting permissions_updated, restore button after a short timeout
                     setTimeout(() => { try { btn.disabled = false; btn.innerHTML = prevHtml; } catch (e) {} }, 3000);
                 });
             });
@@ -1041,8 +932,12 @@
             statusParts.push(canSpeak ? 'Speak: ✓' : 'Speak: ✕');
             statusParts.push(canShareScreen ? 'Share: ✓' : 'Share: ✕');
             document.getElementById('permissionStatus').textContent = statusParts.join(' • ');
-            document.getElementById('canvasOverlay').style.display = canDraw ? 'none' : 'flex';
-            // ensure media buttons reflect current permissions
+            
+            // FIX: Removed logic that shows full screen overlay. Using Badge instead.
+            // Also setting cursor to not-allowed.
+            document.getElementById('canvasOverlay').style.display = canDraw ? 'none' : 'block';
+            if(canvas) canvas.style.cursor = canDraw ? 'crosshair' : 'not-allowed';
+
             const muteBtn = document.getElementById('muteBtn');
             const screenShareBtn = document.getElementById('screenShareBtn');
             if (muteBtn) muteBtn.disabled = !isInCall || (isMuted && !canSpeak);
@@ -1063,6 +958,9 @@
         });
         socket.on('draw_update', (data) => {
             if (!data || !data.drawing_data) return;
+            // FIX: Add to local history so we can redraw on resize
+            drawHistory.push(data.drawing_data);
+            
             const d = data.drawing_data;
             let x0 = d.x0, y0 = d.y0, x1 = d.x1, y1 = d.y1;
             if (d.normalized) {
@@ -1073,7 +971,11 @@
             }
             draw(x0, y0, x1, y1, d.color, d.size, d.opacity);
         });
-        socket.on('board_cleared', () => ctx.clearRect(0, 0, canvas.width, canvas.height));
+        socket.on('board_cleared', () => {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            // FIX: Clear history
+            drawHistory = [];
+        });
         socket.on('session_ended', async (data) => {
             await leaveCall();
             showCustomAlert(data.reason || 'This session has been ended', 'Session Ended').then(() => window.location.href = '/whiteboard');
@@ -1086,7 +988,6 @@
                 participants[uid].can_speak = data.can_speak?.map(String).includes(String(uid));
                 participants[uid].can_share_screen = data.can_share_screen?.map(String).includes(String(uid));
             });
-            const prevCanSpeak = canSpeak;
             canDraw = isCreator || data.can_draw?.map(String).includes(userId);
             canSpeak = isCreator || data.can_speak?.map(String).includes(userId);
             canShareScreen = isCreator || data.can_share_screen?.map(String).includes(userId);
@@ -1095,27 +996,23 @@
             
             if (isInCall) {
                 const muteBtn = document.getElementById('muteBtn');
-                const screenShareBtn = document.getElementById('screenShareBtn');
                 if (muteBtn) muteBtn.disabled = !isInCall || (isMuted && !canSpeak);
-                if (screenShareBtn) screenShareBtn.disabled = !canShareScreen;
+                
                 if(!canSpeak && !isMuted) {
-                    try { mediaService.publishAudio(false); } catch(e) { console.warn('Could not mute after permission update', e); }
+                    try { mediaService.publishAudio(false); } catch(e) { }
                     isMuted = true;
-                    // mark that moderator forced this mute so we can auto-unmute if permissions return
                     mutedByModerator = true;
                     updateMuteButton();
                 }
-                // If moderator restored speak permission and we were muted by moderator, try to auto-unmute
                 if (canSpeak && mutedByModerator && isMuted) {
-                    console.debug('Permissions restored: attempting to auto-unmute since mute was moderator-forced');
-                    try { mediaService.publishAudio(true).catch(() => {}); } catch (e) { console.warn('Auto-unmute failed', e); }
+                    try { mediaService.publishAudio(true).catch(() => {}); } catch (e) { }
                     isMuted = false;
                     mutedByModerator = false;
                     updateMuteButton();
-                    try { showCustomAlert('Your microphone was unmuted because speak permission was restored.', 'Permission'); } catch(e){}
+                    try { showCustomAlert('Your microphone was unmuted.', 'Permission'); } catch(e){}
                 }
                 if(!canShareScreen && isScreenSharing) {
-                    try { mediaService.publishScreenShare(false); } catch(e) { console.warn('Could not stop screen share after permission update', e); }
+                    try { mediaService.publishScreenShare(false); } catch(e) { }
                     isScreenSharing = false;
                     updateScreenShareButton();
                 }
@@ -1123,16 +1020,14 @@
             renderParticipants();
         });
 
-        // Server-initiated forced actions (immediate effects)
         socket.on('force_mute', (data) => {
-            // Ask the media service to stop publishing immediately
             try {
                 if (isInCall) {
                     mediaService.publishAudio(false).catch(() => {});
                     isMuted = true;
                     updateMuteButton();
                 }
-            } catch (e) { console.warn('force_mute handling failed', e); }
+            } catch (e) { }
             try { showCustomAlert(data?.reason || 'You have been muted by the moderator.', 'Muted'); } catch(e){}
         });
 
@@ -1143,7 +1038,7 @@
                     isScreenSharing = false;
                     updateScreenShareButton();
                 }
-            } catch (e) { console.warn('force_stop_screen handling failed', e); }
+            } catch (e) { }
             try { showCustomAlert(data?.reason || 'Screen sharing disabled by moderator.', 'Screen Share'); } catch(e){}
         });
         
@@ -1161,11 +1056,25 @@
         });
 
         // Simplified drawing logic
+        // FIX: Added Debounce function to prevent lag on resize
+        function debounce(func, wait) {
+            let timeout;
+            return function(...args) {
+                clearTimeout(timeout);
+                timeout = setTimeout(() => func.apply(this, args), wait);
+            };
+        }
+
         const initDrawing = () => {
              if (!canvas) return;
-            // Set canvas backing store to device pixel ratio for crisp lines
             setCanvasSize();
-            window.addEventListener('resize', setCanvasSize);
+            
+            // FIX: Debounced resize listener that restores history
+            window.addEventListener('resize', debounce(() => {
+                setCanvasSize();
+                redrawHistory();
+            }, 200));
+
              if (document.getElementById('brushSize')) {
                 document.getElementById('brushSize').addEventListener('input', (e) => {
                     document.getElementById('sizeValue').textContent = e.target.value;
@@ -1180,34 +1089,44 @@
              canvas.addEventListener('touchend', () => isDrawing = false);
              document.getElementById('clearBtn')?.addEventListener('click', () => {
                  if (confirm('Clear the entire whiteboard?')) {
-                    // Clear using CSS-size aware coordinates
                     ctx.clearRect(0, 0, canvas.width, canvas.height);
-                     socket.emit('clear_board', { room: `whiteboard:${sessionId}`, user_id: userId });
+                    drawHistory = [];
+                    socket.emit('clear_board', { room: `whiteboard:${sessionId}`, user_id: userId });
                  }
              });
         };
 
-        // --- Drawing helpers (position conversion, draw, emit) ---
         function getPos(clientX, clientY) {
             const rect = canvas.getBoundingClientRect();
-            // Use CSS pixels for coordinates; the context is scaled to devicePixelRatio
             return { x: (clientX - rect.left), y: (clientY - rect.top) };
         }
 
-        // Ensure canvas has appropriate backing store size for sharp drawing
         function setCanvasSize() {
             if (!canvas || !ctx) return;
             const dpr = window.devicePixelRatio || 1;
             const rect = canvas.getBoundingClientRect();
             const w = Math.round(rect.width * dpr);
             const h = Math.round(rect.height * dpr);
-            // Avoid unnecessary resizing which can clear the canvas
             if (canvas.width !== w || canvas.height !== h) {
-                // Reset any transforms and set to a scale matching device pixel ratio
                 canvas.width = w;
                 canvas.height = h;
                 ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
             }
+        }
+
+        // FIX: New function to replay history on canvas
+        function redrawHistory() {
+            if (!ctx || !drawHistory.length) return;
+            drawHistory.forEach(d => {
+                let x0 = d.x0, y0 = d.y0, x1 = d.x1, y1 = d.y1;
+                if (d.normalized) {
+                    x0 = d.x0 * canvas.clientWidth;
+                    y0 = d.y0 * canvas.clientHeight;
+                    x1 = d.x1 * canvas.clientWidth;
+                    y1 = d.y1 * canvas.clientHeight;
+                }
+                draw(x0, y0, x1, y1, d.color, d.size, d.opacity);
+            });
         }
 
         function draw(x0, y0, x1, y1, color, size, opacity) {
@@ -1231,12 +1150,14 @@
             const color = document.getElementById('colorPicker')?.value || '#000';
             const size = parseInt(document.getElementById('brushSize')?.value || '3', 10);
             const opacity = parseFloat(document.getElementById('opacity')?.value || '1');
-            // Send normalized coordinates so remote clients can map to their canvas size
             const drawing_data = { x0: x0 / canvas.clientWidth, y0: y0 / canvas.clientHeight, x1: x1 / canvas.clientWidth, y1: y1 / canvas.clientHeight, color, size, opacity, normalized: true };
+            
+            // FIX: Add local stroke to history immediately
+            drawHistory.push(drawing_data);
+            
             socket.emit('whiteboard_draw', { room: `whiteboard:${sessionId}`, drawing_data, user_id: userId });
         }
         
-        // Initial setup
         initDrawing();
         loadSessionInfo();
 
@@ -1311,7 +1232,6 @@
                 const invite = (body.data && body.data.invite_url) || body.invite_url || '/whiteboard';
                 createdSessionLink.value = invite.startsWith('http') ? invite : (window.location.origin + invite);
                 try { new bootstrap.Modal(sessionCreatedModalEl).show(); } catch(e){ sessionCreatedModalEl.style.display='block'; }
-                // refresh the session list on landing so user sees the created session
                 try { loadMySessions(); } catch(e){}
             } catch (e) {
                 console.error('Create session failed:', e);
@@ -1332,17 +1252,13 @@
             if (!val) return alert('Please enter a session ID or link');
             let id = val;
             try {
-                // If it's a full URL with session param
                 const u = new URL(val, window.location.origin);
                 const s = new URLSearchParams(u.search).get('session');
                 if (s) id = s;
-            } catch (e) {
-                // ignore
-            }
+            } catch (e) { }
             window.location.href = `/whiteboard?session=${encodeURIComponent(id)}`;
         });
         
-        // --- My sessions listing and session end helper ---
         async function loadMySessions() {
             const listEl = document.getElementById('mySessionsListLanding');
             const cardEl = document.getElementById('mySessionsCardLanding');
@@ -1384,15 +1300,12 @@
                 const res = await fetch(`/api/whiteboards/${id}`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${token}` } });
                 const body = await res.json();
                 if (!res.ok) throw new Error(body.message || 'Failed to end session');
-                // If currently in that session, redirect to landing
                 if (sessionId && sessionId === id) {
                     window.location.href = '/whiteboard';
                     return;
                 }
-                // Otherwise remove from list
                 const el = document.getElementById(`session-item-${id}`);
                 if (el) el.remove();
-                // hide card if no items left
                 const listEl = document.getElementById('mySessionsListLanding');
                 if (listEl && listEl.children.length === 0) document.getElementById('mySessionsCardLanding').style.display = 'none';
                 alert(body.message || 'Session ended');
@@ -1402,7 +1315,6 @@
             }
         }
 
-        // --- Fullscreen handlers (mobile whiteboard + remote video) ---
         (function setupFullscreen() {
             const fsToggle = document.getElementById('fullscreenToggleBtn');
             const canvasContainerEl = document.getElementById('canvasContainer');
@@ -1412,13 +1324,8 @@
             let _wbPrev = null;
             async function enterWhiteboardFullscreen() {
                 if (!canvasContainerEl) return;
-                // save previous sizing
                 _wbPrev = { width: canvas.width, height: canvas.height };
-                // snapshot current canvas to preserve drawing content
-                let _wbSnapshot = null;
-                try { _wbSnapshot = canvas.toDataURL(); } catch(e) { console.warn('Could not snapshot canvas', e); }
 
-                // Prefer Fullscreen API
                 try {
                     if (canvasContainerEl.requestFullscreen) {
                         await canvasContainerEl.requestFullscreen();
@@ -1428,31 +1335,14 @@
                         canvasContainerEl.classList.add('whiteboard-fullscreen');
                     }
                 } catch (e) {
-                    // fallback to class-based fullscreen + resize
                     canvasContainerEl.classList.add('whiteboard-fullscreen');
                 }
-                // resize canvas to match viewport (account for devicePixelRatio)
                 try {
-                    const dpr = window.devicePixelRatio || 1;
-                    canvas.style.width = '100%';
-                    canvas.style.height = '100%';
-                    canvas.width = Math.round(window.innerWidth * dpr);
-                    canvas.height = Math.round(window.innerHeight * dpr);
-
-                    // restore snapshot scaled to new size
-                    if (_wbSnapshot) {
-                        const img = new Image();
-                        img.onload = () => {
-                            try {
-                                ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-                                ctx.clearRect(0, 0, canvas.width, canvas.height);
-                                ctx.drawImage(img, 0, 0, canvas.width / dpr, canvas.height / dpr);
-                            } catch(e) { console.warn('Could not restore canvas snapshot', e); }
-                        };
-                        img.src = _wbSnapshot;
-                    }
-                } catch (e) { console.warn('Could not resize canvas for fullscreen', e); }
-                // show an exit button
+                    // Trigger resize logic which will redraw history
+                    const evt = new Event('resize');
+                    window.dispatchEvent(evt);
+                } catch (e) { }
+                
                 let exit = document.getElementById('wb-fs-exit');
                 if (!exit) {
                     exit = document.createElement('button');
@@ -1466,45 +1356,25 @@
 
             function exitWhiteboardFullscreen() {
                 if (!canvasContainerEl) return;
-                // snapshot current fullscreen canvas so we can restore it at previous size
-                let _wbSnapshot = null;
-                try { _wbSnapshot = canvas.toDataURL(); } catch(e) { console.warn('Could not snapshot canvas before exit', e); }
-
-                canvasContainerEl.classList.remove('whiteboard-fullscreen');
-                // restore canvas size
                 try {
-                    if (_wbPrev) {
-                        const dpr = window.devicePixelRatio || 1;
-                        canvas.width = _wbPrev.width;
-                        canvas.height = _wbPrev.height;
-                        canvas.style.width = '';
-                        canvas.style.height = '';
-                        _wbPrev = null;
-
-                        // restore snapshot scaled back to previous size
-                        if (_wbSnapshot) {
-                            const img = new Image();
-                            img.onload = () => {
-                                try {
-                                    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-                                    ctx.clearRect(0, 0, canvas.width, canvas.height);
-                                    ctx.drawImage(img, 0, 0, canvas.width / dpr, canvas.height / dpr);
-                                } catch(e) { console.warn('Could not restore canvas snapshot on exit', e); }
-                            };
-                            img.src = _wbSnapshot;
-                        }
-                    }
-                } catch (e) { console.warn('Could not restore canvas size', e); }
+                   if(document.fullscreenElement) document.exitFullscreen();
+                } catch(e) {}
+                canvasContainerEl.classList.remove('whiteboard-fullscreen');
+                
+                try {
+                    // Trigger resize to restore original scale and redraw
+                    const evt = new Event('resize');
+                    window.dispatchEvent(evt);
+                } catch (e) { }
+                
                 const exit = document.getElementById('wb-fs-exit');
                 if (exit) exit.remove();
             }
 
             if (fsToggle) {
                 fsToggle.addEventListener('click', () => {
-                    if (canvasContainerEl.classList.contains('whiteboard-fullscreen')) exitWhiteboardFullscreen();
+                    if (canvasContainerEl.classList.contains('whiteboard-fullscreen') || document.fullscreenElement === canvasContainerEl) exitWhiteboardFullscreen();
                     else enterWhiteboardFullscreen();
-                    // adjust canvas size to fill
-                    try { canvas.style.width = '100%'; canvas.style.height = '100%'; } catch(e){}
                 });
             }
 
@@ -1514,7 +1384,6 @@
                         if (document.fullscreenElement) await document.exitFullscreen();
                         else await remoteContainer.requestFullscreen();
                     } catch (e) {
-                        console.warn('Fullscreen API failed, fallback toggling class');
                         remoteContainer.classList.toggle('whiteboard-fullscreen');
                     }
                 });
