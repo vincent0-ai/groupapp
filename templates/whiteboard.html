@@ -30,6 +30,16 @@
         border: none !important;
     }
 
+    /* When the whiteboard container is fullscreen, ensure the canvas actually
+       fills the viewport (overrides inline height:50vh) so on mobile the draw
+       area covers the entire screen height. */
+    .whiteboard-fullscreen canvas {
+        width: 100vw !important;
+        height: 100vh !important;
+        max-height: 100vh !important;
+        display: block !important;
+    }
+
     .fullscreen-controls {
         position: fixed;
         bottom: 20px;
@@ -61,6 +71,25 @@
         border-radius: 50%;
         width: 45px;
         height: 45px;
+    }
+
+    /* Participant list improvements */
+    #participantsList .participants-row {
+        align-items: center;
+        justify-content: space-between;
+    }
+
+    #participantsList .participant-name {
+        min-width: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    #participantsList .mod-btn {
+        padding: 6px 8px;
+        font-size: 0.85rem;
+        border-radius: 8px;
     }
 
     /* Always show fullscreen toggle (desktop & mobile) */
@@ -109,6 +138,13 @@
             display: inline-flex !important;
             align-items: center !important;
             gap: 6px;
+        }
+
+        /* When the whiteboard is fullscreen we hide the floating controls in
+           favor of the fullscreen controls to avoid obscuring the canvas. */
+        .whiteboard-fullscreen ~ #sessionControls,
+        .whiteboard-fullscreen + #sessionControls {
+            display: none !important;
         }
 
         /* Compact icon-only mode for very narrow screens */
@@ -715,7 +751,6 @@
                 liveBtn.className = 'btn btn-sm btn-outline-success';
                 liveBtn.innerHTML = '<i class="fas fa-phone"></i><span class="btn-text"> Join Call</span>';
             }
-            document.getElementById('muteBtn')?.classList.add('d-none');
             const muteBtn = document.getElementById('muteBtn');
             const screenShareBtn = document.getElementById('screenShareBtn');
             if (muteBtn) { muteBtn.disabled = true; }
@@ -748,12 +783,14 @@
                 
             } else if (track.kind === 'audio') {
                 console.debug('[Media] audio track subscribed from', participant.identity);
-                // FIX: Attach directly to document body (hidden) to prevent browser auto-pause on cleanup
+                // FIX: Attach to the hidden participants audio container to avoid leaving orphaned
+                // audio elements directly on the document body (helps on reconnects and cleanup).
                 const el = track.attach();
                 el.id = `audio-${participant.identity}`;
                 el.autoplay = true;
                 el.playsInline = true;
-                document.body.appendChild(el); // Explicit DOM append
+                // Ensure small footprint and append to our dedicated container
+                try { participantsAudioContainer.appendChild(el); } catch (e) { document.body.appendChild(el); }
                 
                 // Aggressive play attempt for mobile
                 const attemptPlay = async () => {
@@ -886,13 +923,14 @@
                     moderatorControls = `<small class="text-muted">${meta.can_draw ? '✏️' : ''} ${meta.raised ? '✋' : ''}</small>`;
                 }
                 
-                return `<div class="d-flex align-items-center justify-content-between mb-2">
-                    <div class="d-flex align-items-center" style="min-width: 0;">
-                        <img src="${avatarSrc}" class="rounded-circle me-2 flex-shrink-0" width="24" height="24"/>
-                        <span class="small fw-medium text-truncate" title="${meta.name || uid}">${meta.name || uid}</span>
-                    </div>
-                    <div class="d-flex gap-1 flex-shrink-0 ms-1">${moderatorControls}</div>
-                </div>`;
+                return `
+                    <div class="participants-row d-flex align-items-center justify-content-between mb-2">
+                        <div class="d-flex align-items-center min-width-0">
+                            <img src="${avatarSrc}" class="rounded-circle me-2 flex-shrink-0" width="28" height="28"/>
+                            <div class="participant-name small fw-medium text-truncate" title="${meta.name || uid}">${meta.name || uid}</div>
+                        </div>
+                        <div class="d-flex gap-1 align-items-center flex-shrink-0 moderator-controls">${moderatorControls}</div>
+                    </div>`;
             }).join('');
             participantsEl.innerHTML = content;
             
@@ -1329,6 +1367,14 @@
                 if (!canvasContainerEl) return;
                 _wbPrev = { width: canvas.width, height: canvas.height };
 
+                // Save previous visible state of the controls so we can restore later
+                const controlsEl = document.getElementById('sessionControls');
+                const prevControlsDisplay = controlsEl ? controlsEl.style.display : null;
+                canvasContainerEl.dataset._prevControlsDisplay = prevControlsDisplay || '';
+
+                // Save inline canvas height to restore later
+                canvasContainerEl.dataset._prevCanvasHeight = canvas.style.height || '';
+
                 try {
                     if (canvasContainerEl.requestFullscreen) {
                         await canvasContainerEl.requestFullscreen();
@@ -1340,6 +1386,13 @@
                 } catch (e) {
                     canvasContainerEl.classList.add('whiteboard-fullscreen');
                 }
+
+                // Hide floating session controls to prevent overlapping content
+                try { if (controlsEl) controlsEl.style.display = 'none'; } catch(e){}
+
+                // Force canvas to fill viewport as well (some browsers keep inline style)
+                try { canvas.style.height = '100vh'; canvas.style.width = '100%'; } catch(e){}
+
                 try {
                     // Trigger resize logic which will redraw history
                     const evt = new Event('resize');
@@ -1363,6 +1416,20 @@
                    if(document.fullscreenElement) document.exitFullscreen();
                 } catch(e) {}
                 canvasContainerEl.classList.remove('whiteboard-fullscreen');
+
+                // Restore session controls visibility
+                try {
+                    const controlsEl = document.getElementById('sessionControls');
+                    const prev = canvasContainerEl.dataset._prevControlsDisplay || '';
+                    if (controlsEl) controlsEl.style.display = prev || '';
+                } catch(e) {}
+
+                // Restore canvas inline height if we changed it
+                try {
+                    const prevH = canvasContainerEl.dataset._prevCanvasHeight || '';
+                    canvas.style.height = prevH || '50vh';
+                    canvas.style.width = '100%';
+                } catch(e) {}
                 
                 try {
                     // Trigger resize to restore original scale and redraw
