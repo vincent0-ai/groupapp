@@ -244,7 +244,7 @@
             </div>
             <div class="card-body overflow-auto text-center" id="canvasContainer" style="background: linear-gradient(180deg, #f8f9fa 0%, #e9ecef 100%); padding: 1rem;">
                 <div style="position:relative; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 20px rgba(0,0,0,0.1);">
-                    <canvas id="whiteboard" style="width:100%;height:50vh;display:block; background: white;" width="1200" height="600"></canvas>
+                    <canvas id="whiteboard" style="width:100%;display:block; background: white;" width="1200" height="600"></canvas>
                     
                     <!-- FIX: Replaced blur with a non-intrusive View Only badge -->
                     <div id="canvasOverlay" style="position:absolute; top: 12px; right: 12px; display:none; pointer-events: none; z-index: 10;">
@@ -724,7 +724,10 @@
             remoteVideoContainer.style.display = 'none';
             try { document.getElementById('watchScreenBtn')?.setAttribute('disabled', 'true'); } catch(e){}
             if(remoteVideoEl) remoteVideoEl.srcObject = null;
-            participantsAudioContainer.innerHTML = '';
+            
+            // FIX: Find and remove all managed audio elements from the body
+            const audioElements = document.querySelectorAll('audio[id^="audio-"]');
+            audioElements.forEach(el => el.remove());
         }
 
         mediaService.onTrackSubscribed = (track, participant) => {
