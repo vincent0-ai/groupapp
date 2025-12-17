@@ -418,6 +418,8 @@
 
         // FIX: Local history for resizing
         let drawHistory = [];
+        // Quick mode: eraser toggle when true
+        let isErasing = false;
 
         // --- LiveKit Service ---
         class MediaService {
@@ -980,6 +982,16 @@
             const screenShareBtn = document.getElementById('screenShareBtn');
             if (muteBtn) muteBtn.disabled = !isInCall || (isMuted && !canSpeak);
             if (screenShareBtn) screenShareBtn.disabled = !isInCall || !canShareScreen || !supportsDisplayMedia;
+
+            // Update fullscreen controls (if present)
+            try {
+                const fsClear = document.getElementById('wb-clear-btn');
+                const fsUndo = document.getElementById('wb-undo-btn');
+                const fsBrush = document.getElementById('wb-brush-toggle-btn');
+                if (fsClear) fsClear.disabled = !canDraw;
+                if (fsUndo) fsUndo.disabled = !canDraw || drawHistory.length === 0;
+                if (fsBrush) fsBrush.disabled = !canDraw;
+            } catch (e) { /* ignore */ }
         }
         
         socket.on('connect', () => socket.emit('join_room', { room: `whiteboard:${sessionId}`, user_id: userId }));
@@ -1013,6 +1025,15 @@
             ctx.clearRect(0, 0, canvas.width, canvas.height);
             // FIX: Clear history
             drawHistory = [];
+        });
+
+        // Handle undo actions from other participants (server emits for others)
+        socket.on('undo_action', () => {
+            if (!drawHistory.length) return;
+            drawHistory.pop();
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            redrawHistory();
+            try { if (!drawHistory.length) document.getElementById('wb-undo-btn')?.setAttribute('disabled', 'true'); } catch (e) {}
         });
         socket.on('session_ended', async (data) => {
             await leaveCall();
@@ -1132,6 +1153,17 @@
                     socket.emit('clear_board', { room: `whiteboard:${sessionId}`, user_id: userId });
                  }
              });
+             // Undo button (sidebar)
+             document.getElementById('undoBtn')?.addEventListener('click', () => undoLastStroke());
+             // Optional brush toggle in sidebar (keeps parity with fullscreen toggle)
+             // This just toggles eraser mode locally
+             const sidebarBrushToggle = document.getElementById('brushToggleBtn');
+             if (sidebarBrushToggle) {
+                 sidebarBrushToggle.addEventListener('click', () => {
+                     isErasing = !isErasing;
+                     sidebarBrushToggle.innerHTML = isErasing ? '<i class="fas fa-eraser"></i> Erase' : '<i class="fas fa-paint-brush"></i> Brush';
+                 });
+             }
         };
 
         function getPos(clientX, clientY) {
@@ -1154,7 +1186,8 @@
 
         // FIX: New function to replay history on canvas
         function redrawHistory() {
-            if (!ctx || !drawHistory.length) return;
+            if (!ctx) return;
+            if (!drawHistory.length) return;
             drawHistory.forEach(d => {
                 let x0 = d.x0, y0 = d.y0, x1 = d.x1, y1 = d.y1;
                 if (d.normalized) {
@@ -1163,8 +1196,24 @@
                     x1 = d.x1 * canvas.clientWidth;
                     y1 = d.y1 * canvas.clientHeight;
                 }
+                // Use draw with params from history; eraser entries may not be flagged specially,
+                // erasing is implemented via client-side composite mode while drawing, so we just draw strokes.
                 draw(x0, y0, x1, y1, d.color, d.size, d.opacity);
             });
+        }
+
+        // Undo the last stroke and notify others (unless silent)
+        function undoLastStroke(emit = true) {
+            if (!drawHistory.length) return;
+            drawHistory.pop();
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            redrawHistory();
+            if (emit && socket && sessionId) {
+                socket.emit('undo_action', { room: `whiteboard:${sessionId}`, user_id: userId });
+            }
+            // Update undo button enabled state
+            try { document.getElementById('wb-undo-btn')?.removeAttribute('disabled'); } catch (e) {}
+        }
         }
 
         function draw(x0, y0, x1, y1, color, size, opacity) {
@@ -1173,8 +1222,17 @@
             ctx.lineCap = 'round';
             ctx.lineJoin = 'round';
             ctx.globalAlpha = (typeof opacity === 'number') ? opacity : (document.getElementById('opacity')?.value || 1);
-            ctx.strokeStyle = color || document.getElementById('colorPicker')?.value || '#000';
+            const strokeColor = color || document.getElementById('colorPicker')?.value || '#000';
+            ctx.strokeStyle = strokeColor;
             ctx.lineWidth = size || (document.getElementById('brushSize')?.value || 3);
+            // If erasing mode is active, switch composite operation to remove pixels
+            if (isErasing) {
+                ctx.globalCompositeOperation = 'destination-out';
+                // Ensure the stroke is solid to remove content cleanly
+                ctx.strokeStyle = 'rgba(0,0,0,1)';
+            } else {
+                ctx.globalCompositeOperation = 'source-over';
+            }
             ctx.beginPath();
             ctx.moveTo(x0, y0);
             ctx.lineTo(x1, y1);
@@ -1193,6 +1251,9 @@
             // FIX: Add local stroke to history immediately
             drawHistory.push(drawing_data);
             
+            // Enable undo button when new stroke added
+            try { document.getElementById('wb-undo-btn')?.removeAttribute('disabled'); } catch (e) {}
+
             socket.emit('whiteboard_draw', { room: `whiteboard:${sessionId}`, drawing_data, user_id: userId });
         }
         
@@ -1405,6 +1466,48 @@
                     exit.addEventListener('click', exitWhiteboardFullscreen);
                     document.body.appendChild(exit);
                 }
+
+                // Create fullscreen floating controls (clear, undo, brush toggle)
+                let fsControls = document.getElementById('wb-fs-controls');
+                if (!fsControls) {
+                    fsControls = document.createElement('div');
+                    fsControls.id = 'wb-fs-controls';
+                    fsControls.className = 'fullscreen-controls';
+
+                    const clearBtnFs = document.createElement('button');
+                    clearBtnFs.id = 'wb-clear-btn';
+                    clearBtnFs.className = 'btn btn-light';
+                    clearBtnFs.title = 'Clear Whiteboard';
+                    clearBtnFs.innerHTML = '<i class="fas fa-trash"></i>';
+
+                    const undoBtnFs = document.createElement('button');
+                    undoBtnFs.id = 'wb-undo-btn';
+                    undoBtnFs.className = 'btn btn-light';
+                    undoBtnFs.title = 'Undo';
+                    undoBtnFs.innerHTML = '<i class="fas fa-undo"></i>';
+
+                    const brushToggleFs = document.createElement('button');
+                    brushToggleFs.id = 'wb-brush-toggle-btn';
+                    brushToggleFs.className = 'btn btn-light';
+                    brushToggleFs.title = 'Toggle Brush / Eraser';
+                    brushToggleFs.innerHTML = '<i class="fas fa-paint-brush"></i>';
+
+                    fsControls.appendChild(clearBtnFs);
+                    fsControls.appendChild(undoBtnFs);
+                    fsControls.appendChild(brushToggleFs);
+
+                    document.body.appendChild(fsControls);
+
+                    // Attach handlers
+                    clearBtnFs.addEventListener('click', () => document.getElementById('clearBtn')?.click());
+                    undoBtnFs.addEventListener('click', () => undoLastStroke());
+                    brushToggleFs.addEventListener('click', () => {
+                        isErasing = !isErasing;
+                        brushToggleFs.innerHTML = isErasing ? '<i class="fas fa-eraser"></i>' : '<i class="fas fa-paint-brush"></i>';
+                        // small visual indication
+                        brushToggleFs.classList.toggle('btn-danger', isErasing);
+                    });
+                }
             }
 
             function exitWhiteboardFullscreen() {
@@ -1436,6 +1539,9 @@
                 
                 const exit = document.getElementById('wb-fs-exit');
                 if (exit) exit.remove();
+                // Remove fullscreen floating controls if present
+                const fsControls = document.getElementById('wb-fs-controls');
+                if (fsControls) fsControls.remove();
             }
 
             if (fsToggle) {
