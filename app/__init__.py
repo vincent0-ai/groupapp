@@ -414,6 +414,29 @@ def create_app(config_name='development'):
                                 db.push_to_array('whiteboards', {'_id': ObjectId(wb_id)}, 'drawing_data', drawing_data)
                 except Exception:
                     pass
+
+    @socketio.on('undo_action')
+    def handle_undo_action(data):
+        """Handle undo of the last stroke"""
+        room = data.get('room')
+        user_id = data.get('user_id')
+        if room and room.startswith('whiteboard:'):
+            wb_id = room.split(':', 1)[1]
+            if not _is_valid_object_id(wb_id):
+                print(f"undo_action called with invalid wb_id: '{wb_id}'")
+                return
+            from app.services import Database
+            db = Database()
+            wb = db.find_one('whiteboards', {'_id': ObjectId(wb_id)})
+            if wb:
+                perms = compute_permissions(wb, user_id)
+                if perms.get('can_draw'):
+                    try:
+                        # remove last element from the drawing_data array
+                        db.update_one('whiteboards', {'_id': ObjectId(wb_id)}, {'$pop': {'drawing_data': 1}})
+                    except Exception:
+                        pass
+                    emit('undo_action', {'user_id': user_id}, room=room, skip_sid=request.sid)
     
     @socketio.on('typing_indicator')
     def handle_typing(data):
