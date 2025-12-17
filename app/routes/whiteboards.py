@@ -278,7 +278,6 @@ def get_livekit_token(wb_id):
     lk_permissions = VideoGrants(
         room_join=True,
         room=f'whiteboard:{wb_id}',
-        can_publish=can_speak or can_share_screen,
         can_publish_data=True,
         can_subscribe=True, # Always allow users to subscribe to others
         hidden=not can_speak # Hide participant if they don't have speaking perms
