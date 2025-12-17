@@ -27,6 +27,21 @@
             align-items: center;
             justify-content: space-between;
         }
+
+        /* Ensure the messages area participates in flex layout so the footer/input
+           stays visible on small screens. The min-height:0 prevents overflow issues
+           in flex children on some mobile browsers. */
+        #messagesArea {
+            flex: 1 1 auto;
+            min-height: 0;
+            overflow: auto;
+        }
+
+        #messageInputArea {
+            position: relative;
+            z-index: 5;
+            background: var(--card-bg);
+        }
         
         .chat-header h5 {
             margin: 0;
@@ -402,7 +417,7 @@
                         </div>
                     </div>
                 </div>
-                <div class="card-body overflow-auto bg-light" id="messagesArea">
+                <div class="card-body overflow-auto bg-light" id="messagesArea" style="background: var(--card-bg);">
                     <div class="h-100 d-flex align-items-center justify-content-center">
                         <p class="text-secondary">Loading messages...</p>
                     </div>
