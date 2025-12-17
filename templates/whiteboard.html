@@ -366,6 +366,13 @@
         const remoteVideoLabel = document.getElementById('remoteVideoLabel');
         const participantsAudioContainer = document.createElement('div');
         participantsAudioContainer.id = 'participantsAudioContainer';
+        // Keep the audio container out of sight but in the DOM so some mobile
+        // browsers allow playback of dynamically-created audio elements.
+        participantsAudioContainer.style.display = 'none';
+        participantsAudioContainer.setAttribute('aria-hidden', 'true');
+        try { document.body.appendChild(participantsAudioContainer); } catch (e) { console.warn('Failed to append participantsAudioContainer early', e); }
+        // Detect whether screen sharing is supported by the browser/device.
+        const supportsDisplayMedia = !!(navigator.mediaDevices && navigator.mediaDevices.getDisplayMedia);
         // Map to hold AudioContext source/gain nodes for remote audio fallbacks
         const remoteAudioNodes = new Map();
 
@@ -507,6 +514,12 @@
             screenShareBtn.setAttribute('aria-label', 'Share Screen');
             screenShareBtn.disabled = true;
             screenShareBtn.innerHTML = '<i class="fas fa-desktop"></i><span class="btn-text"> Share Screen</span>';
+            // If the browser/device does not support getDisplayMedia (common on iOS and many mobile browsers)
+            // keep the control disabled and provide an explanatory tooltip.
+            if (!supportsDisplayMedia) {
+                screenShareBtn.disabled = true;
+                screenShareBtn.title = 'Screen sharing not supported on this device or browser';
+            }
             
             const watchScreenBtn = document.createElement('button');
             watchScreenBtn.id = 'watchScreenBtn';
@@ -567,6 +580,8 @@
             });
             screenShareBtn.addEventListener('click', async () => {
                 if (!isInCall) return showCustomAlert('Join the call first to share your screen.', 'Not In Call');
+                // Check for platform/browser support first
+                if (!supportsDisplayMedia) return showCustomAlert('Screen sharing is not supported by your browser or device. Many mobile browsers (especially iOS Safari) do not allow screen sharing.', 'Screen Share');
                 // Only allow if server-side permission says user may share
                 if (!canShareScreen) return showCustomAlert('You do not have permission to share your screen in this session.', 'Permission');
                 isScreenSharing = !isScreenSharing;
@@ -575,7 +590,12 @@
                 } catch(e) {
                      console.error('Screen share failed:', e);
                      isScreenSharing = false;
-                     showCustomAlert('Could not start screen sharing. Make sure you allowed the browser to share your screen.', 'Screen Share');
+                     // Provide a clearer hint for mobile where getDisplayMedia is often unsupported
+                     if (!supportsDisplayMedia) {
+                         showCustomAlert('Screen sharing is not available on this device/browser.', 'Screen Share');
+                     } else {
+                         showCustomAlert('Could not start screen sharing. Make sure you allowed the browser to share your screen.', 'Screen Share');
+                     }
                 }
                 updateScreenShareButton();
             });
@@ -782,8 +802,14 @@
                 el.id = `audio-${participant.identity}`;
                 el.autoplay = true;
                 el.playsInline = true;
+                el.setAttribute('playsinline', 'true');
+                el.setAttribute('webkit-playsinline', 'true');
                 el.controls = false;
                 el.muted = false;
+                // Keep the element visually hidden but present in DOM to satisfy
+                // certain mobile autoplay policies.
+                el.style.display = 'none';
+                el.volume = 1;
                 participantsAudioContainer.appendChild(el);
 
                 // Attempt to start playback (may require user gesture in some browsers).
@@ -1020,7 +1046,7 @@
             const muteBtn = document.getElementById('muteBtn');
             const screenShareBtn = document.getElementById('screenShareBtn');
             if (muteBtn) muteBtn.disabled = !isInCall || (isMuted && !canSpeak);
-            if (screenShareBtn) screenShareBtn.disabled = !isInCall || !canShareScreen;
+            if (screenShareBtn) screenShareBtn.disabled = !isInCall || !canShareScreen || !supportsDisplayMedia;
         }
         
         socket.on('connect', () => socket.emit('join_room', { room: `whiteboard:${sessionId}`, user_id: userId }));
