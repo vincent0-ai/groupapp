@@ -587,7 +587,14 @@
             
             container.innerHTML = messages.map(m => {
                 const isMine = m.sender_id === userId;
-                const timeStr = m.created_at ? new Date(m.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '';
+                let timeStr = '';
+                if (m.created_at) {
+                    let _d = new Date(m.created_at);
+                    if (typeof m.created_at === 'string' && m.created_at.includes('T') && !m.created_at.endsWith('Z') && !m.created_at.includes('+')) {
+                        _d = new Date(m.created_at + 'Z');
+                    }
+                    timeStr = _d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                }
                 
                 // Build reactions HTML
                 const reactions = m.reactions || {};
@@ -917,10 +924,15 @@
         }
         
         function formatTimeAgo(dateStr) {
-            const date = new Date(dateStr);
+            // Robust parsing: treat naive ISO datetimes from server as UTC
+            let date = new Date(dateStr);
+            if (typeof dateStr === 'string' && dateStr.includes('T') && !dateStr.endsWith('Z') && !dateStr.includes('+')) {
+                date = new Date(dateStr + 'Z');
+            }
+
             const now = new Date();
             const seconds = Math.floor((now - date) / 1000);
-            
+
             if (seconds < 60) return 'now';
             if (seconds < 3600) return `${Math.floor(seconds / 60)}m`;
             if (seconds < 86400) return `${Math.floor(seconds / 3600)}h`;

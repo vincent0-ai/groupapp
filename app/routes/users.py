@@ -161,19 +161,48 @@ def get_user(user_id):
 
 @users_bp.route('/leaderboard', methods=['GET'])
 def get_leaderboard():
-    """Get global leaderboard"""
+    """Get global leaderboard. Supports optional query params: period (all|week|month) and group_id."""
     db = Database()
-    
+
     page = request.args.get('page', 1, type=int)
     per_page = request.args.get('per_page', 20, type=int)
-    
+    period = request.args.get('period', 'all')
+    group_id = request.args.get('group_id')
+
     skip = (page - 1) * per_page
-    
-    # Get users sorted by points
-    users = list(db.find('users', {}, skip=skip, limit=per_page, sort=('points', -1)))
-    
-    total = db.count('users')
-    
+
+    # Build query based on filters
+    query = {}
+    from datetime import timedelta
+    if period in ('week', 'month'):
+        days = 7 if period == 'week' else 30
+        cutoff = datetime.utcnow() - timedelta(days=days)
+        query['created_at'] = {'$gte': cutoff}
+
+    if group_id:
+        try:
+            group_obj_id = ObjectId(group_id)
+        except:
+            return error_response('Invalid group ID', 400)
+        group = db.find_one('groups', {'_id': group_obj_id})
+        if not group:
+            return error_response('Group not found', 404)
+        members = group.get('members', [])
+        if not members:
+            return success_response({
+                'leaderboard': [],
+                'users': [],
+                'total': 0,
+                'page': page,
+                'per_page': per_page
+            }, 'Leaderboard retrieved successfully', 200)
+        query['_id'] = {'$in': members}
+
+    # Get users matching query sorted by points
+    users = list(db.find('users', query, skip=skip, limit=per_page, sort=('points', -1)))
+
+    total = db.count('users', query)
+
     # Build public profile data for each user
     leaderboard_users = []
     for user in users:
@@ -189,7 +218,7 @@ def get_leaderboard():
             'badges': user.get('badges', []),
             'groups_count': groups_count
         })
-    
+
     return success_response({
         'leaderboard': leaderboard_users,
         'users': leaderboard_users,  # Keep for backward compatibility
