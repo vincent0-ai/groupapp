@@ -1,4 +1,4 @@
-from flask import Blueprint, request, url_for, redirect
+from flask import Blueprint, request, url_for, redirect, current_app
 import os
 import secrets
 from dotenv import load_dotenv
@@ -8,6 +8,7 @@ import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from datetime import datetime
+import time
 
 from app.utils import (
     hash_password,
@@ -25,7 +26,13 @@ from app import limiter
 auth_bp = Blueprint("auth", __name__, url_prefix="/api/auth")
 
 
-def send_verification_email(to_email, token):
+def send_verification_email(to_email, token, return_error=False):
+    """Send a verification email.
+
+    If return_error is True, return a tuple: (success: bool, error: str|None, fatal: bool)
+    Where `fatal` indicates a non-retriable error (e.g., missing config or auth failure).
+    When return_error is False (backwards compatible), return a boolean success flag.
+    """
     smtp_server = os.environ.get("SMTP_SERVER", "smtp.gmail.com")
     smtp_port = int(os.environ.get("SMTP_PORT", 465))
     smtp_user = os.environ.get("SMTP_USER")
@@ -39,6 +46,8 @@ def send_verification_email(to_email, token):
         print(f"EMAIL VERIFICATION for {to_email}")
         print(f"Link: {verify_url}")
         print(f"============================================")
+        if return_error:
+            return False, 'missing_credentials', True
         return False
 
     msg = MIMEMultipart()
@@ -64,9 +73,19 @@ def send_verification_email(to_email, token):
         server.login(smtp_user, smtp_password)
         server.send_message(msg)
         server.quit()
+        if return_error:
+            return True, None, False
         return True
+    except smtplib.SMTPAuthenticationError as e:
+        print(f"Failed to send email (auth): {e}")
+        if return_error:
+            return False, 'auth_error', True
+        return False
     except Exception as e:
+        # Treat generic exceptions as transient unless explicitly an auth/missing config error
         print(f"Failed to send email: {e}")
+        if return_error:
+            return False, str(e), False
         return False
 
 
@@ -120,10 +139,35 @@ def signup():
     if not user_id:
         return error_response("User creation failed", 500)
 
-    send_verification_email(email, user_doc["verification_token"])
+    # Try to send verification email and report if it fails. Get detailed error info
+    email_ok, err, fatal = send_verification_email(email, user_doc["verification_token"], return_error=True)
+
+    if not email_ok:
+        # If it's a transient error, schedule background retries
+        if not fatal:
+            try:
+                schedule_verification_email_retry(email, user_doc["verification_token"])
+                retry_scheduled = True
+            except Exception as e:
+                print(f"Failed to schedule retry worker: {e}")
+                retry_scheduled = False
+        else:
+            retry_scheduled = False
+
+        # In development expose the verification link to make it easy for local testing
+        data = {"email_sent": False, "retry_scheduled": retry_scheduled}
+        if current_app and current_app.config.get('DEBUG', False):
+            data["verification_link"] = url_for('auth.verify_email', token=user_doc["verification_token"], _external=True)
+            data["error"] = err
+
+        return success_response(
+            data,
+            "Signup successful. We were unable to send a verification email. Please check server logs or contact support.",
+            201
+        )
 
     return success_response(
-        None,
+        {"email_sent": True},
         "Signup successful. Please check your email to verify your account.",
         201
     )
@@ -132,6 +176,58 @@ def signup():
 # =========================
 # EMAIL / PASSWORD LOGIN
 # =========================
+@auth_bp.route("/login", methods=["POST"])
+def _email_retry_worker(to_email, token, max_attempts: int = 3, initial_delay: int = 5, backoff_factor: int = 2):
+    """Background worker that retries sending emails with exponential backoff.
+
+    This is intentionally simple: it uses time.sleep and prints logs. It will
+    stop early on fatal errors (auth/misconfiguration).
+    """
+    attempt = 1
+    delay = initial_delay
+    while attempt <= max_attempts:
+        print(f"Email retry attempt {attempt}/{max_attempts} for {to_email}")
+        success, err, fatal = send_verification_email(to_email, token, return_error=True)
+        if success:
+            print(f"Email sent to {to_email} on retry attempt {attempt}.")
+            return True
+        if fatal:
+            print(f"Fatal email error for {to_email}: {err}. Aborting retries.")
+            return False
+        if attempt == max_attempts:
+            print(f"Reached max email retry attempts for {to_email}. Giving up.")
+            return False
+        print(f"Transient email error for {to_email}: {err}. Sleeping {delay}s before next attempt.")
+        time.sleep(delay)
+        delay *= backoff_factor
+        attempt += 1
+    return False
+
+
+def schedule_verification_email_retry(to_email, token, max_attempts: int = 3):
+    """Schedule the email retry worker in the background.
+
+    Tries to use the app's SocketIO background task helper, falling back to
+    a plain thread if necessary.
+    """
+    try:
+        # Use socketio background task if available to run inside app context properly
+        if current_app and hasattr(current_app, 'socketio'):
+            current_app.socketio.start_background_task(_email_retry_worker, to_email, token, max_attempts)
+            return True
+    except Exception as e:
+        print(f"Failed to start background task via socketio: {e}")
+
+    # Fallback to a simple thread
+    try:
+        import threading
+        t = threading.Thread(target=_email_retry_worker, args=(to_email, token, max_attempts), daemon=True)
+        t.start()
+        return True
+    except Exception as e:
+        print(f"Failed to start background thread for email retries: {e}")
+        return False
+
 @auth_bp.route("/login", methods=["POST"])
 @limiter.limit("5 per 15 minute")
 def login():
