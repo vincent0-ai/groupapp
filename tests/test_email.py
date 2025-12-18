@@ -44,3 +44,16 @@ def test_login_route_is_mapped_and_returns_400_when_missing_fields():
     data = resp.get_json()
     assert data['status'] == 'error'
     assert 'Missing email or password' in data['message']
+
+
+def test_verification_link_uses_app_url_if_set(monkeypatch, capsys):
+    # Ensure SMTP creds are not set so the function prints the verification link to stdout
+    monkeypatch.delenv('SMTP_USER', raising=False)
+    monkeypatch.delenv('SMTP_PASSWORD', raising=False)
+
+    app, socketio = create_app('testing')
+    app.config['APP_URL'] = 'https://example.com'
+    with app.test_request_context():
+        send_verification_email('test@example.com', 'token123')
+        captured = capsys.readouterr()
+        assert 'https://example.com' in captured.out
