@@ -287,7 +287,14 @@ def verify_email(token):
         {"$set": {"is_verified": True}, "$unset": {"verification_token": ""}}
     )
     
-    return redirect(url_for('main.auth_page', verified='true'))
+    # Redirect to the auth page. Use 'auth_page' (defined in app routes) and
+    # fall back to APP_URL if building the URL fails for any reason.
+    try:
+        return redirect(url_for('auth_page', verified='true'))
+    except Exception as e:
+        print(f"Failed to build auth_page url: {e}")
+        fallback = current_app.config.get('APP_URL', '/') + '/auth?verified=true'
+        return redirect(fallback)
 
 
 @auth_bp.route("/google", methods=["GET", "POST"])
