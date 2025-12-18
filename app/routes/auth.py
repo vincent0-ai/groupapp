@@ -38,8 +38,17 @@ def send_verification_email(to_email, token, return_error=False):
     smtp_user = os.environ.get("SMTP_USER")
     smtp_password = os.environ.get("SMTP_PASSWORD")
     
-    # Generate verification URL
-    verify_url = url_for('auth.verify_email', token=token, _external=True)
+    # Generate verification URL. Prefer configured APP_URL (useful when behind an HTTPS reverse proxy).
+    app_url = current_app.config.get('APP_URL') if current_app else None
+    if app_url:
+        # Build absolute URL using configured APP_URL (preserves https if set)
+        # Include the recipient email as a query param so if a token is invalid but
+        # the account is already verified we can still redirect the user gracefully.
+        path = url_for('auth.verify_email', token=token, email=to_email, _external=False)
+        verify_url = app_url.rstrip('/') + path
+    else:
+        # Fallback to request-based external url. Include email query param as above.
+        verify_url = url_for('auth.verify_email', token=token, email=to_email, _external=True)
     
     if not smtp_user or not smtp_password:
         print(f"============================================")
@@ -157,7 +166,11 @@ def signup():
         # In development expose the verification link to make it easy for local testing
         data = {"email_sent": False, "retry_scheduled": retry_scheduled}
         if current_app and current_app.config.get('DEBUG', False):
-            data["verification_link"] = url_for('auth.verify_email', token=user_doc["verification_token"], _external=True)
+            app_url = current_app.config.get('APP_URL') if current_app else None
+            if app_url:
+                data["verification_link"] = app_url.rstrip('/') + url_for('auth.verify_email', token=user_doc["verification_token"], email=user_doc.get('email'), _external=False)
+            else:
+                data["verification_link"] = url_for('auth.verify_email', token=user_doc["verification_token"], email=user_doc.get('email'), _external=True)
             data["error"] = err
 
         return success_response(
@@ -279,6 +292,20 @@ def verify_email(token):
     user = db.find_one("users", {"verification_token": token})
     
     if not user:
+        # If token isn't found, check whether the link included an email and
+        # that account is already verified. This handles cases where a token
+        # has been consumed or removed (e.g., by admin or prior verification)
+        # and avoids showing a confusing error to the end user.
+        email = request.args.get('email')
+        if email:
+            existing = db.find_one("users", {"email": email.lower()})
+            if existing and existing.get('is_verified', False):
+                try:
+                    return redirect(url_for('auth_page', verified='true'))
+                except Exception as e:
+                    print(f"Failed to build auth_page url: {e}")
+                    fallback = current_app.config.get('APP_URL', '/') + '/auth?verified=true'
+                    return redirect(fallback)
         return "Invalid or expired verification link.", 400
         
     db.update_one(
