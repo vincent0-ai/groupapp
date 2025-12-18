@@ -34,3 +34,13 @@ def test_schedule_retry_does_not_raise(monkeypatch):
     with app.app_context():
         # Should not raise
         schedule_verification_email_retry('test@example.com', 'token123')
+
+
+def test_login_route_is_mapped_and_returns_400_when_missing_fields():
+    app, socketio = create_app('testing')
+    client = app.test_client()
+    resp = client.post('/api/auth/login', json={})
+    assert resp.status_code == 400
+    data = resp.get_json()
+    assert data['status'] == 'error'
+    assert 'Missing email or password' in data['message']
