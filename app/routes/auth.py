@@ -176,7 +176,6 @@ def signup():
 # =========================
 # EMAIL / PASSWORD LOGIN
 # =========================
-@auth_bp.route("/login", methods=["POST"])
 def _email_retry_worker(to_email, token, max_attempts: int = 3, initial_delay: int = 5, backoff_factor: int = 2):
     """Background worker that retries sending emails with exponential backoff.
 
