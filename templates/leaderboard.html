@@ -216,6 +216,9 @@
                 <option value="week">This Week</option>
                 <option value="month">This Month</option>
             </select>
+            <select class="form-select" id="filterGroup">
+                <option value="">All Groups</option>
+            </select>
             <div class="search-input-wrapper flex-grow-1" style="max-width: 300px;">
                 <i class="fas fa-search"></i>
                 <input type="text" class="form-control" id="searchUser" placeholder="Search user...">
@@ -335,6 +338,7 @@
     <script>
         const token = localStorage.getItem('token');
         const userId = localStorage.getItem('userId');
+        const medals = ['🥇','🥈','🥉'];
         let viewUserModal = null;
 
         async function viewUserProfile(targetUserId) {
@@ -410,7 +414,10 @@
         async function loadLeaderboard() {
             try {
                 const period = document.getElementById('filterPeriod').value;
-                const res = await fetch(`/api/users/leaderboard?period=${period}`, {
+                const groupId = document.getElementById('filterGroup') ? document.getElementById('filterGroup').value : '';
+                let url = `/api/users/leaderboard?period=${period}`;
+                if (groupId) url += `&group_id=${groupId}`;
+                const res = await fetch(url, {
                     headers: { 'Authorization': `Bearer ${token}` }
                 });
                 const data = await res.json();
@@ -525,12 +532,33 @@
                 console.error('Error searching users:', error);
             }
         });
-        document.addEventListener('DOMContentLoaded', () => {
+        document.addEventListener('DOMContentLoaded', async () => {
             if (!token) {
                 sessionStorage.setItem('redirectAfterLogin', window.location.href);
                 window.location.href = "{{ url_for('auth_page') }}";
                 return;
             }
+
+            // Load groups for group filter
+            try {
+                const groupRes = await fetch('/api/users/groups', { headers: { 'Authorization': `Bearer ${token}` } });
+                if (groupRes.ok) {
+                    const groupData = await groupRes.json();
+                    const groups = groupData.data?.groups || [];
+                    const filterGroupSelect = document.getElementById('filterGroup');
+                    groups.forEach(g => {
+                        const opt = document.createElement('option');
+                        opt.value = g.id || g._id;
+                        opt.textContent = g.name;
+                        filterGroupSelect.appendChild(opt);
+                    });
+                    // When group filter changes, reload leaderboard
+                    filterGroupSelect.addEventListener('change', loadLeaderboard);
+                }
+            } catch (e) {
+                console.error('Error loading groups for leaderboard filter', e);
+            }
+
             loadLeaderboard();
         });
     </script>

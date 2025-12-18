@@ -27,6 +27,7 @@ except Exception:
         def __new__(cls, val):
             return str.__new__(cls, val)
 from datetime import datetime
+from app.utils.helpers import serialize_document
 
 dm_bp = flask.Blueprint('dm', __name__, url_prefix='/api/dm')
 # If running in a minimal test environment where Blueprint lacks route, provide a no-op fallback
@@ -98,7 +99,7 @@ def get_dm_threads():
                     'avatar_url': other_user.get('avatar_url', '') if other_user else ''
                 },
                 'last_message': thread.get('last_message'),
-                'last_message_at': thread.get('last_message_at').isoformat() if thread.get('last_message_at') else None,
+                'last_message_at': serialize_document(thread.get('last_message_at')) if thread.get('last_message_at') else None,
                 'unread_count': db.db.dm_messages.count_documents({
                     'thread_id': thread['_id'],
                     'sender_id': ObjectId(other_user_id),
@@ -195,7 +196,7 @@ def get_dm_messages(thread_id):
                 'content': bleach.linkify(content),
                 'sender_id': str(msg['sender_id']),
                 'sender_name': sender.get('full_name', sender.get('username', 'Unknown')) if sender else 'Unknown',
-                'created_at': msg.get('created_at').isoformat() if msg.get('created_at') else None,
+                'created_at': serialize_document(msg.get('created_at')) if msg.get('created_at') else None,
                 'read': msg.get('read', False),
                 'reactions': msg.get('reactions', {})
             })
@@ -266,7 +267,7 @@ def send_dm_message(thread_id):
                 '_id': str(result.inserted_id),
                 'content': content,
                 'sender_id': g.user_id,
-                'created_at': message['created_at'].isoformat()
+                'created_at': serialize_document(message['created_at'])
             }
         }), 201
     except Exception as e:

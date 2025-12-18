@@ -29,11 +29,12 @@ def get_notifications():
         })
         
         # Format for response
+        from app.utils.helpers import serialize_document
         for n in notifications:
             n['_id'] = str(n['_id'])
             n['user_id'] = str(n['user_id'])
             if 'created_at' in n:
-                n['created_at'] = n['created_at'].isoformat()
+                n['created_at'] = serialize_document(n['created_at'])
         
         return jsonify({
             'success': True,
