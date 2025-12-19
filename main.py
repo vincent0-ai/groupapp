@@ -14,4 +14,5 @@ load_dotenv()
 app, socketio = create_app(os.getenv('FLASK_ENV', 'development'))
 
 if __name__ == '__main__':
-    socketio.run(app, debug=True, host='0.0.0.0', port=5000)
+    # Respect configuration debug flag and PORT env var
+    socketio.run(app, debug=app.config.get('DEBUG', False), host='0.0.0.0', port=int(os.getenv('PORT', 5000)))
