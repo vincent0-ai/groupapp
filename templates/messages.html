@@ -372,6 +372,7 @@
         /* Threaded arguments styling */
         .thread-container {
             padding: 6px 0;
+            font-size: 11px; /* very small font for thread */
         }
         .thread-container .card {
             box-shadow: none;
@@ -379,8 +380,20 @@
         }
         .thread-badge {
             text-transform: capitalize;
-            font-size: 0.7rem;
+            font-size: 10px;
             padding: 3px 6px;
+        }
+        /* Prevent buttons and small labels from wrapping */
+        .thread-container .btn, .message-actions button, .quick-action-item span, .performer-item {
+            white-space: nowrap;
+        }
+        .thread-container .btn {
+            font-size: 11px;
+            padding: .25rem .4rem;
+        }
+        /* Small arg count badge */
+        .badge {
+            font-size: 10px;
         }
         
         .announcement-bubble .announcement-badge {
@@ -542,7 +555,7 @@
                     </div>
                     <div class="modal-footer">
                         <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                        <button type="submit" class="btn btn-primary">Add</button>
+                        <button type="submit" class="btn btn-primary" id="argumentSubmitBtn">Add</button>
                     </div>
                 </form>
             </div>
@@ -1384,51 +1397,7 @@
             modal.show();
         }
 
-        // Submit argument form
-        document.getElementById('argumentForm').addEventListener('submit', async (e) => {
-            e.preventDefault();
-            try {
-                const nodeType = document.getElementById('argNodeType').value;
-                const content = document.getElementById('argContent').value.trim();
-                const messageId = document.getElementById('argumentMessageId').value || null;
-                const parentId = document.getElementById('argumentParentId').value || null;
 
-                if (!content) {
-                    await showCustomAlert('Content cannot be empty', 'Error');
-                    return;
-                }
-
-                const payload = {
-                    node_type: nodeType,
-                    content: content,
-                    group_id: currentGroupId
-                };
-                if (messageId) payload.message_id = messageId;
-                if (parentId) payload.parent_id = parentId;
-
-                const res = await fetch('/api/arguments', {
-                    method: 'POST',
-                    headers: {
-                        'Authorization': `Bearer ${token}`,
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify(payload)
-                });
-
-                const data = await res.json();
-                if (res.ok) {
-                    await showCustomAlert('Argument added', 'Success');
-                    const modal = bootstrap.Modal.getInstance(document.getElementById('argumentModal'));
-                    if (modal) modal.hide();
-                    loadArgumentsForMessage(messageId);
-                } else {
-                    await showCustomAlert(data.message || 'Failed to add argument', 'Error');
-                }
-            } catch (err) {
-                console.error('Error creating argument:', err);
-                await showCustomAlert('Error creating argument', 'Error');
-            }
-        });
 
         async function loadArgumentsForMessage(messageId) {
             if (!messageId) return;
@@ -1542,8 +1511,15 @@
             modal.show();
         }
 
+        // Prevent duplicate submissions by disabling submit and using a flag
+        let argumentSubmitting = false;
         document.getElementById('argumentForm').addEventListener('submit', async (e) => {
             e.preventDefault();
+            if (argumentSubmitting) return; // ignore duplicate
+            argumentSubmitting = true;
+            const submitBtn = document.getElementById('argumentSubmitBtn');
+            if (submitBtn) submitBtn.disabled = true;
+
             try {
                 const node_type = document.getElementById('argNodeType').value;
                 const content = document.getElementById('argContent').value.trim();
@@ -1586,6 +1562,9 @@
             } catch (err) {
                 console.error('Error creating argument:', err);
                 await showCustomAlert('Error creating argument', 'Error');
+            } finally {
+                argumentSubmitting = false;
+                if (submitBtn) submitBtn.disabled = false;
             }
         });
 
