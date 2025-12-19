@@ -338,66 +338,42 @@
     <script>
         const token = localStorage.getItem('token');
         const userId = localStorage.getItem('userId');
-        const medals = ['🥇','🥈','🥉'];
-        let viewUserModal = null;
 
-        async function viewUserProfile(targetUserId) {
+        // Load groups leaderboard and render groups with streaks
+        async function loadGroupsLeaderboard() {
             try {
-                const res = await fetch(`/api/users/${targetUserId}`, {
-                    headers: { 'Authorization': `Bearer ${token}` }
-                });
-                
+                const res = await fetch('/api/groups/leaderboard', { headers: { 'Authorization': `Bearer ${token}` } });
                 if (!res.ok) {
-                    const errData = await res.json();
-                    await showCustomAlert(errData.message || 'Failed to load profile', 'Error');
+                    document.getElementById('leaderboardBody').innerHTML = `<div class="list-group-item text-center py-4 text-danger">Failed to load leaderboard</div>`;
                     return;
                 }
-                
                 const data = await res.json();
-                const user = data.data;
-                
-                // Populate modal
-                document.getElementById('viewUserAvatar').src = user.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${user.username}`;
-                document.getElementById('viewUserFullName').textContent = user.full_name || user.username;
-                document.getElementById('viewUserUsername').textContent = `@${user.username}`;
-                document.getElementById('viewUserPoints').textContent = user.points || 0;
-                document.getElementById('viewUserGroups').textContent = user.groups_count || 0;
-                document.getElementById('viewUserBadges').textContent = (user.badges || []).length;
-                
-                // Bio section
-                const bioSection = document.getElementById('viewUserBio');
-                if (user.bio) {
-                    bioSection.style.display = 'block';
-                    document.getElementById('viewUserBioText').textContent = user.bio;
-                } else {
-                    bioSection.style.display = 'none';
+                const groups = data.data?.groups || [];
+                if (groups.length === 0) {
+                    document.getElementById('leaderboardBody').innerHTML = `<div class="list-group-item text-center py-4 text-muted">No groups available</div>`;
+                    return;
                 }
-                
-                // Badges section
-                const badgesSection = document.getElementById('viewUserBadgesSection');
-                const badgesList = document.getElementById('viewUserBadgesList');
-                if (user.badges && user.badges.length > 0) {
-                    badgesSection.style.display = 'block';
-                    badgesList.innerHTML = user.badges.map(b => `
-                        <span class="badge bg-warning text-dark" title="${b.description || b.name || b}">
-                            <i class="fas fa-award me-1"></i>${b.name || b}
-                        </span>
-                    `).join('');
-                } else {
-                    badgesSection.style.display = 'none';
-                }
-                
-                // Join date
-                if (user.created_at) {
-                    const joinDate = new Date(user.created_at);
-                    document.getElementById('viewUserJoined').textContent = joinDate.toLocaleDateString('en-US', { 
-                        year: 'numeric', 
-                        month: 'long', 
-                        day: 'numeric' 
-                    });
-                } else {
-                    document.getElementById('viewUserJoined').textContent = '-';
-                }
+                document.getElementById('leaderboardBody').innerHTML = groups.map((g, i) => `
+                    <div class="list-group-item leaderboard-row d-flex justify-content-between align-items-center">
+                        <div class="d-flex align-items-center">
+                            <div class="rank-num me-3">${i + 1}</div>
+                            <div>
+                                <div class="fw-semibold">${g.name}</div>
+                                <div class="small text-muted">${g.member_count || 0} members • ${g.activity || 0} msgs (7d)</div>
+                            </div>
+                        </div>
+                        <div>
+                            <span class="badge bg-warning text-dark">🔥 ${g.streak_count || 0}d</span>
+                        </div>
+                    </div>
+                `).join('');
+            } catch (e) {
+                console.error('Error loading groups leaderboard', e);
+                document.getElementById('leaderboardBody').innerHTML = `<div class="list-group-item text-center py-4 text-danger">Failed to load leaderboard</div>`;
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', loadGroupsLeaderboard);
                 
                 // Show modal
                 if (!viewUserModal) {

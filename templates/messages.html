@@ -369,32 +369,7 @@
             max-width: 100% !important;
         }
 
-        /* Threaded arguments styling */
-        .thread-container {
-            padding: 6px 0;
-            font-size: 11px; /* very small font for thread */
-        }
-        .thread-container .card {
-            box-shadow: none;
-            border-radius: 8px;
-        }
-        .thread-badge {
-            text-transform: capitalize;
-            font-size: 10px;
-            padding: 3px 6px;
-        }
-        /* Prevent buttons and small labels from wrapping */
-        .thread-container .btn, .message-actions button, .quick-action-item span, .performer-item {
-            white-space: nowrap;
-        }
-        .thread-container .btn {
-            font-size: 11px;
-            padding: .25rem .4rem;
-        }
-        /* Small arg count badge */
-        .badge {
-            font-size: 10px;
-        }
+
         
         .announcement-bubble .announcement-badge {
             display: inline-flex;
@@ -528,39 +503,6 @@
         </div>
     </div>
 
-    <!-- Argument Modal -->
-    <div class="modal fade" id="argumentModal" tabindex="-1">
-        <div class="modal-dialog">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title">Add Argument</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                </div>
-                <form id="argumentForm">
-                    <div class="modal-body">
-                        <div class="mb-3">
-                            <label for="argNodeType" class="form-label">Type</label>
-                            <select id="argNodeType" class="form-control">
-                                <option value="claim">Claim</option>
-                                <option value="evidence">Evidence</option>
-                                <option value="counter">Counter-argument</option>
-                            </select>
-                        </div>
-                        <div class="mb-3">
-                            <label for="argContent" class="form-label">Content</label>
-                            <textarea id="argContent" class="form-control" rows="4" required></textarea>
-                        </div>
-                        <input type="hidden" id="argumentMessageId">
-                        <input type="hidden" id="argumentParentId">
-                    </div>
-                    <div class="modal-footer">
-                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                        <button type="submit" class="btn btn-primary" id="argumentSubmitBtn">Add</button>
-                    </div>
-                </form>
-            </div>
-        </div>
-    </div>
 
 {% endblock %}
 
@@ -1007,13 +949,10 @@
                                         <button class="btn btn-sm btn-light" onclick="replyToMessage('${m._id}', '${m.user_first_name || 'User'}', \`${m.content.replace(/`/g, "'").replace(/\\/g, "\\\\")}\`)" title="Reply">
                                             <i class="fas fa-reply"></i>
                                         </button>
-                                        <button class="btn btn-sm btn-light" onclick="openArgumentModal('${m._id}')" title="Discuss">
+" title="Discuss">
                                             <i class="fas fa-comments"></i>
                                         </button>
-                                        <button class="btn btn-sm btn-light" onclick="toggleThread('${m._id}')" title="View thread">
-                                            <i class="fas fa-stream"></i>
-                                        </button>
-                                        ${argCount ? `<span class="badge bg-light text-muted ms-1" id="arg-count-${m._id}">${argCount}</span>` : ''}
+
                                         ${canDelete ? `
                                             <button class="btn btn-sm btn-light text-danger" onclick="deleteMessage('${m._id}')" title="Delete">
                                                 <i class="fas fa-trash"></i>
@@ -1023,10 +962,7 @@
                                     <p class="mb-0 message-content">${formattedContent}</p>
                                     ${renderReactions(m)}
                                 </div>
-                                <div class="mt-1 small text-muted argument-summary" style="max-width:85%;">
-                                    ${argSummaries[m._id] && argSummaries[m._id].top_claim ? `<div><strong>Claim:</strong> ${truncate(argSummaries[m._id].top_claim.content, 120)}</div>` : ''}
-                                    ${argSummaries[m._id] && argSummaries[m._id].top_evidence ? `<div><strong>Evidence:</strong> ${truncate(argSummaries[m._id].top_evidence.content, 120)}</div>` : ''}
-                                </div>
+
                                 </div>
                                 <div id="thread-${m._id}" class="mt-2 thread-container" style="display:none; max-width: 85%;"></div>
                                 <small class="text-muted mt-1" style="font-size: 0.7rem;">
