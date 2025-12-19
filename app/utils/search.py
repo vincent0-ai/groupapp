@@ -23,18 +23,30 @@ class MeilisearchClient:
             'Authorization': f'Bearer {self.api_key}',
             'Content-Type': 'application/json'
         }
+        # Basic validation to avoid accidental SSRF: base_url must be a non-empty http(s) URL
+        try:
+            from urllib.parse import urlparse
+            parsed = urlparse(self.base_url)
+            if parsed.scheme not in ('http', 'https') or not parsed.netloc:
+                raise ValueError('MEILISEARCH_URL must be a valid http(s) URL')
+        except Exception as e:
+            print(f'Invalid Meilisearch base URL: {e}')
+            # Prevent initialization from silently proceeding with an invalid URL
+            raise
         self._initialized = True
     
     def _make_request(self, method: str, endpoint: str, data: Dict = None) -> Optional[Dict]:
         """Make a request to Meilisearch"""
         try:
             url = f"{self.base_url}{endpoint}"
+            # Use a short timeout and do not follow user-supplied redirects
+            timeout = float(current_app.config.get('SEARCH_REQUEST_TIMEOUT', 5))
             if method == 'GET':
-                response = requests.get(url, headers=self.headers, params=data)
+                response = requests.get(url, headers=self.headers, params=data, timeout=timeout)
             elif method == 'POST':
-                response = requests.post(url, headers=self.headers, json=data)
+                response = requests.post(url, headers=self.headers, json=data, timeout=timeout)
             elif method == 'DELETE':
-                response = requests.delete(url, headers=self.headers)
+                response = requests.delete(url, headers=self.headers, timeout=timeout)
             else:
                 return None
             

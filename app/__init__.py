@@ -51,6 +51,10 @@ def create_app(config_name='development'):
         response.headers.setdefault('X-Content-Type-Options', 'nosniff')
         response.headers.setdefault('X-Frame-Options', 'DENY')
         response.headers.setdefault('Referrer-Policy', 'no-referrer-when-downgrade')
+        # Basic Content-Security-Policy (adjust as needed for your static assets / CDNs)
+        if 'Content-Security-Policy' not in response.headers:
+            csp = "default-src 'self'; script-src 'self' 'unsafe-inline' https:; style-src 'self' 'unsafe-inline' https:; img-src 'self' data: https:; connect-src 'self' https: ws: wss:;"
+            response.headers.setdefault('Content-Security-Policy', csp)
         # HSTS only in non-debug (i.e., production)
         if not app.debug:
             response.headers.setdefault('Strict-Transport-Security', 'max-age=63072000; includeSubDomains; preload')
@@ -276,14 +280,52 @@ def create_app(config_name='development'):
 
     @socketio.on('connect')
     def handle_connect():
-        emit('connect_response', {'data': 'Connected'})
+        # Require a JWT token on connection (via query param `token` or Authorization header)
+        token = request.args.get('token')
+        if not token:
+            auth_header = request.headers.get('Authorization')
+            if auth_header and auth_header.startswith('Bearer '):
+                token = auth_header.split(' ', 1)[1]
+        if not token:
+            print('Socket connect denied: missing token')
+            try:
+                from flask_socketio import disconnect
+                disconnect()
+            except Exception:
+                pass
+            return
+
+        try:
+            import jwt
+            payload = jwt.decode(token, current_app.config['JWT_SECRET_KEY'], algorithms=[current_app.config['JWT_ALGORITHM']])
+            uid = str(payload['user_id'])
+        except Exception as e:
+            print(f'Socket connect denied: token invalid: {e}')
+            try:
+                from flask_socketio import disconnect
+                disconnect()
+            except Exception:
+                pass
+            return
+
+        # Track connection
+        with connected_users_lock:
+            s = connected_users.get(uid)
+            if not s:
+                s = set()
+                connected_users[uid] = s
+            s.add(request.sid)
+            sid_to_user[request.sid] = uid
+
+        emit('connect_response', {'data': 'Connected', 'user_id': uid})
 
     @socketio.on('join_room')
     def on_join_room(data):
         room = data.get('room')
-        user_id = data.get('user_id')
 
-        if not room or not user_id:
+        # Use authenticated user id derived from connection (do not trust client-supplied user_id)
+        uid = sid_to_user.get(request.sid)
+        if not room or not uid:
             return
 
         # Handle whiteboard session bookkeeping in a try/except
@@ -297,9 +339,9 @@ def create_app(config_name='development'):
                             room_timers[room] = {'start_time': datetime.utcnow(), 'warned': False}
                             print(f"Started session timer for room: {room}")
 
-                    # Only push participant if user_id looks like a valid ObjectId
-                    if _is_valid_object_id(user_id):
-                        db.push_to_array('whiteboards', {'_id': ObjectId(wb_id)}, 'participants', ObjectId(user_id))
+                    # Only push participant if uid looks like a valid ObjectId
+                    if _is_valid_object_id(uid):
+                        db.push_to_array('whiteboards', {'_id': ObjectId(wb_id)}, 'participants', ObjectId(uid))
             except Exception as e:
                 print(f"Error joining whiteboard: {e}")
                 pass
@@ -311,51 +353,41 @@ def create_app(config_name='development'):
             print(f"Warning: could not join room {room} for sid {request.sid}: {e}")
             emit('error', {'message': 'Could not join room due to transient connection error'})
 
-            # Track connection (support multiple tabs/sids per user)
-            uid = str(user_id)
-            with connected_users_lock:
-                s = connected_users.get(uid)
-                if not s:
-                    s = set()
-                    connected_users[uid] = s
-                s.add(request.sid)
-                sid_to_user[request.sid] = uid
-            
-            # Include basic user profile info
-            try:
-                db = Database()
-                user_doc = db.find_one('users', {'_id': ObjectId(user_id)})
-                profile = None
-                if user_doc:
-                    profile = {
-                        'id': str(user_doc['_id']),
-                        'full_name': user_doc.get('full_name', ''),
-                        'avatar_url': user_doc.get('avatar_url', ''),
-                        'username': user_doc.get('username', '')
-                    }
-            except Exception:
-                profile = None
-            
-            # Track online status per room
-            with online_users_lock:
-                if room not in online_users:
-                    online_users[room] = {}
-                online_users[room][user_id] = {
-                    'profile': profile,
-                    'last_seen': datetime.utcnow(),
-                    'sid': request.sid
+        # Include basic user profile info
+        try:
+            db = Database()
+            user_doc = db.find_one('users', {'_id': ObjectId(uid)})
+            profile = None
+            if user_doc:
+                profile = {
+                    'id': str(user_doc['_id']),
+                    'full_name': user_doc.get('full_name', ''),
+                    'avatar_url': user_doc.get('avatar_url', ''),
+                    'username': user_doc.get('username', '')
                 }
-            
-            # Emit updated online users list to the room
-            online_list = [{'user_id': uid, 'profile': info['profile']} 
-                          for uid, info in online_users.get(room, {}).items()]
-            emit('online_users', {'users': online_list}, room=room)
-            
-            emit('user_joined', {
-                'user_id': user_id,
+        except Exception:
+            profile = None
+
+        # Track online status per room
+        with online_users_lock:
+            if room not in online_users:
+                online_users[room] = {}
+            online_users[room][uid] = {
                 'profile': profile,
-                'timestamp': datetime.utcnow().isoformat()
-            }, room=room)
+                'last_seen': datetime.utcnow(),
+                'sid': request.sid
+            }
+
+        # Emit updated online users list to the room
+        online_list = [{'user_id': u, 'profile': info['profile']} 
+                      for u, info in online_users.get(room, {}).items()]
+        emit('online_users', {'users': online_list}, room=room)
+        
+        emit('user_joined', {
+            'user_id': uid,
+            'profile': profile,
+            'timestamp': datetime.utcnow().isoformat()
+        }, room=room)
     
     
     
@@ -372,13 +404,15 @@ def create_app(config_name='development'):
     def handle_message(data):
         """Handle real-time messages"""
         room = data.get('room')
-        user_id = data.get('user_id')
         message = data.get('message')
-        
-        if room and message:
+        uid = sid_to_user.get(request.sid)
+        if room and message and uid:
+            # Escape message content to prevent XSS when clients render it
+            from html import escape as _escape
+            safe_message = _escape(str(message))
             emit('new_message', {
-                'user_id': user_id,
-                'message': message,
+                'user_id': uid,
+                'message': safe_message,
                 'timestamp': datetime.utcnow().isoformat()
             }, room=room)
     
@@ -386,9 +420,9 @@ def create_app(config_name='development'):
     def handle_clear_board(data):
         """Handle clearing the whiteboard"""
         room = data.get('room')
-        user_id = data.get('user_id')
+        uid = sid_to_user.get(request.sid)
         
-        if room and room.startswith('whiteboard:'):
+        if room and room.startswith('whiteboard:') and uid:
             wb_id = room.split(':', 1)[1]
             if not _is_valid_object_id(wb_id):
                 print(f"clear_board called with invalid wb_id: '{wb_id}'")
@@ -398,20 +432,20 @@ def create_app(config_name='development'):
             wb = db.find_one('whiteboards', {'_id': ObjectId(wb_id)})
             if wb:
                 # Check draw permission via centralized helper
-                perms = compute_permissions(wb, user_id)
+                perms = compute_permissions(wb, uid)
                 if perms.get('can_draw'):
                     # Clear drawing data in DB
                     db.update_one('whiteboards', {'_id': ObjectId(wb_id)}, {'drawing_data': []})
-                    emit('board_cleared', {'user_id': user_id}, room=room)
+                    emit('board_cleared', {'user_id': uid}, room=room)
 
     @socketio.on('whiteboard_draw')
     def handle_whiteboard_draw(data):
         """Handle whiteboard drawing"""
         room = data.get('room')
         drawing_data = data.get('drawing_data')
-        user_id = data.get('user_id')
+        uid = sid_to_user.get(request.sid)
         
-        if room and drawing_data:
+        if room and drawing_data and uid:
             # enforce draw permissions if room is a whiteboard session (format: 'whiteboard:<id>')
             allowed = True
             try:
@@ -425,13 +459,13 @@ def create_app(config_name='development'):
                         db = Database()
                         wb = db.find_one('whiteboards', {'_id': ObjectId(wb_id)})
                     if wb:
-                        perms = compute_permissions(wb, user_id)
+                        perms = compute_permissions(wb, uid)
                         allowed = perms.get('can_draw', True)
             except Exception:
                 allowed = True
             if allowed:
                 emit('draw_update', {
-                    'user_id': user_id,
+                    'user_id': uid,
                     'drawing_data': drawing_data,
                     'timestamp': datetime.utcnow().isoformat()
                 }, room=room, skip_sid=request.sid)
@@ -448,8 +482,8 @@ def create_app(config_name='development'):
     def handle_undo_action(data):
         """Handle undo of the last stroke"""
         room = data.get('room')
-        user_id = data.get('user_id')
-        if room and room.startswith('whiteboard:'):
+        uid = sid_to_user.get(request.sid)
+        if room and room.startswith('whiteboard:') and uid:
             wb_id = room.split(':', 1)[1]
             if not _is_valid_object_id(wb_id):
                 print(f"undo_action called with invalid wb_id: '{wb_id}'")
@@ -458,33 +492,33 @@ def create_app(config_name='development'):
             db = Database()
             wb = db.find_one('whiteboards', {'_id': ObjectId(wb_id)})
             if wb:
-                perms = compute_permissions(wb, user_id)
+                perms = compute_permissions(wb, uid)
                 if perms.get('can_draw'):
                     try:
                         # remove last element from the drawing_data array
                         db.update_one('whiteboards', {'_id': ObjectId(wb_id)}, {'$pop': {'drawing_data': 1}})
                     except Exception:
                         pass
-                    emit('undo_action', {'user_id': user_id}, room=room, skip_sid=request.sid)
+                    emit('undo_action', {'user_id': uid}, room=room, skip_sid=request.sid)
     
     @socketio.on('typing_indicator')
     def handle_typing(data):
         """Handle typing indicator"""
         room = data.get('room')
-        user_id = data.get('user_id')
+        uid = sid_to_user.get(request.sid)
         is_typing = data.get('is_typing', False)
         
-        if room:
+        if room and uid:
             emit('user_typing', {
-                'user_id': user_id,
+                'user_id': uid,
                 'is_typing': is_typing
             }, room=room, skip_sid=request.sid)
 
     @socketio.on('raise_hand')
     def handle_raise_hand(data):
         room = data.get('room')
-        user_id = data.get('user_id')
-        if not room or not room.startswith('whiteboard:'):
+        uid = sid_to_user.get(request.sid)
+        if not room or not room.startswith('whiteboard:') or not uid:
             return
         wb_id = room.split(':', 1)[1]
         if not _is_valid_object_id(wb_id):
@@ -492,18 +526,18 @@ def create_app(config_name='development'):
             return
         db = Database()
         try:
-            db.push_to_array('whiteboards', {'_id': ObjectId(wb_id)}, 'raised_hands', ObjectId(user_id))
-            user_doc = db.find_one('users', {'_id': ObjectId(user_id)})
+            db.push_to_array('whiteboards', {'_id': ObjectId(wb_id)}, 'raised_hands', ObjectId(uid))
+            user_doc = db.find_one('users', {'_id': ObjectId(uid)})
             profile = {'id': str(user_doc['_id']), 'full_name': user_doc.get('full_name', ''), 'avatar_url': user_doc.get('avatar_url', ''), 'username': user_doc.get('username', '')} if user_doc else None
-            emit('hand_raised', {'user_id': user_id, 'profile': profile}, room=room)
+            emit('hand_raised', {'user_id': uid, 'profile': profile}, room=room)
         except Exception:
             pass
 
     @socketio.on('clear_hand')
     def handle_clear_hand(data):
         room = data.get('room')
-        user_id = data.get('user_id')
-        if not room or not room.startswith('whiteboard:'):
+        uid = sid_to_user.get(request.sid)
+        if not room or not room.startswith('whiteboard:') or not uid:
             return
         wb_id = room.split(':', 1)[1]
         if not _is_valid_object_id(wb_id):
@@ -511,8 +545,8 @@ def create_app(config_name='development'):
             return
         db = Database()
         try:
-            db.pull_from_array('whiteboards', {'_id': ObjectId(wb_id)}, 'raised_hands', ObjectId(user_id))
-            emit('hand_cleared', {'user_id': user_id}, room=room)
+            db.pull_from_array('whiteboards', {'_id': ObjectId(wb_id)}, 'raised_hands', ObjectId(uid))
+            emit('hand_cleared', {'user_id': uid}, room=room)
         except Exception:
             pass
 
@@ -521,20 +555,20 @@ def create_app(config_name='development'):
     def handle_video_join(data):
         """User indicates they are joining the video/media session."""
         room = data.get('room')
-        user_id = data.get('user_id')
-        print(f"User {user_id} joining video session in room {room}")
+        uid = sid_to_user.get(request.sid)
+        print(f"User {uid} joining video session in room {room}")
         # This is now mostly for app-level logic if needed.
         # Client will fetch token and connect to LiveKit separately.
-        emit('video_user_joined', {'user_id': user_id}, room=room, skip_sid=request.sid)
+        emit('video_user_joined', {'user_id': uid}, room=room, skip_sid=request.sid)
 
     @socketio.on('video_leave')
     def handle_video_leave(data):
         """User indicates they are leaving the video/media session."""
         room = data.get('room')
-        user_id = data.get('user_id')
-        print(f"User {user_id} leaving video session in room {room}")
+        uid = sid_to_user.get(request.sid)
+        print(f"User {uid} leaving video session in room {room}")
         # This is now mostly for app-level logic if needed.
-        emit('video_user_left', {'user_id': user_id}, room=room, skip_sid=request.sid)
+        emit('video_user_left', {'user_id': uid}, room=room, skip_sid=request.sid)
 
     async def _update_lk_permissions(wb, target_user_id, room_name):
         """Async helper to update LiveKit participant permissions."""
@@ -563,8 +597,8 @@ def create_app(config_name='development'):
     def handle_grant_draw(data):
         room = data.get('room')
         target_user = data.get('user_id')
-        requester = data.get('requester_id')
-        if not room or not room.startswith('whiteboard:'):
+        requester = sid_to_user.get(request.sid)
+        if not room or not room.startswith('whiteboard:') or not requester:
             return
         wb_id = room.split(':', 1)[1]
         if not _is_valid_object_id(wb_id):
@@ -598,8 +632,8 @@ def create_app(config_name='development'):
     def handle_revoke_draw(data):
         room = data.get('room')
         target_user = data.get('user_id')
-        requester = data.get('requester_id')
-        if not room or not room.startswith('whiteboard:'):
+        requester = sid_to_user.get(request.sid)
+        if not room or not room.startswith('whiteboard:') or not requester:
             return
         wb_id = room.split(':', 1)[1]
         if not _is_valid_object_id(wb_id):
@@ -632,8 +666,8 @@ def create_app(config_name='development'):
     def handle_grant_speak(data):
         room = data.get('room')
         target_user = data.get('user_id')
-        requester = data.get('requester_id')
-        if not room or not room.startswith('whiteboard:'):
+        requester = sid_to_user.get(request.sid)
+        if not room or not room.startswith('whiteboard:') or not requester:
             return
         wb_id = room.split(':', 1)[1]
         if not _is_valid_object_id(wb_id):
@@ -673,8 +707,8 @@ def create_app(config_name='development'):
     def handle_revoke_speak(data):
         room = data.get('room')
         target_user = data.get('user_id')
-        requester = data.get('requester_id')
-        if not room or not room.startswith('whiteboard:'):
+        requester = sid_to_user.get(request.sid)
+        if not room or not room.startswith('whiteboard:') or not requester:
             return
         wb_id = room.split(':', 1)[1]
         if not _is_valid_object_id(wb_id):
@@ -721,8 +755,8 @@ def create_app(config_name='development'):
     def handle_grant_screen_share(data):
         room = data.get('room')
         target_user = data.get('user_id')
-        requester = data.get('requester_id')
-        if not room or not room.startswith('whiteboard:'):
+        requester = sid_to_user.get(request.sid)
+        if not room or not room.startswith('whiteboard:') or not requester:
             return
         wb_id = room.split(':', 1)[1]
         if not _is_valid_object_id(wb_id):
@@ -758,8 +792,8 @@ def create_app(config_name='development'):
     def handle_revoke_screen_share(data):
         room = data.get('room')
         target_user = data.get('user_id')
-        requester = data.get('requester_id')
-        if not room or not room.startswith('whiteboard:'):
+        requester = sid_to_user.get(request.sid)
+        if not room or not room.startswith('whiteboard:') or not requester:
             return
         wb_id = room.split(':', 1)[1]
         if not _is_valid_object_id(wb_id):

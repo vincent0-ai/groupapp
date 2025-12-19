@@ -65,10 +65,7 @@ def get_current_user():
     if 'Authorization' in request.headers and request.headers['Authorization'].startswith('Bearer '):
         token = request.headers['Authorization'].split(' ')[1]
 
-    if not token:
-        # Check for token in cookies as a fallback
-        token = request.cookies.get('token')
-
+    # Do not accept tokens from cookies (CSRF risk). API should use Authorization header bearer tokens.
     if not token:
         return None
 

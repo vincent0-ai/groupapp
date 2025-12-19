@@ -156,7 +156,11 @@ def send_message():
     if not data or 'content' not in data or 'group_id' not in data:
         return error_response('Missing required fields', 400)
     
+    from app.utils.helpers import escape_html
+
     content = data.get('content', '').strip()
+    # Escape message content server-side to reduce XSS risks (clients should still render as text)
+    content = escape_html(content)
     group_id = data.get('group_id')
     attachments = data.get('attachments', [])
     reply_to = data.get('reply_to')

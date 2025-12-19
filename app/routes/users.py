@@ -58,8 +58,10 @@ def search_users():
             '$and': [
                 {'_id': {'$ne': ObjectId(g.user_id)}},
                 {'$or': [
-                    {'username': {'$regex': query, '$options': 'i'}},
-                    {'full_name': {'$regex': query, '$options': 'i'}}
+                    {
+                    'username': {'$regex': __import__('re').escape(query), '$options': 'i'}
+                },
+                    {'full_name': {'$regex': __import__('re').escape(query), '$options': 'i'}}
                 ]}
             ]
         }, limit=20))

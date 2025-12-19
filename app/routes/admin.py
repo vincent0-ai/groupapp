@@ -35,10 +35,11 @@ def get_users():
     
     query = {}
     if search:
+        esc = __import__('re').escape(search)
         query['$or'] = [
-            {'username': {'$regex': search, '$options': 'i'}},
-            {'email': {'$regex': search, '$options': 'i'}},
-            {'full_name': {'$regex': search, '$options': 'i'}}
+            {'username': {'$regex': esc, '$options': 'i'}},
+            {'email': {'$regex': esc, '$options': 'i'}},
+            {'full_name': {'$regex': esc, '$options': 'i'}}
         ]
     
     db = Database()

@@ -160,6 +160,13 @@ def upload_file():
     minio_client = MinioClient()
     
     content_type = file.content_type or 'application/octet-stream'
+    # Basic content validation for common types (reduce upload of mismatched content)
+    ext = original_filename.rsplit('.', 1)[1].lower()
+    image_exts = {'jpg','jpeg','png','gif'}
+    if ext in image_exts and not content_type.startswith('image/'):
+        os.remove(temp_path)
+        return error_response('File content-type does not match image extension', 400)
+
     success = minio_client.upload_file(temp_path, minio_path, content_type)
     
     # Clean up temporary file
