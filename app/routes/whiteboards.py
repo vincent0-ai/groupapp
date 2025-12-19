@@ -9,6 +9,7 @@ from flask import current_app
 from datetime import datetime
 import os
 from werkzeug.utils import secure_filename
+import uuid
 from app.utils import MinioClient
 from app.models import File
 
@@ -198,18 +199,31 @@ def upload_audio(wb_id):
     group = db.find_one('groups', {'_id': group_id}) if group_id else None
     if group and ObjectId(g.user_id) not in group.get('members', []):
         return error_response('You are not a member of this group', 403)
-    filename = secure_filename(f.filename)
-    temp_path = os.path.join(current_app.config['UPLOAD_FOLDER'], filename)
+    original_filename = secure_filename(f.filename)
+    ext = original_filename.rsplit('.', 1)[1].lower() if '.' in original_filename else ''
+    unique_filename = f"{uuid.uuid4().hex}.{ext}" if ext else uuid.uuid4().hex
+    temp_path = os.path.join(current_app.config['UPLOAD_FOLDER'], unique_filename)
     os.makedirs(current_app.config['UPLOAD_FOLDER'], exist_ok=True)
     f.save(temp_path)
-    minio_path = f"whiteboards/{wb_id}/audio/{filename}"
+
+    # File size check
+    file_size = os.path.getsize(temp_path)
+    max_len = current_app.config.get('MAX_CONTENT_LENGTH') or 0
+    if max_len and file_size > max_len:
+        os.remove(temp_path)
+        return error_response('File too large', 413)
+
+    minio_path = f"whiteboards/{wb_id}/audio/{unique_filename}"
     minio_client = MinioClient()
     success = minio_client.upload_file(temp_path, minio_path, content_type=f.content_type or 'audio/webm')
     os.remove(temp_path)
     if not success:
         return error_response('Failed to upload audio', 500)
     # Create file doc
-    file_doc = File.create_file_doc(filename, ext, g.user_id, str(group_id) if group_id else None, minio_path=minio_path)
+    file_doc = File.create_file_doc(original_filename, ext, g.user_id, str(group_id) if group_id else None, minio_path=minio_path)
+    file_doc['stored_filename'] = unique_filename
+    file_doc['original_filename'] = original_filename
+    file_doc['file_size'] = file_size
     file_id = db.insert_one('files', file_doc)
     if not file_id:
         return error_response('Failed to save audio metadata', 500)

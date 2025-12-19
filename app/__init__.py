@@ -22,15 +22,39 @@ def create_app(config_name='development'):
     app = Flask(__name__, template_folder='../templates', static_folder='../static')
     app.config.from_object(config[config_name])
 
-    CORS(app, resources={r"/api/*": {"origins": "*"}})
-    socketio = SocketIO(app, cors_allowed_origins="*")
+    # Configure session cookie security
+    app.config['SESSION_COOKIE_HTTPONLY'] = True
+    app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
+    app.config['SESSION_COOKIE_SECURE'] = not app.config.get('DEBUG', False)
+
+    # Configure CORS and Socket.IO allowed origins from config (avoid '*' in production)
+    cors_origins = app.config.get('CORS_ALLOWED_ORIGINS')
+    if cors_origins:
+        CORS(app, resources={r"/api/*": {"origins": cors_origins}})
+    else:
+        # Fall back to default CORS (restrictive)
+        CORS(app)
+
+    socketio = SocketIO(app, cors_allowed_origins=app.config.get('SOCKETIO_CORS_ALLOWED_ORIGINS'))
     app.socketio = socketio
 
+    # Initialize rate limiter with storage configured from app config
+    limiter.storage_uri = app.config['LIMITER_STORAGE_URI']
     limiter.init_app(app)
     limiter.limit(app.config['DEFAULT_RATE_LIMITS'])
-    limiter.storage_uri = app.config['LIMITER_STORAGE_URI']
 
     os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
+
+    @app.after_request
+    def set_security_headers(response):
+        # Common security headers
+        response.headers.setdefault('X-Content-Type-Options', 'nosniff')
+        response.headers.setdefault('X-Frame-Options', 'DENY')
+        response.headers.setdefault('Referrer-Policy', 'no-referrer-when-downgrade')
+        # HSTS only in non-debug (i.e., production)
+        if not app.debug:
+            response.headers.setdefault('Strict-Transport-Security', 'max-age=63072000; includeSubDomains; preload')
+        return response
 
     from app.routes.auth import auth_bp
     from app.routes.groups import groups_bp
@@ -850,6 +874,13 @@ def create_app(config_name='development'):
     
     # Start the background task for session timers
     socketio.start_background_task(target=check_session_timers, app=app, socketio=socketio)
-    
+
+    # Production sanity checks
+    if not app.config.get('DEBUG', False):
+        if not app.config.get('SECRET_KEY') or not app.config.get('JWT_SECRET_KEY'):
+            raise RuntimeError("In production, SECRET_KEY and JWT_SECRET_KEY must be set and not use default values.")
+        if app.config.get('CORS_ALLOWED_ORIGINS') == '*' or app.config.get('SOCKETIO_CORS_ALLOWED_ORIGINS') == '*':
+            raise RuntimeError("In production, CORS origins must be restricted; do not set '*' for origins.")
+
     return app, socketio
 

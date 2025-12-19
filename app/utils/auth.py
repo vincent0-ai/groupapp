@@ -8,7 +8,8 @@ from bson import ObjectId
 
 def hash_password(password: str) -> str:
     """Hash a password using bcrypt"""
-    salt = bcrypt.gensalt(rounds=10)
+    rounds = current_app.config.get('BCRYPT_ROUNDS', 12)
+    salt = bcrypt.gensalt(rounds=rounds)
     return bcrypt.hashpw(password.encode('utf-8'), salt).decode('utf-8')
 
 def verify_password(password: str, password_hash: str) -> bool:

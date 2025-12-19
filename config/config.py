@@ -3,11 +3,13 @@ from datetime import timedelta
 
 class Config:
     """Base configuration"""
-    SECRET_KEY = os.getenv('SECRET_KEY', 'dev-secret-key')
-    JWT_SECRET_KEY = os.getenv('JWT_SECRET_KEY', 'jwt-secret-key')
+    # Do not provide production secret defaults here. Production MUST set these env vars.
+    SECRET_KEY = os.getenv('SECRET_KEY')
+    JWT_SECRET_KEY = os.getenv('JWT_SECRET_KEY')
     JWT_ALGORITHM = os.getenv('JWT_ALGORITHM', 'HS256')
     JWT_ACCESS_TOKEN_EXPIRES = timedelta(hours=3)
-    
+    BCRYPT_ROUNDS = int(os.getenv('BCRYPT_ROUNDS', '12'))
+
     # MongoDB
     MONGODB_URI = os.getenv('MONGODB_URI', 'mongodb://localhost:27017/Discussio')
     MONGODB_DATABASE = os.getenv('MONGODB_DATABASE', 'Discussio')
@@ -22,18 +24,18 @@ class Config:
     # MinIO
     MINIO_ENDPOINT = os.getenv('MINIO_ENDPOINT', 'localhost:9000')
     MINIO_ROOT_USER = os.getenv('MINIO_ROOT_USER', 'minioadmin')
-    MINIO_ROOT_PASSWORD = os.getenv('MINIO_ROOT_PASSWORD', 'minioadmin')
+    MINIO_ROOT_PASSWORD = os.getenv('MINIO_ROOT_PASSWORD')
     MINIO_BUCKET = os.getenv('MINIO_BUCKET', 'Discussio')
     MINIO_USE_SSL = os.getenv('MINIO_USE_SSL', 'False') == 'True'
 
     # LiveKit
     LIVEKIT_URL = os.getenv('LIVEKIT_URL', 'http://localhost:7880')
-    LIVEKIT_API_KEY = os.getenv('LIVEKIT_API_KEY', '')
-    LIVEKIT_API_SECRET = os.getenv('LIVEKIT_API_SECRET', '')
+    LIVEKIT_API_KEY = os.getenv('LIVEKIT_API_KEY')
+    LIVEKIT_API_SECRET = os.getenv('LIVEKIT_API_SECRET')
     
     # Meilisearch
     MEILISEARCH_URL = os.getenv('MEILISEARCH_URL', 'http://localhost:7700')
-    MEILISEARCH_API_KEY = os.getenv('MEILISEARCH_API_KEY', 'masterKey')
+    MEILISEARCH_API_KEY = os.getenv('MEILISEARCH_API_KEY')
     
     # App
     APP_URL = os.getenv('APP_URL', 'http://localhost:5000')
@@ -41,8 +43,9 @@ class Config:
     UPLOAD_FOLDER = 'uploads'
     MAX_PARTICIPANTS_PER_ROOM = int(os.getenv('MAX_PARTICIPANTS_PER_ROOM', '10'))
     
-    # Flask-SocketIO
-    SOCKETIO_CORS_ALLOWED_ORIGINS = '*'
+    # CORS / SocketIO allowed origins (set via env in production)
+    CORS_ALLOWED_ORIGINS = os.getenv('CORS_ALLOWED_ORIGINS', 'http://localhost:5000')
+    SOCKETIO_CORS_ALLOWED_ORIGINS = os.getenv('SOCKETIO_CORS_ALLOWED_ORIGINS', 'http://localhost:5000')
 
     # Gamification Points
     POINTS_CONFIG = {
@@ -56,6 +59,12 @@ class DevelopmentConfig(Config):
     """Development configuration"""
     DEBUG = True
     TESTING = False
+    # Provide convenient defaults for development (NOT for production)
+    SECRET_KEY = os.getenv('SECRET_KEY', 'dev-secret-key')
+    JWT_SECRET_KEY = os.getenv('JWT_SECRET_KEY', 'jwt-secret-key')
+    MINIO_ROOT_PASSWORD = os.getenv('MINIO_ROOT_PASSWORD', 'minioadmin')
+    MEILISEARCH_API_KEY = os.getenv('MEILISEARCH_API_KEY', 'masterKey')
+
 
 class ProductionConfig(Config):
     """Production configuration"""
@@ -67,6 +76,10 @@ class TestingConfig(Config):
     DEBUG = True
     TESTING = True
     MONGODB_DATABASE = 'Discussio_test'
+    # Keep predictable test keys
+    SECRET_KEY = os.getenv('SECRET_KEY', 'dev-secret-key')
+    JWT_SECRET_KEY = os.getenv('JWT_SECRET_KEY', 'jwt-secret-key')
+
 
 config = {
     'development': DevelopmentConfig,

@@ -12,6 +12,7 @@ from flask import current_app
 from datetime import datetime
 import os
 from werkzeug.utils import secure_filename
+import uuid
 
 files_bp = Blueprint('files', __name__, url_prefix='/api/files')
 
@@ -136,20 +137,26 @@ def upload_file():
     if user_id_obj not in group['members']:
         return error_response('You are not a member of this group', 403)
     
-    # Save file temporarily
-    filename = secure_filename(file.filename)
-    temp_path = os.path.join(current_app.config['UPLOAD_FOLDER'], filename)
+    # Save file temporarily using a unique filename to avoid collisions
+    original_filename = secure_filename(file.filename)
+    ext = original_filename.rsplit('.', 1)[1].lower()
+    unique_filename = f"{uuid.uuid4().hex}.{ext}"
+    temp_path = os.path.join(current_app.config['UPLOAD_FOLDER'], unique_filename)
     
     # Create upload folder if it doesn't exist
     os.makedirs(current_app.config['UPLOAD_FOLDER'], exist_ok=True)
     
     file.save(temp_path)
     
-    # Get file size before any operations
+    # Get file size before any operations and enforce MAX_CONTENT_LENGTH
     file_size = os.path.getsize(temp_path)
+    max_len = current_app.config.get('MAX_CONTENT_LENGTH') or 0
+    if max_len and file_size > max_len:
+        os.remove(temp_path)
+        return error_response('File too large', 413)
     
-    # Upload to MinIO
-    minio_path = f"groups/{group_id}/{filename}"
+    # Upload to MinIO using unique name but preserve original filename in metadata
+    minio_path = f"groups/{group_id}/{unique_filename}"
     minio_client = MinioClient()
     
     content_type = file.content_type or 'application/octet-stream'
@@ -161,11 +168,13 @@ def upload_file():
     if not success:
         return error_response('Failed to upload file', 500)
     
-    # Create file document
+    # Create file document (store original filename and stored filename separately)
     file_doc = File.create_file_doc(
-        filename, file.filename.rsplit('.', 1)[1].lower(), g.user_id,
+        original_filename, ext, g.user_id,
         group_id, channel_id, minio_path=minio_path
     )
+    file_doc['stored_filename'] = unique_filename
+    file_doc['original_filename'] = original_filename
     file_doc['file_size'] = file_size
     file_doc['mime_type'] = content_type
     
