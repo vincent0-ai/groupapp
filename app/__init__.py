@@ -76,6 +76,11 @@ def create_app(config_name='development'):
     def auth_page():
         """Serve auth page"""
         return render_template('auth.html', google_client_id=os.environ.get('GOOGLE_CLIENT_ID'))
+
+    @app.route('/reset-password')
+    def reset_password_page():
+        """Serve password reset page"""
+        return render_template('reset_password.html')
     
     @app.route('/admin')
     def admin_page():

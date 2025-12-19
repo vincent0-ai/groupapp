@@ -51,10 +51,6 @@ def send_verification_email(to_email, token, return_error=False):
         verify_url = url_for('auth.verify_email', token=token, email=to_email, _external=True)
     
     if not smtp_user or not smtp_password:
-        print(f"============================================")
-        print(f"EMAIL VERIFICATION for {to_email}")
-        print(f"Link: {verify_url}")
-        print(f"============================================")
         if return_error:
             return False, 'missing_credentials', True
         return False
@@ -322,6 +318,227 @@ def verify_email(token):
         print(f"Failed to build auth_page url: {e}")
         fallback = current_app.config.get('APP_URL', '/') + '/auth?verified=true'
         return redirect(fallback)
+
+
+# =========================
+# PASSWORD RESET FLOW
+# =========================
+from datetime import timedelta
+
+
+def send_password_reset_email(to_email, token, return_error=False):
+    """Send a password reset email.
+
+    Works like send_verification_email in terms of return value semantics.
+    """
+    smtp_server = os.environ.get("SMTP_SERVER", "smtp.gmail.com")
+    smtp_port = int(os.environ.get("SMTP_PORT", 465))
+    smtp_user = os.environ.get("SMTP_USER")
+    smtp_password = os.environ.get("SMTP_PASSWORD")
+    
+    # Build reset URL. Prefer APP_URL config to preserve correct scheme.
+    app_url = current_app.config.get('APP_URL') if current_app else None
+    if app_url:
+        path = url_for('reset_password_page', _external=False)
+        reset_url = app_url.rstrip('/') + path + f"?token={token}&email={to_email}"
+    else:
+        reset_url = url_for('reset_password_page', token=token, email=to_email, _external=True)
+
+    if not smtp_user or not smtp_password:
+        if return_error:
+            return False, 'missing_credentials', True
+        return False
+
+    msg = MIMEMultipart()
+    msg["From"] = smtp_user
+    msg["To"] = to_email
+    msg["Subject"] = "Reset your password - Discussio"
+
+    body = f"""
+    <h3>Password reset requested</h3>
+    <p>Click the button below to reset your password. This link will expire in 1 hour.</p>
+    <a href="{reset_url}" style="padding: 10px 20px; background-color: #4F46E5; color: white; text-decoration: none; border-radius: 5px;">Reset Password</a>
+    <p>Or copy this link: {reset_url}</p>
+    """
+    msg.attach(MIMEText(body, "html"))
+
+    try:
+        if smtp_port == 465:
+            server = smtplib.SMTP_SSL(smtp_server, smtp_port)
+        else:
+            server = smtplib.SMTP(smtp_server, smtp_port)
+            server.starttls()
+            
+        server.login(smtp_user, smtp_password)
+        server.send_message(msg)
+        server.quit()
+        if return_error:
+            return True, None, False
+        return True
+    except smtplib.SMTPAuthenticationError as e:
+        print(f"Failed to send reset email (auth): {e}")
+        if return_error:
+            return False, 'auth_error', True
+        return False
+    except Exception as e:
+        print(f"Failed to send reset email: {e}")
+        if return_error:
+            return False, str(e), False
+        return False
+
+
+def _reset_email_retry_worker(to_email, token, max_attempts: int = 3, initial_delay: int = 5, backoff_factor: int = 2):
+    attempt = 1
+    delay = initial_delay
+    while attempt <= max_attempts:
+        print(f"Reset email retry attempt {attempt}/{max_attempts} for {to_email}")
+        success, err, fatal = send_password_reset_email(to_email, token, return_error=True)
+        if success:
+            print(f"Reset email sent to {to_email} on retry attempt {attempt}.")
+            return True
+        if fatal:
+            print(f"Fatal reset email error for {to_email}: {err}. Aborting retries.")
+            return False
+        if attempt == max_attempts:
+            print(f"Reached max reset email retry attempts for {to_email}. Giving up.")
+            return False
+        print(f"Transient reset email error for {to_email}: {err}. Sleeping {delay}s before next attempt.")
+        time.sleep(delay)
+        delay *= backoff_factor
+        attempt += 1
+    return False
+
+
+def schedule_password_reset_email_retry(to_email, token, max_attempts: int = 3):
+    try:
+        if current_app and hasattr(current_app, 'socketio'):
+            current_app.socketio.start_background_task(_reset_email_retry_worker, to_email, token, max_attempts)
+            return True
+    except Exception as e:
+        print(f"Failed to start background task via socketio for reset email: {e}")
+
+    try:
+        import threading
+        t = threading.Thread(target=_reset_email_retry_worker, args=(to_email, token, max_attempts), daemon=True)
+        t.start()
+        return True
+    except Exception as e:
+        print(f"Failed to start background thread for reset email retries: {e}")
+        return False
+
+
+@auth_bp.route('/forgot-password', methods=['POST'])
+@limiter.limit('5 per hour')
+def forgot_password():
+    data = request.get_json() or {}
+    email = data.get('email', '').strip().lower()
+
+    # Always return success to avoid disclosing whether an email exists
+    db = Database()
+    user = db.find_one('users', {'email': email}) if email else None
+
+    if user:
+        token = secrets.token_urlsafe(32)
+        expires = datetime.utcnow() + timedelta(hours=1)
+        # Store token and expiry
+        db.update_one('users', {'_id': user['_id']}, {'$set': {'password_reset_token': token, 'password_reset_expires': expires}} , raw=True)
+
+        # Attempt to send email and schedule retries on transient failures
+        sent, err, fatal = send_password_reset_email(email, token, return_error=True)
+        if not sent:
+            if not fatal:
+                try:
+                    schedule_password_reset_email_retry(email, token)
+                    retry_scheduled = True
+                except Exception as e:
+                    print(f"Failed to schedule reset email retry worker: {e}")
+                    retry_scheduled = False
+            else:
+                retry_scheduled = False
+
+            # In DEBUG expose link for local testing
+            data = {'email_sent': False, 'retry_scheduled': retry_scheduled}
+            if current_app and current_app.config.get('DEBUG', False):
+                app_url = current_app.config.get('APP_URL') if current_app else None
+                if app_url:
+                    data['reset_link'] = app_url.rstrip('/') + url_for('reset_password_page', _external=False) + f'?token={token}&email={email}'
+                else:
+                    data['reset_link'] = url_for('reset_password_page', token=token, email=email, _external=True)
+                data['error'] = err
+
+            return success_response(data, "If an account with that email exists, you'll receive a reset link shortly.")
+
+    return success_response({'email_sent': True}, "If an account with that email exists, you'll receive a reset link shortly.")
+
+
+@auth_bp.route('/validate-reset-token', methods=['POST'])
+def validate_reset_token():
+    data = request.get_json() or {}
+    token = data.get('token')
+
+    if not token:
+        return error_response('Missing token', 400)
+
+    db = Database()
+    user = db.find_one('users', {'password_reset_token': token})
+    if not user:
+        return error_response('Invalid token', 400)
+
+    expires = user.get('password_reset_expires')
+    if not expires or (isinstance(expires, str) and not expires) :
+        return error_response('Invalid token', 400)
+
+    # If expires stored as datetime or string, compare correctly
+    try:
+        if isinstance(expires, str):
+            # Try parsing ISO format
+            expires_dt = datetime.fromisoformat(expires)
+        else:
+            expires_dt = expires
+    except Exception:
+        expires_dt = expires
+
+    if expires_dt < datetime.utcnow():
+        return error_response('Token expired', 400)
+
+    return success_response({}, 'Token valid')
+
+
+@auth_bp.route('/reset-password', methods=['POST'])
+@limiter.limit('10 per hour')
+def reset_password():
+    data = request.get_json() or {}
+    token = data.get('token')
+    password = data.get('password', '').strip()
+
+    if not token or not password:
+        return error_response('Missing token or password', 400)
+
+    if len(password) < 8:
+        return error_response('Password must be at least 8 characters', 400)
+
+    db = Database()
+    user = db.find_one('users', {'password_reset_token': token})
+    if not user:
+        return error_response('Invalid token', 400)
+
+    expires = user.get('password_reset_expires')
+    try:
+        if isinstance(expires, str):
+            from dateutil import parser
+            expires_dt = parser.isoparse(expires)
+        else:
+            expires_dt = expires
+    except Exception:
+        expires_dt = expires
+
+    if expires_dt < datetime.utcnow():
+        return error_response('Token expired', 400)
+
+    # Update password and remove token fields
+    db.update_one('users', {'_id': user['_id']}, {"$set": {'password_hash': hash_password(password), 'last_password_reset': datetime.utcnow()}, "$unset": {'password_reset_token': '', 'password_reset_expires': ''}}, raw=True)
+
+    return success_response({}, 'Password reset successful')
 
 
 @auth_bp.route("/google", methods=["GET", "POST"])
