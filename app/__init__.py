@@ -71,6 +71,7 @@ def create_app(config_name='development'):
     from app.routes.admin import admin_bp
     from app.routes.notifications import notifications_bp
     from app.routes.dm import dm_bp
+    from app.routes.arguments import arguments_bp
     
     app.register_blueprint(auth_bp)
     app.register_blueprint(groups_bp)
@@ -82,6 +83,7 @@ def create_app(config_name='development'):
     app.register_blueprint(admin_bp)
     app.register_blueprint(notifications_bp)
     app.register_blueprint(dm_bp)
+    app.register_blueprint(arguments_bp)
     
     # Serve service worker from root with proper scope header
     @app.route('/service-worker.js')

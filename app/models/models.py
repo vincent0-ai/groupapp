@@ -100,6 +100,37 @@ class Message:
             'is_pinned': False
         }
 
+class Argument:
+    """Threaded Argument node model for MongoDB
+
+    A node represents a Claim, Evidence, or Counter-argument tied to a group and
+    optionally to a message (discussion) or another argument node.
+    """
+
+    VALID_TYPES = ('claim', 'evidence', 'counter')
+
+    @staticmethod
+    def create_argument_doc(node_type: str, content: str, author_id: str,
+                            group_id: str, message_id: Optional[str] = None,
+                            parent_id: Optional[str] = None, metadata: Dict = None) -> Dict:
+        """Create a new argument node document"""
+        if node_type not in Argument.VALID_TYPES:
+            raise ValueError('Invalid node_type')
+
+        return {
+            '_id': ObjectId(),
+            'node_type': node_type,
+            'content': content,
+            'author_id': ObjectId(author_id),
+            'group_id': ObjectId(group_id),
+            'message_id': ObjectId(message_id) if message_id else None,
+            'parent_id': ObjectId(parent_id) if parent_id else None,
+            'metadata': metadata or {},
+            'reactions': {},
+            'created_at': datetime.utcnow(),
+            'updated_at': datetime.utcnow()
+        }
+
 class Whiteboard:
     """Whiteboard session model"""
     
