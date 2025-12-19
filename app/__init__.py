@@ -71,8 +71,8 @@ def create_app(config_name='development'):
     from app.routes.admin import admin_bp
     from app.routes.notifications import notifications_bp
     from app.routes.dm import dm_bp
-    from app.routes.arguments import arguments_bp
     from app.routes.streaks import streaks_bp
+    from app.routes.groups_leaderboard import leaderboard_bp
     
     app.register_blueprint(auth_bp)
     app.register_blueprint(groups_bp)
@@ -84,8 +84,8 @@ def create_app(config_name='development'):
     app.register_blueprint(admin_bp)
     app.register_blueprint(notifications_bp)
     app.register_blueprint(dm_bp)
-    app.register_blueprint(arguments_bp)
     app.register_blueprint(streaks_bp)
+    app.register_blueprint(leaderboard_bp)
     
     # Serve service worker from root with proper scope header
     @app.route('/service-worker.js')
@@ -942,19 +942,15 @@ def create_app(config_name='development'):
                                 calc = int(max(1, round(total_members * min_percent)))
                                 threshold = max(min_abs, calc)
 
-                            # Compute active users in last 24 hours from messages and arguments
+                            # Compute active users in last 24 hours from messages (and other participation signals in the future)
                             active_user_ids = set()
                             msgs = db.find('messages', {'group_id': group_id, 'created_at': {'$gt': start_window}})
                             for m in msgs:
                                 uid = m.get('user_id')
                                 if uid:
                                     active_user_ids.add(str(uid))
-                            args = db.find('arguments', {'group_id': group_id, 'created_at': {'$gt': start_window}})
-                            for a in args:
-                                aid = a.get('author_id')
-                                if aid:
-                                    active_user_ids.add(str(aid))
 
+                            # Potential future signals: competitions participation, insights, etc.
                             active_count = len(active_user_ids)
 
                             today_str = now.date().isoformat()

@@ -445,8 +445,8 @@
                 });
                 const groupsData = await groupsRes.json();
                 
-                // Load leaderboard
-                const leaderboardRes = await fetch('/api/users/leaderboard', {
+                // Load groups leaderboard (show top groups by streak/activity)
+                const leaderboardRes = await fetch('/api/groups/leaderboard', {
                     headers: { 'Authorization': `Bearer ${token}` }
                 });
                 const leaderboardData = await leaderboardRes.json();
@@ -487,15 +487,16 @@
                 `).join('') || '<p class="text-muted text-center py-3">No groups yet</p>';
                 document.getElementById('recentGroups').innerHTML = groupsHtml || '<p class="text-muted text-center py-3">No groups yet</p>';
 
-                // Update top performers
-                const leaderboard = leaderboardData.data?.leaderboard || [];
-                const performersHtml = leaderboard.slice(0, 3).map((u, i) => `
+                // Update top groups (show streaks and recent activity)
+                const groupsLeaderboard = leaderboardData.data?.groups || [];
+                const performersHtml = groupsLeaderboard.slice(0, 3).map((g, i) => `
                     <div class="performer-item">
                         <div class="performer-rank ${['gold', 'silver', 'bronze'][i]}">${i + 1}</div>
                         <div class="flex-grow-1">
-                            <div class="fw-semibold" style="color: var(--text-dark);">${u.username}</div>
-                            <div class="small text-muted">${u.points || 0} points</div>
+                            <div class="fw-semibold" style="color: var(--text-dark);">${g.name}</div>
+                            <div class="small text-muted">${g.member_count || 0} members • ${g.activity || 0} msgs</div>
                         </div>
+                        <div class="ms-2 align-self-center"><span class="badge bg-warning text-dark">🔥 ${g.streak_count || 0}d</span></div>
                     </div>
                 `).join('') || '<p class="text-muted text-center py-3">No data available</p>';
                 document.getElementById('topPerformers').innerHTML = performersHtml || '<p class="text-muted text-center py-3">No data available</p>';

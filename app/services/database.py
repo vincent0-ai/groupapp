@@ -39,18 +39,7 @@ class Database:
         self.db.messages.create_index('group_id')
         self.db.messages.create_index([('created_at', DESCENDING)])
 
-        # Arguments (threaded discussion nodes) indexes
-        self.db.arguments.create_index('group_id')
-        self.db.arguments.create_index('message_id')
-        self.db.arguments.create_index('parent_id')
-        self.db.arguments.create_index('author_id')
-        self.db.arguments.create_index([('created_at', DESCENDING)])
-        # Compound index for quick group/message retrieval
-        try:
-            self.db.arguments.create_index([('group_id', ASCENDING), ('message_id', ASCENDING)])
-        except Exception:
-            # Best-effort: if index creation fails, continue gracefully
-            pass
+
         
         # Channel (categories) indexes
         # Deduplicate existing channels by name to allow creating a unique index

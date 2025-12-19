@@ -444,12 +444,16 @@ def create_channel(group_id):
 @groups_bp.route('/channels', methods=['GET'])
 @require_auth
 def list_channels():
-    """List all channels (categories) and groups under each channel"""
+    """List all channels (categories) and groups under each channel. Groups within each
+    channel are sorted by recent activity (messages in last 7 days)."""
+    from datetime import datetime, timedelta
     db = Database()
     user_id_obj = ObjectId(g.user_id)
 
     channels = list(db.find('channels', {}))
     result = []
+
+    cutoff = datetime.utcnow() - timedelta(days=7)
 
     for ch in channels:
         # List all groups in the channel so users can find private ones
@@ -459,6 +463,13 @@ def list_channels():
             group['id'] = str(group['_id'])
             group['is_member'] = user_id_obj in group.get('members', [])
             group['is_pending'] = user_id_obj in group.get('pending_members', [])
+            # Compute activity (messages in last 7 days)
+            try:
+                group['activity'] = db.count('messages', {'group_id': group['_id'], 'created_at': {'$gt': cutoff}})
+            except Exception:
+                group['activity'] = 0
+        # Sort groups by activity descending
+        groups.sort(key=lambda x: x.get('activity', 0), reverse=True)
         ch['group_count'] = len(groups)
         ch['groups'] = [serialize_document(g) for g in groups]
         ch['id'] = str(ch['_id'])
