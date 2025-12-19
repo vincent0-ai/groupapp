@@ -55,6 +55,12 @@ class Config:
         'JOIN_COMPETITION': 3
     }
 
+    # Group Streaks
+    GROUP_STREAK_MIN_PERCENT = float(os.getenv('GROUP_STREAK_MIN_PERCENT', '0.2'))  # fraction of members
+    GROUP_STREAK_MIN_ABSOLUTE = int(os.getenv('GROUP_STREAK_MIN_ABSOLUTE', '2'))
+    GROUP_STREAK_CHECK_INTERVAL_SECONDS = int(os.getenv('GROUP_STREAK_CHECK_INTERVAL_SECONDS', '3600'))
+
+
 class DevelopmentConfig(Config):
     """Development configuration"""
     DEBUG = True

@@ -84,6 +84,13 @@ class Database:
         self.db.competitions.create_index('group_ids')
         self.db.competitions.create_index('created_by')
         self.db.competitions.create_index('start_time')
+
+        # Group streaks
+        try:
+            self.db.group_streaks.create_index('group_id', unique=True)
+            self.db.group_streaks.create_index([('updated_at', DESCENDING)])
+        except Exception:
+            pass
         
         # Files indexes
         self.db.files.create_index('uploaded_by')

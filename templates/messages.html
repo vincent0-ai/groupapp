@@ -901,17 +901,35 @@
                     headers: { 'Authorization': `Bearer ${token}` }
                 }).catch(err => console.warn('Failed to mark messages as read:', err));
                 
-                // Pre-fetch argument counts for messages in this group (helps show counts beside View Thread)
+                // Pre-fetch argument counts and top summaries for messages in this group
                 let argCounts = {};
+                let argSummaries = {}; // { messageId: { total, top_claim, top_evidence } }
                 try {
                     const argsRes = await fetch(`/api/arguments?group_id=${currentGroupId}`, { headers: { 'Authorization': `Bearer ${token}` } });
                     if (argsRes.ok) {
                         const argsData = await argsRes.json();
                         const allArgs = argsData.data?.arguments || [];
+                        // Group by message_id
+                        const grouped = {};
                         allArgs.forEach(a => {
                             const mid = a.message_id || '';
-                            if (!argCounts[mid]) argCounts[mid] = 0;
-                            argCounts[mid]++;
+                            if (!grouped[mid]) grouped[mid] = [];
+                            grouped[mid].push(a);
+                        });
+
+                        // Build counts and pick top claim/evidence by most recent created_at
+                        Object.keys(grouped).forEach(mid => {
+                            const list = grouped[mid];
+                            argCounts[mid] = list.length;
+
+                            // pick most recent claim and evidence
+                            const claims = list.filter(x => x.node_type === 'claim').sort((a,b) => new Date(b.created_at) - new Date(a.created_at));
+                            const evidence = list.filter(x => x.node_type === 'evidence').sort((a,b) => new Date(b.created_at) - new Date(a.created_at));
+                            argSummaries[mid] = {
+                                total: list.length,
+                                top_claim: claims.length ? claims[0] : null,
+                                top_evidence: evidence.length ? evidence[0] : null
+                            };
                         });
                     }
                 } catch (err) {
@@ -1004,6 +1022,11 @@
                                     </div>
                                     <p class="mb-0 message-content">${formattedContent}</p>
                                     ${renderReactions(m)}
+                                </div>
+                                <div class="mt-1 small text-muted argument-summary" style="max-width:85%;">
+                                    ${argSummaries[m._id] && argSummaries[m._id].top_claim ? `<div><strong>Claim:</strong> ${truncate(argSummaries[m._id].top_claim.content, 120)}</div>` : ''}
+                                    ${argSummaries[m._id] && argSummaries[m._id].top_evidence ? `<div><strong>Evidence:</strong> ${truncate(argSummaries[m._id].top_evidence.content, 120)}</div>` : ''}
+                                </div>
                                 </div>
                                 <div id="thread-${m._id}" class="mt-2 thread-container" style="display:none; max-width: 85%;"></div>
                                 <small class="text-muted mt-1" style="font-size: 0.7rem;">
