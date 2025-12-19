@@ -72,6 +72,7 @@ def create_app(config_name='development'):
     from app.routes.notifications import notifications_bp
     from app.routes.dm import dm_bp
     from app.routes.arguments import arguments_bp
+    from app.routes.streaks import streaks_bp
     
     app.register_blueprint(auth_bp)
     app.register_blueprint(groups_bp)
@@ -84,6 +85,7 @@ def create_app(config_name='development'):
     app.register_blueprint(notifications_bp)
     app.register_blueprint(dm_bp)
     app.register_blueprint(arguments_bp)
+    app.register_blueprint(streaks_bp)
     
     # Serve service worker from root with proper scope header
     @app.route('/service-worker.js')
@@ -911,6 +913,92 @@ def create_app(config_name='development'):
     
     # Start the background task for session timers
     socketio.start_background_task(target=check_session_timers, app=app, socketio=socketio)
+
+    def check_group_streaks(app):
+        """Background checker to update group streaks daily (or every configured interval)."""
+        with app.app_context():
+            from datetime import timedelta
+            while True:
+                try:
+                    now = datetime.utcnow()
+                    start_window = now - timedelta(days=1)
+                    db = Database()
+                    groups = list(db.find('groups', {}))
+                    for group in groups:
+                        try:
+                            group_id = group['_id']
+                            members = group.get('members', [])
+                            total_members = len(members)
+                            if total_members == 0:
+                                continue
+
+                            # Determine threshold
+                            gs = db.find_one('group_streaks', {'group_id': group_id})
+                            if gs and gs.get('threshold'):
+                                threshold = gs['threshold']
+                            else:
+                                min_percent = app.config.get('GROUP_STREAK_MIN_PERCENT', 0.2)
+                                min_abs = app.config.get('GROUP_STREAK_MIN_ABSOLUTE', 2)
+                                calc = int(max(1, round(total_members * min_percent)))
+                                threshold = max(min_abs, calc)
+
+                            # Compute active users in last 24 hours from messages and arguments
+                            active_user_ids = set()
+                            msgs = db.find('messages', {'group_id': group_id, 'created_at': {'$gt': start_window}})
+                            for m in msgs:
+                                uid = m.get('user_id')
+                                if uid:
+                                    active_user_ids.add(str(uid))
+                            args = db.find('arguments', {'group_id': group_id, 'created_at': {'$gt': start_window}})
+                            for a in args:
+                                aid = a.get('author_id')
+                                if aid:
+                                    active_user_ids.add(str(aid))
+
+                            active_count = len(active_user_ids)
+
+                            today_str = now.date().isoformat()
+                            yesterday_str = (now.date() - timedelta(days=1)).isoformat()
+
+                            if active_count >= threshold:
+                                # increment or set streak
+                                if not gs:
+                                    db.insert_one('group_streaks', {
+                                        '_id': ObjectId(),
+                                        'group_id': group_id,
+                                        'streak_count': 1,
+                                        'last_active_day': today_str,
+                                        'threshold': None,
+                                        'min_percent': None,
+                                        'created_at': now,
+                                        'updated_at': now
+                                    })
+                                else:
+                                    last_day = gs.get('last_active_day')
+                                    if last_day == today_str:
+                                        # already updated today
+                                        pass
+                                    else:
+                                        if last_day == yesterday_str:
+                                            db.update_one('group_streaks', {'_id': gs['_id']}, {'streak_count': gs.get('streak_count', 0) + 1, 'last_active_day': today_str, 'updated_at': now})
+                                        else:
+                                            db.update_one('group_streaks', {'_id': gs['_id']}, {'streak_count': 1, 'last_active_day': today_str, 'updated_at': now})
+                            else:
+                                # streak broken -> reset to 0 and clear last_active_day
+                                if gs and gs.get('streak_count', 0) > 0:
+                                    db.update_one('group_streaks', {'_id': gs['_id']}, {'streak_count': 0, 'last_active_day': None, 'updated_at': now})
+
+                        except Exception as e:
+                            print(f"Error processing group streak for {group.get('_id')}: {e}")
+                except Exception as e:
+                    print(f"Error in group streak checker: {e}")
+
+                # Sleep until next iteration
+                import time
+                interval = app.config.get('GROUP_STREAK_CHECK_INTERVAL_SECONDS', 3600)
+                time.sleep(interval)
+
+    socketio.start_background_task(target=check_group_streaks, app=app)
 
     # Production sanity checks
     if not app.config.get('DEBUG', False):

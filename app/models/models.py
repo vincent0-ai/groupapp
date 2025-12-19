@@ -258,3 +258,23 @@ class Event:
             'updated_at': datetime.utcnow(),
             'is_cancelled': False
         }
+
+class GroupStreak:
+    """Group streak model for tracking daily group engagement"""
+
+    @staticmethod
+    def create_group_streak_doc(group_id: str, streak_count: int = 0,
+                                last_active_day: Optional[str] = None,
+                                threshold: Optional[int] = None,
+                                min_percent: Optional[float] = None) -> Dict:
+        """Create a new group streak document"""
+        return {
+            '_id': ObjectId(),
+            'group_id': ObjectId(group_id),
+            'streak_count': streak_count,
+            'last_active_day': last_active_day,  # ISO date string YYYY-MM-DD
+            'threshold': threshold,
+            'min_percent': min_percent,
+            'created_at': datetime.utcnow(),
+            'updated_at': datetime.utcnow()
+        }
