@@ -50,9 +50,18 @@ class MinioClient:
         except S3Error as e:
             print(f"Error creating bucket: {e}")
     
+    def _validate_object_name(self, object_name: str) -> bool:
+        """Basic validation to avoid accidental path traversal or absolute paths."""
+        if not object_name or '..' in object_name or object_name.startswith('/') or '\\' in object_name:
+            return False
+        return True
+
     def upload_file(self, file_path: str, object_name: str, 
                    content_type: str = 'application/octet-stream') -> bool:
         """Upload a file to MinIO"""
+        if not self._validate_object_name(object_name):
+            print(f"Rejected upload due to invalid object_name: {object_name}")
+            return False
         try:
             file_size = os.path.getsize(file_path)
             with open(file_path, 'rb') as file_data:
@@ -84,6 +93,9 @@ class MinioClient:
     
     def delete_file(self, object_name: str) -> bool:
         """Delete a file from MinIO"""
+        if not self._validate_object_name(object_name):
+            print(f"Rejected delete due to invalid object_name: {object_name}")
+            return False
         try:
             self.client.remove_object(self.bucket, object_name)
             return True
@@ -94,6 +106,9 @@ class MinioClient:
     def get_presigned_url(self, object_name: str, 
                          expires: int = 3600) -> str:
         """Get a presigned URL for a file"""
+        if not self._validate_object_name(object_name):
+            print(f"Rejected presigned URL due to invalid object_name: {object_name}")
+            return None
         try:
             url = self.client.presigned_get_object(
                 self.bucket,

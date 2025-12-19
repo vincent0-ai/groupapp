@@ -213,9 +213,15 @@ def upload_audio(wb_id):
         os.remove(temp_path)
         return error_response('File too large', 413)
 
+    content_type = f.content_type or 'audio/webm'
+    # Enforce audio content-type for audio uploads
+    if ext and not content_type.startswith('audio/'):
+        os.remove(temp_path)
+        return error_response('Audio content-type does not match extension', 400)
+
     minio_path = f"whiteboards/{wb_id}/audio/{unique_filename}"
     minio_client = MinioClient()
-    success = minio_client.upload_file(temp_path, minio_path, content_type=f.content_type or 'audio/webm')
+    success = minio_client.upload_file(temp_path, minio_path, content_type=content_type)
     os.remove(temp_path)
     if not success:
         return error_response('Failed to upload audio', 500)
