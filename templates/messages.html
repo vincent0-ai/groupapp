@@ -843,41 +843,7 @@
                     headers: { 'Authorization': `Bearer ${token}` }
                 }).catch(err => console.warn('Failed to mark messages as read:', err));
                 
-                // Pre-fetch argument counts and top summaries for messages in this group
-                let argCounts = {};
-                let argSummaries = {}; // { messageId: { total, top_claim, top_evidence } }
-                try {
-                    const argsRes = await fetch(`/api/arguments?group_id=${currentGroupId}`, { headers: { 'Authorization': `Bearer ${token}` } });
-                    if (argsRes.ok) {
-                        const argsData = await argsRes.json();
-                        const allArgs = argsData.data?.arguments || [];
-                        // Group by message_id
-                        const grouped = {};
-                        allArgs.forEach(a => {
-                            const mid = a.message_id || '';
-                            if (!grouped[mid]) grouped[mid] = [];
-                            grouped[mid].push(a);
-                        });
 
-                        // Build counts and pick top claim/evidence by most recent created_at
-                        Object.keys(grouped).forEach(mid => {
-                            const list = grouped[mid];
-                            argCounts[mid] = list.length;
-
-                            // pick most recent claim and evidence
-                            const claims = list.filter(x => x.node_type === 'claim').sort((a,b) => new Date(b.created_at) - new Date(a.created_at));
-                            const evidence = list.filter(x => x.node_type === 'evidence').sort((a,b) => new Date(b.created_at) - new Date(a.created_at));
-                            argSummaries[mid] = {
-                                total: list.length,
-                                top_claim: claims.length ? claims[0] : null,
-                                top_evidence: evidence.length ? evidence[0] : null
-                            };
-                        });
-                    }
-                } catch (err) {
-                    // Ignore arg fetch errors for now
-                    console.warn('Failed to fetch argument counts', err);
-                }
 
                 // Create message map for reply lookups
                 const messageMap = {};
@@ -949,11 +915,7 @@
                                         <button class="btn btn-sm btn-light" onclick="replyToMessage('${m._id}', '${m.user_first_name || 'User'}', \`${m.content.replace(/`/g, "'").replace(/\\/g, "\\\\")}\`)" title="Reply">
                                             <i class="fas fa-reply"></i>
                                         </button>
-" title="Discuss">
-                                            <i class="fas fa-comments"></i>
-                                        </button>
 
-                                        ${canDelete ? `
                                             <button class="btn btn-sm btn-light text-danger" onclick="deleteMessage('${m._id}')" title="Delete">
                                                 <i class="fas fa-trash"></i>
                                             </button>
@@ -964,7 +926,6 @@
                                 </div>
 
                                 </div>
-                                <div id="thread-${m._id}" class="mt-2 thread-container" style="display:none; max-width: 85%;"></div>
                                 <small class="text-muted mt-1" style="font-size: 0.7rem;">
                                     ${isMine ? 'You' : (m.user_first_name || 'User ' + m.user_id.substr(-4))} • ${displayTime}
                                 </small>
@@ -1013,11 +974,7 @@
             });
         }
 
-        // Initialize thread UI bindings when page is ready
-        function setupThreadsUI() {
-            // nothing extra yet; placeholder for future enhancements
-        }
-        
+
         // Delete a message
         async function deleteMessage(msgId) {
             if (!confirm('Delete this message?')) return;
@@ -1329,53 +1286,9 @@
             }
         });
 
-        // Threaded Arguments: listen for new arguments and refresh minimal UI
-        socket.on('new_argument', (data) => {
-            try {
-                if (data.room === currentGroupId) {
-                    // If the argument is for a message currently visible, fetch and optionally show
-                    const arg = data.argument || {};
-                    if (arg && arg.message_id) {
-                        loadArgumentsForMessage(arg.message_id);
-                    } else {
-                        // generic refresh: notify user
-                        showCustomAlert('A new argument was added in this group', 'Info');
-                    }
-                }
-            } catch (e) {
-                console.error('Error handling new_argument socket event', e);
-            }
-        });
-
-        function openArgumentModal(messageId, parentId = '') {
-            document.getElementById('argumentMessageId').value = messageId || '';
-            document.getElementById('argumentParentId').value = parentId || '';
-            document.getElementById('argContent').value = '';
-            const modalEl = document.getElementById('argumentModal');
-            const modal = new bootstrap.Modal(modalEl);
-            modal.show();
-        }
 
 
 
-        async function loadArgumentsForMessage(messageId) {
-            if (!messageId) return;
-            try {
-                const res = await fetch(`/api/arguments?message_id=${messageId}`, {
-                    headers: { 'Authorization': `Bearer ${token}` }
-                });
-                const data = await res.json();
-                if (!res.ok) return;
-                const args = data.data?.arguments || [];
-                // For MVP: show a small toast-like summary
-                if (args.length > 0) {
-                    const top = args.slice(0, 3).map(a => `${a.node_type.toUpperCase()}: ${a.content.substring(0, 80)}`).join('\n— ');
-                    showCustomAlert(`Arguments for this message:\n— ${top}`, 'Info');
-                }
-            } catch (err) {
-                console.error('Error loading arguments:', err);
-            }
-        }
 
         // Online users tracking
         let onlineUsers = [];
@@ -1395,26 +1308,7 @@
             console.log('User left:', data.user_id);
         });
         
-        // Real-time argument updates
-        socket.on('new_argument', (data) => {
-            try {
-                if (data.room === currentGroupId && data.argument && data.argument.message_id) {
-                    const mid = data.argument.message_id;
-                    const cont = document.getElementById(`thread-${mid}`);
-                    // update summary badge if present
-                    try {
-                        const badgeEl = document.getElementById(`arg-count-${mid}`);
-                        if (badgeEl) badgeEl.textContent = parseInt(badgeEl.textContent || '0') + 1;
-                    } catch (e) {}
-                    // If thread is open, reload it; otherwise we can show a small badge/count
-                    if (cont && cont.style.display !== 'none') {
-                        loadThread(mid);
-                    }
-                }
-            } catch (e) {
-                console.warn('Failed to process new_argument event', e);
-            }
-        });
+
 
         function updateOnlineUsersUI() {
             const indicator = document.getElementById('onlineUsersIndicator');
@@ -1455,154 +1349,9 @@
             return div.innerHTML;
         }
 
-        // Threaded Arguments UI
-        function openArgumentModal(messageId, parentId) {
-            document.getElementById('argumentMessageId').value = messageId || '';
-            document.getElementById('argumentParentId').value = parentId || '';
-            // If parentId present, default node type to 'counter' so user is prompted to reply
-            if (parentId) {
-                document.getElementById('argNodeType').value = 'counter';
-            } else {
-                document.getElementById('argNodeType').value = 'claim';
-            }
-            document.getElementById('argContent').value = '';
-            const modal = new bootstrap.Modal(document.getElementById('argumentModal'));
-            modal.show();
-        }
 
-        // Prevent duplicate submissions by disabling submit and using a flag
-        let argumentSubmitting = false;
-        document.getElementById('argumentForm').addEventListener('submit', async (e) => {
-            e.preventDefault();
-            if (argumentSubmitting) return; // ignore duplicate
-            argumentSubmitting = true;
-            const submitBtn = document.getElementById('argumentSubmitBtn');
-            if (submitBtn) submitBtn.disabled = true;
 
-            try {
-                const node_type = document.getElementById('argNodeType').value;
-                const content = document.getElementById('argContent').value.trim();
-                const message_id = document.getElementById('argumentMessageId').value || null;
-                const parent_id = document.getElementById('argumentParentId').value || null;
 
-                if (!content) {
-                    await showCustomAlert('Content is required', 'Error');
-                    return;
-                }
-
-                const payload = {
-                    node_type,
-                    content,
-                    group_id: currentGroupId
-                };
-                if (message_id) payload.message_id = message_id;
-                if (parent_id) payload.parent_id = parent_id;
-
-                const res = await fetch('/api/arguments', {
-                    method: 'POST',
-                    headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
-                    body: JSON.stringify(payload)
-                });
-
-                const data = await res.json();
-                if (res.ok) {
-                    await showCustomAlert('Argument added', 'Success');
-                    const modal = bootstrap.Modal.getInstance(document.getElementById('argumentModal'));
-                    if (modal) modal.hide();
-                    // reload thread for this message
-                    if (message_id) loadThread(message_id);
-                } else if (res.status === 401) {
-                    localStorage.removeItem('token');
-                    sessionStorage.setItem('redirectAfterLogin', window.location.href);
-                    window.location.href = "{{ url_for('auth_page') }}";
-                } else {
-                    await showCustomAlert(data.message || 'Failed to add argument', 'Error');
-                }
-            } catch (err) {
-                console.error('Error creating argument:', err);
-                await showCustomAlert('Error creating argument', 'Error');
-            } finally {
-                argumentSubmitting = false;
-                if (submitBtn) submitBtn.disabled = false;
-            }
-        });
-
-        function toggleThread(messageId) {
-            const container = document.getElementById(`thread-${messageId}`);
-            if (!container) return;
-            if (container.style.display === 'none') {
-                // show and load
-                container.style.display = 'block';
-                if (!container.dataset.loaded) {
-                    loadThread(messageId);
-                }
-            } else {
-                container.style.display = 'none';
-            }
-        }
-
-        async function loadThread(messageId) {
-            try {
-                const res = await fetch(`/api/arguments?message_id=${messageId}`, {
-                    headers: { 'Authorization': `Bearer ${token}` }
-                });
-                const data = await res.json();
-                if (!res.ok) {
-                    console.warn('Failed to load thread', data.message);
-                    return;
-                }
-                const args = data.data?.arguments || [];
-                // Build parent -> children map
-                const map = {};
-                args.forEach(a => {
-                    const pid = a.parent_id || 'ROOT';
-                    if (!map[pid]) map[pid] = [];
-                    map[pid].push(a);
-                });
-
-                const root = map['ROOT'] || [];
-                const container = document.getElementById(`thread-${messageId}`);
-                if (!container) return;
-                container.innerHTML = renderArgumentList(root, map, 0);
-                container.dataset.loaded = '1';
-                // Update badge count
-                try {
-                    const badgeEl = document.getElementById(`arg-count-${messageId}`);
-                    if (badgeEl) badgeEl.textContent = args.length;
-                } catch (e) {}
-            } catch (e) {
-                console.error('Error loading thread', e);
-            }
-        }
-
-        function renderArgumentList(nodes, map, depth) {
-            if (!nodes || nodes.length === 0) return '<div class="text-muted small">No arguments yet. Be the first to discuss.</div>';
-            return nodes.map(n => renderArgumentNode(n, map, depth)).join('');
-        }
-
-        function renderArgumentNode(node, map, depth) {
-            const badge = node.node_type ? `<span class="badge bg-secondary ms-1">${node.node_type}</span>` : '';
-            const author = node.author_id ? `User ${node.author_id.toString().substr(-4)}` : 'Unknown';
-            const time = node.created_at ? new Date(node.created_at).toLocaleString() : '';
-            const children = map[node._id] || [];
-            const indent = Math.min(depth * 12, 48);
-            return `
-                <div class="card mb-2" style="margin-left: ${indent}px; padding: 8px; border-radius: 8px; border:1px solid var(--border-color); background: var(--card-bg);">
-                    <div class="d-flex justify-content-between align-items-start">
-                        <div>
-                            <div class="fw-semibold">${escapeHtml(node.content)} ${badge}</div>
-                            <div class="small text-muted mt-1">${author} • ${time}</div>
-                        </div>
-                        <div class="d-flex gap-1">
-                            <button class="btn btn-sm btn-outline-primary" onclick="openArgumentModal('${node.message_id}', '${node._id}')">Reply</button>
-                        </div>
-                    </div>
-                    <div class="mt-2">
-                        ${renderArgumentList(children, map, depth + 1)}
-                    </div>
-                </div>
-            `;
-        }
 
         document.addEventListener('DOMContentLoaded', () => {
             if (!token) {
