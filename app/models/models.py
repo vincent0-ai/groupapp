@@ -131,11 +131,12 @@ class Competition:
                               created_by: str, start_time: datetime,
                               end_time: datetime, questions: List = None,
                               competition_type: str = 'quiz',
-                              channel_id: Optional[str] = None, category: str = 'General') -> Dict:
-        """Create a new competition (optionally tied to a channel/category)"""
+                              channel_id: Optional[str] = None, category: str = 'General',
+                              season_id: Optional[str] = None) -> Dict:
+        """Create a new competition (optionally tied to a channel/category or season)"""
         is_intergroup = len(group_ids) > 1
         group_scores = {gid: 0 for gid in group_ids}
-        return {
+        doc = {
             '_id': ObjectId(),
             'title': title,
             'description': description,
@@ -155,6 +156,9 @@ class Competition:
             'updated_at': datetime.utcnow(),
             'is_active': True
         }
+        if season_id:
+            doc['season_id'] = ObjectId(season_id)
+        return doc
 
 class File:
     """File/Document model"""
@@ -245,6 +249,26 @@ class GroupStreak:
             'last_active_day': last_active_day,  # ISO date string YYYY-MM-DD
             'threshold': threshold,
             'min_percent': min_percent,
+            'created_at': datetime.utcnow(),
+            'updated_at': datetime.utcnow()
+        }
+
+
+class Season:
+    """Season model for weekly seasons and Hall of Progress"""
+
+    @staticmethod
+    def create_season_doc(title: str, start_time: datetime, end_time: datetime, created_by: str) -> Dict:
+        """Create a new season document"""
+        return {
+            '_id': ObjectId(),
+            'title': title,
+            'start_time': start_time,
+            'end_time': end_time,
+            'created_by': ObjectId(created_by),
+            'is_active': True,
+            'group_scores': {},  # { group_id_str: score }
+            'winners': [],  # populated on close
             'created_at': datetime.utcnow(),
             'updated_at': datetime.utcnow()
         }

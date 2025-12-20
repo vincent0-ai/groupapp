@@ -73,6 +73,7 @@ def create_app(config_name='development'):
     from app.routes.dm import dm_bp
     from app.routes.streaks import streaks_bp
     from app.routes.groups_leaderboard import leaderboard_bp
+    from app.routes.seasons import seasons_bp
     
     app.register_blueprint(auth_bp)
     app.register_blueprint(groups_bp)
@@ -86,6 +87,7 @@ def create_app(config_name='development'):
     app.register_blueprint(dm_bp)
     app.register_blueprint(streaks_bp)
     app.register_blueprint(leaderboard_bp)
+    app.register_blueprint(seasons_bp)
     
     # Serve service worker from root with proper scope header
     @app.route('/service-worker.js')
@@ -165,6 +167,11 @@ def create_app(config_name='development'):
     def leaderboard_page():
         """Serve leaderboard page"""
         return render_template('leaderboard.html')
+
+    @app.route('/seasons')
+    def seasons_page():
+        """Serve seasons / Hall of Progress"""
+        return render_template('seasons.html')
 
     @app.route('/test/footer')
     def test_footer():

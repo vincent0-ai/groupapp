@@ -60,6 +60,10 @@ class Config:
     GROUP_STREAK_MIN_ABSOLUTE = int(os.getenv('GROUP_STREAK_MIN_ABSOLUTE', '2'))
     GROUP_STREAK_CHECK_INTERVAL_SECONDS = int(os.getenv('GROUP_STREAK_CHECK_INTERVAL_SECONDS', '3600'))
 
+    # Seasons
+    SEASON_LENGTH_DAYS = int(os.getenv('SEASON_LENGTH_DAYS', '7'))  # weeks are 7 days by default
+    AUTO_CREATE_SEASONS = os.getenv('AUTO_CREATE_SEASONS', 'False') == 'True'  # manual by default
+
 
 class DevelopmentConfig(Config):
     """Development configuration"""
