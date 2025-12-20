@@ -198,7 +198,7 @@
 {% block modals %}
     <!-- Create Competition Modal -->
     <div class="modal fade" id="createCompModal" tabindex="-1">
-        <div class="modal-dialog modal-lg">
+        <div class="modal-dialog modal-lg modal-dialog-scrollable">
             <div class="modal-content">
                 <div class="modal-header">
                     <h5 class="modal-title">Create Competition</h5>
@@ -247,7 +247,7 @@
 
     <!-- Play Competition Modal -->
     <div class="modal fade" id="playCompModal" tabindex="-1">
-        <div class="modal-dialog modal-lg">
+        <div class="modal-dialog modal-lg modal-dialog-scrollable">
             <div class="modal-content">
                 <div class="modal-header">
                     <h5 class="modal-title" id="playCompTitle">Play Competition</h5>
@@ -267,7 +267,7 @@
 
     <!-- View Competition Modal -->
     <div class="modal fade" id="viewCompModal" tabindex="-1">
-        <div class="modal-dialog modal-lg">
+        <div class="modal-dialog modal-lg modal-dialog-scrollable">
             <div class="modal-content">
                 <div class="modal-header">
                     <h5 class="modal-title" id="viewCompTitle">Competition Details</h5>
@@ -417,11 +417,19 @@
                                 <div class="mb-3">
                                     ${optionsHtml}
                                 </div>
+                                <!-- Allow custom answers and optional discussion -->
+                                <div class="mb-2">
+                                    <input type="text" class="form-control form-control-sm question-custom-answer" id="custom_q${i}" placeholder="Or write your own answer (optional)" ${isAnswered || isEnded || !isJoined ? 'disabled' : ''}>
+                                </div>
+                                <div class="mb-2">
+                                    <textarea class="form-control form-control-sm question-discussion" id="discussion_q${i}" placeholder="Explain your thinking (optional)" rows="2" ${isAnswered || isEnded || !isJoined ? 'disabled' : ''}></textarea>
+                                </div>
                                 ${!isAnswered && !isEnded && isJoined ? `
                                     <button class="btn btn-primary btn-sm" onclick="submitAnswer('${comp.id}', ${i})">Submit Answer</button>
                                 ` : isAnswered ? `
                                     <div class="alert alert-light border">
                                         Your answer: <strong>${answerData.answer}</strong>
+                                        ${answerData.discussion ? `<div class="mt-2"><strong>Discussion:</strong> ${answerData.discussion}</div>` : ''}
                                         ${isEnded ? ` | Correct: <strong>${q.correct_answer}</strong>` : ''}
                                     </div>
                                 ` : ''}
@@ -481,14 +489,23 @@
                 return;
             }
 
+            // Prefer chosen option, but allow custom text answers
             const selectedOption = document.querySelector(`input[name="q${questionIndex}"]:checked`);
-            if (!selectedOption) {
-                alert('Please select an answer');
+            const customInput = document.getElementById(`custom_q${questionIndex}`);
+            const discussionInput = document.getElementById(`discussion_q${questionIndex}`);
+
+            const customAnswer = customInput ? customInput.value.trim() : '';
+            const discussion = discussionInput ? discussionInput.value.trim() : '';
+
+            let answer = '';
+            if (selectedOption) answer = selectedOption.value;
+            else if (customAnswer) answer = customAnswer;
+
+            if (!answer) {
+                alert('Please select an option or write your own answer');
                 return;
             }
-            
-            const answer = selectedOption.value;
-            
+
             try {
                 const res = await fetch(`/api/competitions/${compId}/submit-answer`, {
                     method: 'POST',
@@ -498,14 +515,15 @@
                     },
                     body: JSON.stringify({
                         question_id: questionIndex,
-                        answer: answer
+                        answer: answer,
+                        discussion: discussion
                     })
                 });
-                
+
                 const data = await res.json();
                 if (res.ok) {
                     const result = data.data;
-                    
+
                     // Show completion message if all questions answered
                     if (result.is_complete) {
                         await showCustomAlert(
@@ -513,7 +531,7 @@
                             'Results'
                         );
                     }
-                    
+
                     // Reload the modal to show result
                     playCompetition(compId);
                 } else {

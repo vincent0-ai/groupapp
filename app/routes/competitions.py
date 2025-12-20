@@ -276,13 +276,14 @@ def submit_answer(comp_id):
     except ValueError:
         return error_response('Invalid question ID format', 400)
 
-    # Store answer
+    # Store answer (allow optional discussion text)
     answer_data = {
         'question_id': question_id,
         'answer': answer,
         'is_correct': is_correct,
         'points': points_awarded,
-        'submitted_at': datetime.utcnow()
+        'submitted_at': datetime.utcnow(),
+        'discussion': data.get('discussion', '') if isinstance(data, dict) else ''
     }
     
     update_op = {
