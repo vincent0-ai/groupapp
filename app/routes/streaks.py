@@ -3,32 +3,10 @@ from app.utils import success_response, error_response, serialize_document
 from app.services import Database
 from bson import ObjectId
 from functools import wraps
+from app.utils.decorators import require_auth
 import jwt
 
 streaks_bp = Blueprint('streaks', __name__, url_prefix='/api/groups')
-
-# Lightweight auth decorator
-def require_auth(f):
-    @wraps(f)
-    def decorated(*args, **kwargs):
-        auth_header = request.headers.get('Authorization')
-        if not auth_header or not auth_header.startswith('Bearer '):
-            return error_response('Missing or invalid authorization', 401)
-        token = auth_header.split(' ')[1]
-        try:
-            payload = jwt.decode(
-                token,
-                current_app.config['JWT_SECRET_KEY'],
-                algorithms=[current_app.config['JWT_ALGORITHM']]
-            )
-            g.user_id = payload['user_id']
-        except jwt.ExpiredSignatureError:
-            return error_response('Token expired', 401)
-        except jwt.InvalidTokenError:
-            return error_response('Invalid token', 401)
-        return f(*args, **kwargs)
-    return decorated
-
 
 @streaks_bp.route('/<group_id>/streak', methods=['GET'])
 @require_auth

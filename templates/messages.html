@@ -842,6 +842,10 @@
                     method: 'POST',
                     headers: { 'Authorization': `Bearer ${token}` }
                 }).catch(err => console.warn('Failed to mark messages as read:', err));
+
+                // Safety: argument feature was removed server-side; ensure these exist so rendering doesn't crash
+                let argCounts = {};
+                let argSummaries = {};
                 
 
 
