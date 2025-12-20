@@ -74,6 +74,16 @@ class Database:
         self.db.competitions.create_index('created_by')
         self.db.competitions.create_index('start_time')
 
+        # Seasons indexes
+        try:
+            self.db.seasons.create_index('start_time')
+            self.db.seasons.create_index('end_time')
+            self.db.seasons.create_index('is_active')
+            self.db.seasons.create_index('created_by')
+        except Exception:
+            # Best-effort, ignore if collection doesn't exist yet or index creation fails
+            pass
+
         # Group streaks
         try:
             self.db.group_streaks.create_index('group_id', unique=True)

@@ -103,9 +103,21 @@ def create_competition():
         if ch:
             channel_name = ch.get('name')
     
+    # Optionally attach to a season
+    season_id = data.get('season_id')
+    if season_id:
+        # Validate season exists and is active
+        try:
+            season_obj = ObjectId(season_id)
+            season = db.find_one('seasons', {'_id': season_obj})
+            if not season or not season.get('is_active'):
+                return error_response('Invalid or inactive season', 400)
+        except Exception:
+            return error_response('Invalid season id', 400)
+
     competition_doc = Competition.create_competition_doc(
         title, description, group_ids, g.user_id, start_time, end_time, 
-        questions, competition_type, str(channel_id) if channel_id else None, channel_name or 'General'
+        questions, competition_type, str(channel_id) if channel_id else None, channel_name or 'General', season_id=season_id
     )
     
     comp_id = db.insert_one('competitions', competition_doc)
@@ -276,13 +288,14 @@ def submit_answer(comp_id):
     except ValueError:
         return error_response('Invalid question ID format', 400)
 
-    # Store answer
+    # Store answer (allow optional discussion text)
     answer_data = {
         'question_id': question_id,
         'answer': answer,
         'is_correct': is_correct,
         'points': points_awarded,
-        'submitted_at': datetime.utcnow()
+        'submitted_at': datetime.utcnow(),
+        'discussion': data.get('discussion', '') if isinstance(data, dict) else ''
     }
     
     update_op = {
@@ -302,6 +315,16 @@ def submit_answer(comp_id):
             
             for group_id in groups_to_update:
                 update_op['$inc'][f'group_scores.{group_id}'] = points_awarded
+
+                # Also update season aggregates if this competition is part of a season
+                season_id = competition.get('season_id')
+                if season_id:
+                    # Increment the season's group_scores map (use string keys)
+                    try:
+                        db.update_one('seasons', {'_id': season_id}, {'$inc': {f'group_scores.{str(group_id)}': points_awarded}}, raw=True)
+                    except Exception:
+                        # Best-effort: don't fail the whole request if season update fails
+                        pass
 
     # Update participant answers and score, and group scores
     db.update_one('competitions', 
