@@ -919,7 +919,7 @@
                                         <button class="btn btn-sm btn-light" onclick="replyToMessage('${m._id}', '${m.user_first_name || 'User'}', \`${m.content.replace(/`/g, "'").replace(/\\/g, "\\\\")}\`)" title="Reply">
                                             <i class="fas fa-reply"></i>
                                         </button>
-
+                                        ${canDelete ? `
                                             <button class="btn btn-sm btn-light text-danger" onclick="deleteMessage('${m._id}')" title="Delete">
                                                 <i class="fas fa-trash"></i>
                                             </button>

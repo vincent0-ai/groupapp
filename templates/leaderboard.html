@@ -387,6 +387,8 @@
             }
         }
 
+        const medals = ['🥇', '🥈', '🥉'];
+
         async function loadLeaderboard() {
             try {
                 const period = document.getElementById('filterPeriod').value;
@@ -400,8 +402,6 @@
                 const users = data.data?.leaderboard || [];
 
                 const tbody = document.getElementById('leaderboardBody');
-                const medals = ['🥇', '🥈', '🥉'];
-
                 const rows = users.map((user, index) => {
                     const medal = index < 3 ? medals[index] : `${index + 1}`;
                     const isCurrentUser = (user.id == userId) ? 'active' : '';
