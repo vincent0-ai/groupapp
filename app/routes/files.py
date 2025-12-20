@@ -12,36 +12,10 @@ from flask import current_app
 from datetime import datetime
 import os
 from werkzeug.utils import secure_filename
+from app.utils.decorators import require_auth
 import uuid
 
 files_bp = Blueprint('files', __name__, url_prefix='/api/files')
-
-def require_auth(f):
-    """Decorator to require authentication"""
-    @wraps(f)
-    def decorated(*args, **kwargs):
-        auth_header = request.headers.get('Authorization')
-        
-        if not auth_header or not auth_header.startswith('Bearer '):
-            return error_response('Missing or invalid authorization', 401)
-        
-        token = auth_header.split(' ')[1]
-        
-        try:
-            payload = jwt.decode(
-                token,
-                current_app.config['JWT_SECRET_KEY'],
-                algorithms=[current_app.config['JWT_ALGORITHM']]
-            )
-            g.user_id = payload['user_id']
-        except jwt.ExpiredSignatureError:
-            return error_response('Token expired', 401)
-        except jwt.InvalidTokenError:
-            return error_response('Invalid token', 401)
-        
-        return f(*args, **kwargs)
-    
-    return decorated
 
 ALLOWED_EXTENSIONS = {'pdf', 'txt', 'jpg', 'jpeg', 'png', 'gif', 'docx', 'doc', 'xlsx', 'xls', 'pptx', 'ppt', 'zip'}
 

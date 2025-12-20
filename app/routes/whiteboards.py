@@ -11,29 +11,12 @@ import os
 from werkzeug.utils import secure_filename
 import uuid
 from app.utils import MinioClient
+from app.utils.decorators import require_auth
 from app.models import File
 
 ALLOWED_AUDIO = {'wav', 'mp3', 'ogg', 'webm'}
 
 whiteboards_bp = Blueprint('whiteboards', __name__, url_prefix='/api/whiteboards')
-
-def require_auth(f):
-    @wraps(f)
-    def decorated(*args, **kwargs):
-        auth_header = request.headers.get('Authorization')
-        if not auth_header or not auth_header.startswith('Bearer '):
-            return error_response('Missing or invalid authorization', 401)
-        token = auth_header.split(' ')[1]
-        try:
-            payload = jwt.decode(token, current_app.config['JWT_SECRET_KEY'], algorithms=[current_app.config['JWT_ALGORITHM']])
-            g.user_id = payload['user_id']
-        except jwt.ExpiredSignatureError:
-            return error_response('Token expired', 401)
-        except jwt.InvalidTokenError:
-            return error_response('Invalid token', 401)
-        return f(*args, **kwargs)
-    return decorated
-
 
 @whiteboards_bp.route('/mine', methods=['GET'])
 @require_auth

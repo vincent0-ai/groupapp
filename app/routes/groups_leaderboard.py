@@ -6,29 +6,9 @@ from flask import g
 from functools import wraps
 import jwt
 from datetime import datetime, timedelta
+from app.utils.decorators import require_auth
 
 leaderboard_bp = Blueprint('groups_leaderboard', __name__, url_prefix='/api/groups')
-
-# Reuse same require_auth from groups or define lightweight
-def require_auth(f):
-    @wraps(f)
-    def decorated(*args, **kwargs):
-        auth_header = request.headers.get('Authorization')
-        if not auth_header or not auth_header.startswith('Bearer '):
-            return error_response('Missing or invalid authorization', 401)
-        token = auth_header.split(' ')[1]
-        try:
-            payload = jwt.decode(
-                token,
-                request.app.config['JWT_SECRET_KEY'],
-                algorithms=[request.app.config['JWT_ALGORITHM']]
-            )
-            g.user_id = payload['user_id']
-        except Exception:
-            return error_response('Invalid token', 401)
-        return f(*args, **kwargs)
-    return decorated
-
 
 @leaderboard_bp.route('/leaderboard', methods=['GET'])
 @require_auth
