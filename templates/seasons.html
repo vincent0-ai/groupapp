@@ -176,6 +176,23 @@
 
     document.addEventListener('DOMContentLoaded', async () => {
         await checkAdminStatus();
+
+        // If requested via query param, show the create form for admins
+        try {
+            const params = new URLSearchParams(window.location.search);
+            const showCreate = params.get('showCreate') || params.get('show_create');
+            if (showCreate && (showCreate === '1' || String(showCreate).toLowerCase() === 'true') && isAdmin) {
+                showCreateForm();
+                // Remove the query param from the URL for cleanliness
+                params.delete('showCreate');
+                params.delete('show_create');
+                const newUrl = window.location.pathname + (params.toString() ? '?' + params.toString() : '');
+                history.replaceState({}, '', newUrl);
+            }
+        } catch (e) {
+            // ignore
+        }
+
         loadSeasons();
 
         // Attach create form buttons
