@@ -5,9 +5,33 @@
 {% block content %}
 <div class="container py-4">
     <div class="d-flex justify-content-between align-items-center mb-3">
-        <h3>Hall of Progress</h3>
-        <small class="text-muted">Weekly seasons — winners archived here</small>
+        <div>
+            <h3>Hall of Progress</h3>
+            <small class="text-muted">Weekly seasons — winners archived here</small>
+        </div>
+        <div id="seasonAdminControls" class="d-none text-end">
+            <button class="btn btn-sm btn-primary" id="showCreateSeasonBtn">Create Season</button>
+        </div>
     </div>
+
+    <!-- Admin create season form (hidden by default) -->
+    <div id="createSeasonForm" class="card p-3 mb-3 d-none">
+        <div class="row g-2 align-items-center">
+            <div class="col-auto">
+                <input id="seasonTitle" class="form-control" placeholder="Season title (e.g. Week 1)" />
+            </div>
+            <div class="col-auto">
+                <input id="seasonStart" type="date" class="form-control" />
+            </div>
+            <div class="col-auto">
+                <button class="btn btn-sm btn-success" id="createSeasonBtn">Create</button>
+            </div>
+            <div class="col-auto">
+                <button class="btn btn-sm btn-secondary" id="cancelCreateSeasonBtn">Cancel</button>
+            </div>
+        </div>
+    </div>
+
     <div id="seasonsList" class="row g-3">
         <div class="col-12 text-center text-muted">Loading seasons...</div>
     </div>
@@ -17,6 +41,83 @@
 {% block scripts %}
 <script>
     const token = localStorage.getItem('token');
+    let isAdmin = false;
+
+    async function checkAdminStatus() {
+        if (!token) return;
+        try {
+            const res = await fetch('/api/users/profile', { headers: { 'Authorization': `Bearer ${token}` }});
+            if (!res.ok) return;
+            const data = await res.json();
+            if (data.data && data.data.is_admin) {
+                isAdmin = true;
+                const controls = document.getElementById('seasonAdminControls');
+                if (controls) controls.classList.remove('d-none');
+            }
+        } catch (err) {
+            console.warn('Could not check admin status', err);
+        }
+    }
+
+    function showCreateForm() {
+        document.getElementById('createSeasonForm').classList.remove('d-none');
+        document.getElementById('showCreateSeasonBtn').classList.add('d-none');
+    }
+    function hideCreateForm() {
+        document.getElementById('createSeasonForm').classList.add('d-none');
+        document.getElementById('showCreateSeasonBtn').classList.remove('d-none');
+    }
+
+    async function createSeason() {
+        const title = document.getElementById('seasonTitle').value.trim();
+        const dateVal = document.getElementById('seasonStart').value;
+        if (!title) {
+            alert('Title is required');
+            return;
+        }
+        let payload = { title };
+        if (dateVal) {
+            payload.start_time = `${dateVal}T00:00:00Z`;
+        }
+        try {
+            const res = await fetch('/api/seasons', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                body: JSON.stringify(payload)
+            });
+            const data = await res.json();
+            if (!res.ok) {
+                alert(data?.message || 'Failed to create season');
+                return;
+            }
+            hideCreateForm();
+            document.getElementById('seasonTitle').value = '';
+            document.getElementById('seasonStart').value = '';
+            loadSeasons();
+        } catch (err) {
+            console.error('Error creating season', err);
+            alert('Error creating season');
+        }
+    }
+
+    async function closeSeason(seasonId) {
+        if (!confirm('Close this season and compute winners?')) return;
+        try {
+            const res = await fetch(`/api/seasons/${seasonId}/close`, {
+                method: 'POST',
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            if (!res.ok) {
+                const data = await res.json();
+                alert(data?.message || 'Failed to close season');
+                return;
+            }
+            loadSeasons();
+        } catch (err) {
+            console.error('Error closing season', err);
+            alert('Error closing season');
+        }
+    }
 
     async function loadSeasons() {
         try {
@@ -40,6 +141,8 @@
                     </div>
                 `).join('') || '<div class="text-muted small p-2">No winners yet</div>';
 
+                const actionBtn = (isAdmin && s.is_active) ? `<button class="btn btn-sm btn-danger ms-2" onclick="closeSeason('${s._id}')">Close Season</button>` : '';
+
                 return `
                     <div class="col-12">
                         <div class="card shadow-sm">
@@ -51,6 +154,7 @@
                                     </div>
                                     <div>
                                         ${s.is_active ? '<span class="badge bg-success">Active</span>' : '<span class="badge bg-secondary">Closed</span>'}
+                                        ${actionBtn}
                                     </div>
                                 </div>
                                 <div class="mt-2">
@@ -70,8 +174,17 @@
         }
     }
 
-    document.addEventListener('DOMContentLoaded', () => {
+    document.addEventListener('DOMContentLoaded', async () => {
+        await checkAdminStatus();
         loadSeasons();
+
+        // Attach create form buttons
+        const showBtn = document.getElementById('showCreateSeasonBtn');
+        if (showBtn) showBtn.addEventListener('click', showCreateForm);
+        const cancelBtn = document.getElementById('cancelCreateSeasonBtn');
+        if (cancelBtn) cancelBtn.addEventListener('click', hideCreateForm);
+        const createBtn = document.getElementById('createSeasonBtn');
+        if (createBtn) createBtn.addEventListener('click', createSeason);
     });
 </script>
 {% endblock %}
