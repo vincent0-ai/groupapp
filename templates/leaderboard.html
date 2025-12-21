@@ -209,6 +209,18 @@
             <p class="text-muted mb-0">Compete and climb the ranks!</p>
         </div>
 
+        <div class="container py-3">
+            <div class="filter-container mb-3">
+                <input type="text" id="groupSearch" class="form-control" placeholder="Search groups" />
+                <select id="filterPeriod" class="form-select">
+                    <option value="7">7 days</option>
+                    <option value="30">30 days</option>
+                </select>
+            </div>
+
+            <div id="leaderboardBody" class="list-group"></div>
+        </div>
+
 {% endblock %}
 
 {% block modals %}
@@ -305,18 +317,6 @@
         }
 
         document.addEventListener('DOMContentLoaded', loadGroupsLeaderboard);
-                
-                // Show modal
-                if (!viewUserModal) {
-                    viewUserModal = new bootstrap.Modal(document.getElementById('viewUserModal'));
-                }
-                viewUserModal.show();
-                
-            } catch (error) {
-                console.error('Error loading user profile:', error);
-                await showCustomAlert('Failed to load user profile', 'Error');
-            }
-        }
 
         document.addEventListener('DOMContentLoaded', async () => {
             if (!token) {
