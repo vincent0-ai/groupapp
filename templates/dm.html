@@ -818,7 +818,8 @@
                 const data = await res.json();
 
                 // data.data is an array of users
-                const users = data.data || [];
+                if (data && data.data) {
+                    const users = data.data || [];
                     console.log('Total users from API:', users.length);
                     
                     if (users.length > 0) {
@@ -903,7 +904,6 @@
                         renderUserResults(matchedUsers);
                         return;
                     }
-                }
             } catch (err) {
                 console.error('Search error:', err);
             }
