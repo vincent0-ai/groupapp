@@ -19,11 +19,11 @@ def search_users():
     db = Database()
     
     if not query or len(query) < 2:
-        # Return some suggested users (most active users, excluding current user)
+        # Return some suggested users (most recently active users, excluding current user)
         users = list(db.find('users', 
             {'_id': {'$ne': ObjectId(g.user_id)}},
             limit=10, 
-            sort=('points', -1)
+            sort=('updated_at', -1)
         ))
     else:
         # Search by username and full_name
@@ -50,7 +50,6 @@ def search_users():
             'username': user.get('username', ''),
             'full_name': user.get('full_name', ''),
             'avatar_url': user.get('avatar_url') or f"https://api.dicebear.com/7.x/avataaars/svg?seed={user.get('username', '')}",
-            'points': user.get('points', 0),
             'badges': user.get('badges', []),
             'groups_count': groups_count
         })
@@ -68,7 +67,9 @@ def get_profile():
     if not user:
         return error_response('User not found', 404)
     
+    # Remove sensitive and deprecated fields
     del user['password_hash']
+    user.pop('points', None)  # Points have been removed
     return success_response(serialize_document(user), 'Profile retrieved successfully', 200)
 
 @users_bp.route('/profile', methods=['PUT'])
@@ -124,7 +125,6 @@ def get_user(user_id):
         'full_name': user.get('full_name', ''),
         'avatar_url': user.get('avatar_url') or f"https://api.dicebear.com/7.x/avataaars/svg?seed={user.get('username', '')}",
         'bio': user.get('bio', ''),
-        'points': user.get('points', 0),
         'badges': user.get('badges', []),
         'groups_count': groups_count,
         'created_at': user.get('created_at').isoformat() if user.get('created_at') else None,
@@ -134,73 +134,7 @@ def get_user(user_id):
     
     return success_response(public_profile, 'User profile retrieved successfully', 200)
 
-@users_bp.route('/leaderboard', methods=['GET'])
-def get_leaderboard():
-    """Get global leaderboard. Supports optional query params: period (all|week|month) and group_id."""
-    db = Database()
 
-    page = request.args.get('page', 1, type=int)
-    per_page = request.args.get('per_page', 20, type=int)
-    period = request.args.get('period', 'all')
-    group_id = request.args.get('group_id')
-
-    skip = (page - 1) * per_page
-
-    # Build query based on filters
-    query = {}
-    from datetime import timedelta
-    if period in ('week', 'month'):
-        days = 7 if period == 'week' else 30
-        cutoff = datetime.utcnow() - timedelta(days=days)
-        query['created_at'] = {'$gte': cutoff}
-
-    if group_id:
-        try:
-            group_obj_id = ObjectId(group_id)
-        except:
-            return error_response('Invalid group ID', 400)
-        group = db.find_one('groups', {'_id': group_obj_id})
-        if not group:
-            return error_response('Group not found', 404)
-        members = group.get('members', [])
-        if not members:
-            return success_response({
-                'leaderboard': [],
-                'users': [],
-                'total': 0,
-                'page': page,
-                'per_page': per_page
-            }, 'Leaderboard retrieved successfully', 200)
-        query['_id'] = {'$in': members}
-
-    # Get users matching query sorted by points
-    users = list(db.find('users', query, skip=skip, limit=per_page, sort=('points', -1)))
-
-    total = db.count('users', query)
-
-    # Build public profile data for each user
-    leaderboard_users = []
-    for user in users:
-        user_id_obj = user['_id']
-        groups_count = db.count('groups', {'members': user_id_obj})
-        leaderboard_users.append({
-            'id': str(user['_id']),
-            '_id': str(user['_id']),
-            'username': user.get('username', ''),
-            'full_name': user.get('full_name', ''),
-            'avatar_url': user.get('avatar_url') or f"https://api.dicebear.com/7.x/avataaars/svg?seed={user.get('username', '')}",
-            'points': user.get('points', 0),
-            'badges': user.get('badges', []),
-            'groups_count': groups_count
-        })
-
-    return success_response({
-        'leaderboard': leaderboard_users,
-        'users': leaderboard_users,  # Keep for backward compatibility
-        'total': total,
-        'page': page,
-        'per_page': per_page
-    }, 'Leaderboard retrieved successfully', 200)
 
 @users_bp.route('/groups', methods=['GET'])
 @require_auth

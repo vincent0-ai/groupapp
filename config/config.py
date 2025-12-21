@@ -47,13 +47,6 @@ class Config:
     CORS_ALLOWED_ORIGINS = os.getenv('CORS_ALLOWED_ORIGINS', 'http://localhost:5000')
     SOCKETIO_CORS_ALLOWED_ORIGINS = os.getenv('SOCKETIO_CORS_ALLOWED_ORIGINS', 'http://localhost:5000')
 
-    # Gamification Points
-    POINTS_CONFIG = {
-        'CREATE_GROUP': 5,
-        'SEND_MESSAGE': 1,
-        'UPLOAD_FILE': 2,
-        'JOIN_COMPETITION': 3
-    }
 
     # Group Streaks
     GROUP_STREAK_MIN_PERCENT = float(os.getenv('GROUP_STREAK_MIN_PERCENT', '0.2'))  # fraction of members

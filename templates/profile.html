@@ -39,17 +39,6 @@
         transform: scale(1.03);
     }
     
-    .points-badge {
-        display: inline-flex;
-        align-items: center;
-        gap: 6px;
-        background: #F59E0B;
-        padding: 6px 14px;
-        border-radius: 50px;
-        color: white;
-        font-weight: 700;
-        box-shadow: 0 2px 8px rgba(245, 158, 11, 0.25);
-    }
     
     .stat-mini {
         text-align: center;
@@ -171,10 +160,6 @@
                         </div>
                         <h3 class="mb-1 fw-bold" id="userName">Loading...</h3>
                         <p class="text-muted mb-3" id="userEmail">-</p>
-                        <div class="points-badge mb-3">
-                            <i class="fas fa-star"></i>
-                            <span id="userPoints">0 Points</span>
-                        </div>
                         <button class="btn btn-primary w-100" data-bs-toggle="modal" data-bs-target="#editProfileModal">
                             <i class="fas fa-edit me-2"></i>Edit Profile
                         </button>
@@ -350,7 +335,6 @@
                 document.getElementById('avatar').src = user.avatar_url || 'https://api.dicebear.com/7.x/avataaars/svg?seed=' + user.username;
                 document.getElementById('userName').textContent = user.username;
                 document.getElementById('userEmail').textContent = user.email;
-                document.getElementById('userPoints').innerHTML = `${user.points || 0} <small class="text-body-secondary">Points</small>`;
                 document.getElementById('fullName').textContent = user.full_name || '-';
                 document.getElementById('username').textContent = user.username;
                 document.getElementById('bio').textContent = user.bio || 'No bio yet';
