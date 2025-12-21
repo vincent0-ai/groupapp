@@ -134,6 +134,17 @@
         margin-bottom: 1rem;
     }
 
+    /* Make questions area scrollable so new questions remain reachable */
+    #questionsContainer {
+        max-height: calc(55vh);
+        overflow: auto;
+        padding-right: 0.5rem; /* room for scrollbar */
+        display: block;
+    }
+    @media (max-width: 576px) {
+        #questionsContainer { max-height: calc(45vh); }
+    }
+
     /* Ensure modal submit/footer is reachable on small screens */
     .modal-footer.sticky-footer {
         position: sticky;
@@ -388,6 +399,18 @@
                 </div>
             `;
             container.appendChild(div);
+            // Ensure the newly added question is visible and focused
+            try {
+                // Smoothly scroll the container to the bottom
+                container.scrollTop = container.scrollHeight;
+                // Scroll the newly added card into view
+                div.scrollIntoView({ behavior: 'smooth', block: 'end' });
+                // Focus the question text input for quick entry
+                const qInput = div.querySelector('.question-text');
+                if (qInput) qInput.focus();
+            } catch (e) {
+                // ignore any scrolling errors
+            }
         }
 
         async function playCompetition(compId) {
