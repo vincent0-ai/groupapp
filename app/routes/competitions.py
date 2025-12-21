@@ -301,8 +301,13 @@ def submit_answer(comp_id):
             return error_response('Invalid question ID', 400)
         
         question = questions[q_idx]
-        is_correct = str(answer).strip().lower() == str(question.get('correct_answer')).strip().lower()
-        points_awarded = 1 if is_correct else 0  # 1 point per correct answer
+        # If question is a discussion type, it is submitted for manual review and not auto-scored
+        if question.get('type') == 'discussion' or question.get('type') == 'Discussion':
+            is_correct = False
+            points_awarded = 0
+        else:
+            is_correct = str(answer).strip().lower() == str(question.get('correct_answer')).strip().lower()
+            points_awarded = 1 if is_correct else 0  # 1 point per correct answer
         
     except ValueError:
         return error_response('Invalid question ID format', 400)
@@ -316,6 +321,14 @@ def submit_answer(comp_id):
         'submitted_at': datetime.utcnow(),
         'discussion': data.get('discussion', '') if isinstance(data, dict) else ''
     }
+
+    # For discussion questions, add review metadata
+    try:
+        if question.get('type') == 'discussion':
+            answer_data['is_reviewed'] = False
+            answer_data['comments'] = []
+    except Exception:
+        pass
     
     update_op = {
         '$push': {'participants.$.answers': answer_data},
@@ -456,6 +469,153 @@ def get_group_leaderboard(comp_id):
     leaderboard.sort(key=lambda x: x['score'], reverse=True)
     
     return success_response(leaderboard, 'Leaderboard retrieved successfully', 200)
+
+
+@competitions_bp.route('/<comp_id>/answers/<user_id>/<int:question_index>/mark', methods=['POST'])
+@require_auth
+def mark_answer(comp_id, user_id, question_index):
+    """Mark a discussion answer and award points (competition owner or admin only)"""
+    try:
+        comp_id_obj = ObjectId(comp_id)
+        participant_id_obj = ObjectId(user_id)
+    except Exception:
+        return error_response('Invalid id format', 400)
+
+    db = Database()
+    competition = db.find_one('competitions', {'_id': comp_id_obj})
+    if not competition:
+        return error_response('Competition not found', 404)
+
+    # Check permissions: creator or admin
+    requester = db.find_one('users', {'_id': ObjectId(g.user_id)})
+    is_admin = requester.get('is_admin', False) if requester else False
+    if str(competition.get('created_by')) != g.user_id and not is_admin:
+        return error_response('Only competition creator or admins can mark answers', 403)
+
+    # Find participant and specific answer
+    participants = competition.get('participants', [])
+    participant = None
+    for p in participants:
+        if p.get('user_id') == participant_id_obj:
+            participant = p
+            break
+    if not participant:
+        return error_response('Participant not found', 404)
+
+    # Find answer
+    answer_obj = None
+    for a in participant.get('answers', []):
+        if str(a.get('question_id')) == str(question_index):
+            answer_obj = a
+            break
+    if not answer_obj:
+        return error_response('Answer not found', 404)
+
+    data = request.get_json() or {}
+    try:
+        points = int(data.get('points', 0))
+    except Exception:
+        return error_response('Invalid points value', 400)
+    comment = data.get('comment', '').strip()
+
+    # compute delta points to update participant score and group scores accordingly
+    prev_points = int(answer_obj.get('points', 0) or 0)
+    delta = points - prev_points
+
+    # Update answer fields
+    answer_obj['points'] = points
+    answer_obj['is_reviewed'] = True
+    answer_obj['marked_by'] = ObjectId(g.user_id)
+    answer_obj['marked_at'] = __import__('datetime').datetime.utcnow()
+    if comment:
+        c = {'user_id': ObjectId(g.user_id), 'text': comment, 'created_at': __import__('datetime').datetime.utcnow()}
+        answer_obj.setdefault('comments', []).append(c)
+
+    # Update participant score
+    participant['score'] = participant.get('score', 0) + delta
+
+    # Update group_scores for participant's selected group if applicable
+    selected_group = participant.get('group_id')
+    if not selected_group:
+        # fallback: choose first of competition groups that the user is a member of
+        user = db.find_one('users', {'_id': participant.get('user_id')})
+        if user:
+            for gid in user.get('groups', []):
+                if gid in competition.get('group_ids', []):
+                    selected_group = gid
+                    break
+    if delta != 0 and selected_group:
+        # apply delta to competition group_scores
+        key = f'group_scores.{str(selected_group)}'
+        try:
+            db.update_one('competitions', {'_id': comp_id_obj}, { '$inc': { key: delta } }, raw=True)
+        except Exception:
+            pass
+        # also update season aggregate if present
+        season_id = competition.get('season_id')
+        if season_id:
+            try:
+                db.update_one('seasons', {'_id': season_id}, {'$inc': {f'group_scores.{str(selected_group)}': delta}}, raw=True)
+            except Exception:
+                pass
+
+    # Persist participants array back to DB
+    try:
+        db.update_one('competitions', {'_id': comp_id_obj}, {'participants': participants, 'updated_at': __import__('datetime').datetime.utcnow()})
+    except Exception as e:
+        return error_response('Failed to save mark', 500)
+
+    return success_response({'answer': answer_obj, 'participant_score': participant['score']}, 'Answer marked', 200)
+
+
+@competitions_bp.route('/<comp_id>/answers/<user_id>/<int:question_index>/comment', methods=['POST'])
+@require_auth
+def comment_on_answer(comp_id, user_id, question_index):
+    """Add a threaded comment to an answer"""
+    try:
+        comp_id_obj = ObjectId(comp_id)
+        participant_id_obj = ObjectId(user_id)
+    except Exception:
+        return error_response('Invalid id format', 400)
+
+    data = request.get_json() or {}
+    text = (data.get('text') or '').strip()
+    if not text:
+        return error_response('Comment text required', 400)
+
+    db = Database()
+    competition = db.find_one('competitions', {'_id': comp_id_obj})
+    if not competition:
+        return error_response('Competition not found', 404)
+
+    # Find participant and answer
+    participants = competition.get('participants', [])
+    participant = None
+    for p in participants:
+        if p.get('user_id') == participant_id_obj:
+            participant = p
+            break
+    if not participant:
+        return error_response('Participant not found', 404)
+
+    answer_obj = None
+    for a in participant.get('answers', []):
+        if str(a.get('question_id')) == str(question_index):
+            answer_obj = a
+            break
+    if not answer_obj:
+        return error_response('Answer not found', 404)
+
+    comment = {'user_id': ObjectId(g.user_id), 'text': text, 'created_at': __import__('datetime').datetime.utcnow()}
+    answer_obj.setdefault('comments', []).append(comment)
+
+    # Persist
+    try:
+        db.update_one('competitions', {'_id': comp_id_obj}, {'participants': participants, 'updated_at': __import__('datetime').datetime.utcnow()})
+    except Exception:
+        return error_response('Failed to save comment', 500)
+
+    return success_response({'comment': comment}, 'Comment added', 201)
 
 
 @competitions_bp.route('/<comp_id>', methods=['DELETE'])
