@@ -888,18 +888,20 @@
                     const indData = await indRes.json();
                     const indiv = indData.data || [];
                     indiv.sort((a,b) => (b.score||0) - (a.score||0));
-                    const leaderboardHtml = indiv.map((entry, index) => `
+                    const leaderboardHtml = indiv.map((entry, index) => {
+                        const avatar = entry.user?.avatar_url || ('https://ui-avatars.com/api/?name=' + encodeURIComponent(entry.user?.username || 'U') + '&background=6366f1&color=fff');
+                        return `
                         <div class="list-group-item d-flex justify-content-between align-items-center">
                             <div class="d-flex align-items-center">
                                 <div class="rank-num me-3">${index+1}</div>
-                                <img src="${entry.user?.avatar_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(entry.user?.username || 'U')}&background=6366f1&color=fff`}" class="rounded-circle me-3" width="40" height="40" alt="${entry.user?.username}">
+                                <img src="${avatar}" class="rounded-circle me-3" width="40" height="40" alt="${entry.user?.username}">
                                 <div>
                                     <strong>${entry.user?.full_name || entry.user?.username || 'User'}</strong>
                                     <div class="text-muted small">Score: ${entry.score}</div>
                                 </div>
                             </div>
                         </div>
-                    `).join('');
+                    `}).join('');
                     document.getElementById('viewCompLeaderboard').innerHTML = leaderboardHtml || '<p class="text-muted">Leaderboard not available yet.</p>';
                 }
 
@@ -1005,10 +1007,12 @@
                 }
 
                 if (!res.ok) {
-                    console.error('Failed to load competitions, status:', res.status);
-                    document.getElementById('activeCompsList').innerHTML = '<div class="col-12 text-center text-danger">Failed to load competitions</div>';
-                    document.getElementById('completedCompsList').innerHTML = '<div class="col-12 text-center text-danger">Failed to load competitions</div>';
-                    document.getElementById('myCompsList').innerHTML = '<div class="col-12 text-center text-danger">Failed to load competitions</div>';
+                    const text = await res.text().catch(() => '');
+                    console.error('Failed to load competitions, status:', res.status, 'body:', text);
+                    const errMsg = text ? `Failed to load competitions: ${text}` : 'Failed to load competitions';
+                    document.getElementById('activeCompsList').innerHTML = `<div class="col-12 text-center text-danger">${escapeHtml(errMsg)}</div>`;
+                    document.getElementById('completedCompsList').innerHTML = `<div class="col-12 text-center text-danger">${escapeHtml(errMsg)}</div>`;
+                    document.getElementById('myCompsList').innerHTML = `<div class="col-12 text-center text-danger">${escapeHtml(errMsg)}</div>`;
                     return;
                 }
 
