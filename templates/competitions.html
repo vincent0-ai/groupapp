@@ -375,6 +375,37 @@
             </div>
         </div>
     </div>
+
+    <!-- Mark Answer Modal -->
+    <div class="modal fade" id="markAnswerModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Mark Answer</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <input type="hidden" id="markModalCompId">
+                    <input type="hidden" id="markModalParticipant">
+                    <input type="hidden" id="markModalQuestion">
+
+                    <div class="mb-3">
+                        <label class="form-label">Points</label>
+                        <input type="number" id="markPointsInput" class="form-control" value="0">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Comment (optional)</label>
+                        <textarea id="markCommentInput" class="form-control" rows="3"></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-primary" onclick="submitMarkFromModal()">Save & Notify</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
 {% endblock %}
 
 {% block scripts %}
@@ -384,6 +415,7 @@
         // Some sessions may have a token but no cached userId.
         // Derive it from the JWT payload to keep UI state (answer marking, creator actions) consistent.
         let userId = localStorage.getItem('userId');
+        let isAdmin = false;
         if (!userId && token) {
             try {
                 const payloadPart = token.split('.')[1];
@@ -395,6 +427,18 @@
                 }
             } catch (e) {
                 // Ignore parse errors; API calls will still work via token.
+            }
+        }
+
+        async function loadProfile() {
+            if (!token) return;
+            try {
+                const res = await fetch('/api/users/profile', { headers: { 'Authorization': `Bearer ${token}` } });
+                if (!res.ok) return;
+                const data = await res.json();
+                if (data.data && data.data.is_admin) isAdmin = true;
+            } catch (e) {
+                // ignore
             }
         }
         let questionCount = 0;
@@ -720,7 +764,11 @@
                         const reviewedHtml = ans.is_reviewed ? `<span class="badge bg-success ms-2">${ans.points || 0} pts</span>` : `<span class="badge bg-warning text-dark ms-2">Pending</span>`;
                         const commentsHtml = (ans.comments || []).map(c => `<div class="small text-muted mb-1"><strong>${c.user_id}</strong>: ${escapeHtml(c.text)} <small class="text-muted">${new Date(c.created_at).toLocaleString()}</small></div>`).join('');
                         // Show mark button only to competition creator (or admins in future)
-                        const markBtn = (comp.created_by === userId) ? `<button class="btn btn-sm btn-outline-primary ms-2" onclick="markAnswer('${comp.id}', '${a.user}', ${i})">Mark</button>` : '';
+                        const markBtn = (comp.created_by === userId || isAdmin) ? `<button class="btn btn-sm btn-outline-primary ms-2" onclick="openMarkModal('${comp.id}', '${a.user}', ${i}, ${ans.points || 0})">Mark</button>` : '';
+
+                        // allow commenting only for participants or competition creator
+                        const isParticipantGlobal = (comp.participants || []).some(p => p.user_id === userId);
+                        const commentInput = (isParticipantGlobal || comp.created_by === userId) ? `<div class="input-group mt-2"><input class="form-control form-control-sm" id="comment_input_view_${comp.id}_${a.user}_${i}" placeholder="Add comment"><button class="btn btn-sm btn-outline-primary" onclick="postComment('${comp.id}', '${a.user}', ${i})">Comment</button></div>` : `<div class="small text-muted mt-2">Only participants can comment.</div>`;
 
                         return `
                             <div class="list-group-item">
@@ -729,7 +777,7 @@
                                         <div class="fw-semibold">${escapeHtml(a.username || a.user)}</div>
                                         <div class="small mt-1 mb-1">${escapeHtml(ans.answer || '')}</div>
                                         ${commentsHtml}
-                                        <div class="input-group mt-2"><input class="form-control form-control-sm" id="comment_input_view_${comp.id}_${a.user}_${i}" placeholder="Add comment"><button class="btn btn-sm btn-outline-primary" onclick="postComment('${comp.id}', '${a.user}', ${i})">Comment</button></div>
+                                        ${commentInput}
                                     </div>
                                     <div class="text-end">${reviewedHtml}${markBtn}</div>
                                 </div>
@@ -890,19 +938,35 @@
         }
 
         // Mark an answer (owner/admin)
-        async function markAnswer(compId, participantUserId, questionIndex) {
+        function openMarkModal(compId, participantUserId, questionIndex, currentPoints = 0) {
+            // Populate modal fields and show
+            document.getElementById('markModalCompId').value = compId;
+            document.getElementById('markModalParticipant').value = participantUserId;
+            document.getElementById('markModalQuestion').value = questionIndex;
+            document.getElementById('markPointsInput').value = currentPoints || 0;
+            document.getElementById('markCommentInput').value = '';
+            const modalEl = document.getElementById('markAnswerModal');
+            const modal = new bootstrap.Modal(modalEl);
+            modal.show();
+        }
+
+        async function submitMarkFromModal() {
+            const compId = document.getElementById('markModalCompId').value;
+            const participantUserId = document.getElementById('markModalParticipant').value;
+            const questionIndex = parseInt(document.getElementById('markModalQuestion').value);
+            const points = parseInt(document.getElementById('markPointsInput').value) || 0;
+            const comment = document.getElementById('markCommentInput').value.trim();
+
             try {
-                const pointsStr = prompt('Points to award (integer):', '0');
-                if (pointsStr === null) return; // cancelled
-                const points = parseInt(pointsStr);
-                if (isNaN(points)) { alert('Invalid points'); return; }
-                const comment = prompt('Optional comment for this marking:','') || '';
                 const res = await fetch(`/api/competitions/${compId}/answers/${participantUserId}/${questionIndex}/mark`, {
                     method: 'POST',
                     headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
                     body: JSON.stringify({ points, comment })
                 });
                 if (res.ok) {
+                    const modalEl = document.getElementById('markAnswerModal');
+                    const modal = bootstrap.Modal.getInstance(modalEl);
+                    if (modal) modal.hide();
                     await showCustomAlert('Answer marked', 'Success');
                     await viewCompetition(compId);
                 } else {
@@ -910,7 +974,8 @@
                     await showCustomAlert(d.message || 'Failed to mark answer', 'Error');
                 }
             } catch (e) {
-                console.error('Error marking answer', e);
+                console.error('Error marking from modal', e);
+                await showCustomAlert('An error occurred', 'Error');
             }
         }
 
@@ -1254,12 +1319,13 @@
                 await showCustomAlert('An error occurred while creating the competition', 'Error');
             }
         });
-        document.addEventListener('DOMContentLoaded', () => {
+        document.addEventListener('DOMContentLoaded', async () => {
             if (!token) {
                 sessionStorage.setItem('redirectAfterLogin', window.location.href);
                 window.location.href = "{{ url_for('auth_page') }}";
                 return;
             }
+            await loadProfile();
             loadCompetitions();
             loadSeasonsForCreate();
         });

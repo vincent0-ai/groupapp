@@ -1,5 +1,6 @@
 from flask import Blueprint, request, g
 from app.utils import success_response, error_response, serialize_document
+from app.routes.notifications import create_notification
 from app.services import Database
 from app.models import Competition
 from bson import ObjectId
@@ -565,6 +566,14 @@ def mark_answer(comp_id, user_id, question_index):
     except Exception as e:
         return error_response('Failed to save mark', 500)
 
+    # Notify participant that their answer was reviewed
+    try:
+        participant_user_id = participant.get('user_id')
+        msg = f"Your answer to question {question_index+1} in competition '{competition.get('title')}' has been reviewed and awarded {points} points."
+        create_notification(participant_user_id, 'competition_review', msg, link=f"/competitions/{comp_id}")
+    except Exception:
+        pass
+
     return success_response({'answer': answer_obj, 'participant_score': participant['score']}, 'Answer marked', 200)
 
 
@@ -606,7 +615,15 @@ def comment_on_answer(comp_id, user_id, question_index):
     if not answer_obj:
         return error_response('Answer not found', 404)
 
-    comment = {'user_id': ObjectId(g.user_id), 'text': text, 'created_at': __import__('datetime').datetime.utcnow()}
+    # Only allow commenting if requester is a participant in this competition or competition creator or admin
+    requester_id = ObjectId(g.user_id)
+    is_participant = any(p.get('user_id') == requester_id for p in participants)
+    requester = db.find_one('users', {'_id': requester_id})
+    is_admin = requester.get('is_admin', False) if requester else False
+    if not (is_participant or str(competition.get('created_by')) == g.user_id or is_admin):
+        return error_response('Only participants or competition creator/admins can comment on answers', 403)
+
+    comment = {'user_id': requester_id, 'text': text, 'created_at': __import__('datetime').datetime.utcnow()}
     answer_obj.setdefault('comments', []).append(comment)
 
     # Persist
