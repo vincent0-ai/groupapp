@@ -994,6 +994,23 @@
                 const res = await fetch('/api/competitions', {
                     headers: { 'Authorization': `Bearer ${token}` }
                 });
+
+                // Handle auth errors explicitly
+                if (res.status === 401) {
+                    localStorage.removeItem('token');
+                    sessionStorage.setItem('redirectAfterLogin', window.location.href);
+                    window.location.href = "{{ url_for('auth_page') }}";
+                    return;
+                }
+
+                if (!res.ok) {
+                    console.error('Failed to load competitions, status:', res.status);
+                    document.getElementById('activeCompsList').innerHTML = '<div class="col-12 text-center text-danger">Failed to load competitions</div>';
+                    document.getElementById('completedCompsList').innerHTML = '<div class="col-12 text-center text-danger">Failed to load competitions</div>';
+                    document.getElementById('myCompsList').innerHTML = '<div class="col-12 text-center text-danger">Failed to load competitions</div>';
+                    return;
+                }
+
                 const data = await res.json();
                 const competitions = data.data?.competitions || [];
                 
