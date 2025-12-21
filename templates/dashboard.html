@@ -49,7 +49,6 @@
     }
     
     .stat-card.groups::before { background: #4F46E5; }
-    .stat-card.points::before { background: #F59E0B; }
     .stat-card.competitions::before { background: #22C55E; }
     .stat-card.messages::before { background: #38BDF8; }
     
@@ -196,13 +195,6 @@
                     <div class="stat-label">My Groups</div>
                     <div class="stat-value" id="groupsCount">0</div>
                     <a href="/groups" class="btn btn-sm btn-outline-primary mt-3">View All</a>
-                </div>
-            </div>
-            <div class="col-6 col-lg-3">
-                <div class="stat-card points">
-                    <div class="stat-label">Total Points</div>
-                    <div class="stat-value" id="pointsCount">0</div>
-                    <a href="/leaderboard" class="btn btn-sm btn-outline-primary mt-3">Leaderboard</a>
                 </div>
             </div>
             <div class="col-6 col-lg-3">
@@ -471,7 +463,6 @@
                 // Update stats
                 const groups = groupsData.data?.groups || [];
                 document.getElementById('groupsCount').textContent = groups.length;
-                document.getElementById('pointsCount').textContent = userData.data?.points || 0;
                 document.getElementById('messagesCount').textContent = unreadData.data?.unread_count || 0;
                 document.getElementById('competitionsCount').textContent = activeComps.length;
 

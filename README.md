@@ -8,7 +8,7 @@ A Progressive Web App for collaborative learning, interactive whiteboards, group
 Below is a short status list indicating which features are already implemented and which are planned or partial.
 
 #### Core Features
-- [x] **User Authentication & Profiles** — Email/password signup, JWT login, Google social login, user profiles with points system ✅
+- [x] **User Authentication & Profiles** — Email/password signup, JWT login, Google social login, user profiles ✅
 - [x] **Groups & Channels** — Create / join public & private groups, member management, moderators ✅
 - [x] **Real-Time Messaging** — Instant messaging, emoji reactions, replies (threading via `reply_to`), mentions, read receipts, pinned messages, notifications ✅
 - [x] **Interactive Whiteboard** — Real-time collaborative drawing, annotations, multiple users, LiveKit video integration ✅
@@ -245,7 +245,6 @@ python main.py
   full_name: String,
   avatar_url: String,
   bio: String,
-  points: Number,
   badges: [String],
   groups: [ObjectId],
   channels: [ObjectId],

@@ -17,7 +17,6 @@ class User:
             'full_name': full_name,
             'avatar_url': avatar_url or f'https://api.dicebear.com/7.x/avataaars/svg?seed={email}',
             'bio': '',
-            'points': 0,
             'badges': [],
             'groups': [],  # List of group IDs
             'channels': [],  # List of channel IDs

@@ -805,23 +805,20 @@
             
             // Use leaderboard endpoint (same as dashboard's Top Performers)
             try {
-                const res = await fetch('/api/users/leaderboard?per_page=20', {
+                const res = await fetch('/api/users/search', {
                     headers: { 'Authorization': `Bearer ${token}` }
                 });
-                
+
                 if (!res.ok) {
-                    console.error('Leaderboard request failed:', res.status, res.statusText);
+                    console.error('User search request failed:', res.status, res.statusText);
                     document.getElementById('userSearchResults').innerHTML = `<p class="text-muted text-center py-3">Error loading users (${res.status})</p>`;
                     return;
                 }
-                
+
                 const data = await res.json();
-                console.log('Leaderboard full response:', data);
-                
-                // Check for status: 'success' (not success: true)
-                if (data.status === 'success' && data.data) {
-                    // Use leaderboard array (same as dashboard)
-                    const users = data.data.leaderboard || data.data.users || [];
+
+                // data.data is an array of users
+                const users = data.data || [];
                     console.log('Total users from API:', users.length);
                     
                     if (users.length > 0) {
@@ -891,19 +888,16 @@
             
             // Search by filtering leaderboard results (most reliable)
             try {
-                const res = await fetch('/api/users/leaderboard?per_page=100', {
+                const res = await fetch(`/api/users/search?q=${encodeURIComponent(query)}`, {
                     headers: { 'Authorization': `Bearer ${token}` }
                 });
                 const data = await res.json();
-                
-                // Check for status: 'success' (not success: true)
-                if (data.status === 'success' && data.data) {
-                    const allUsers = data.data.leaderboard || data.data.users || [];
-                    const queryLower = query.toLowerCase();
-                    const matchedUsers = allUsers.filter(u => 
-                        (u.username && u.username.toLowerCase().includes(queryLower)) ||
-                        (u.full_name && u.full_name.toLowerCase().includes(queryLower))
-                    );
+                const allUsers = data.data || [];
+                const queryLower = query.toLowerCase();
+                const matchedUsers = allUsers.filter(u => 
+                    (u.username && u.username.toLowerCase().includes(queryLower)) ||
+                    (u.full_name && u.full_name.toLowerCase().includes(queryLower))
+                );
                     
                     if (matchedUsers.length > 0) {
                         renderUserResults(matchedUsers);

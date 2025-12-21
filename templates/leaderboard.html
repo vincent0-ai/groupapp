@@ -209,69 +209,6 @@
             <p class="text-muted mb-0">Compete and climb the ranks!</p>
         </div>
 
-        <!-- Filter Options -->
-        <div class="filter-container">
-            <select class="form-select" id="filterPeriod">
-                <option value="all">All Time</option>
-                <option value="week">This Week</option>
-                <option value="month">This Month</option>
-            </select>
-            <select class="form-select" id="filterGroup">
-                <option value="">All Groups</option>
-            </select>
-            <div class="search-input-wrapper flex-grow-1" style="max-width: 300px;">
-                <i class="fas fa-search"></i>
-                <input type="text" class="form-control" id="searchUser" placeholder="Search user...">
-            </div>
-        </div>
-
-        <!-- Leaderboard Table -->
-        <div class="row">
-            <div class="col-lg-12">
-                <div class="card leaderboard-card">
-                    <div class="card-header d-flex align-items-center">
-                        <i class="fas fa-trophy me-2"></i>
-                        <h5 class="mb-0">Top Performers</h5>
-                    </div>
-                    <div class="card-body">
-                        <!-- Leaderboard list view (replaces table for normal display) -->
-                        <div id="leaderboardBody" class="list-group">
-                            <div class="list-group-item text-center py-5">
-                                <div class="spinner-border text-primary" role="status"></div>
-                                <p class="text-muted mt-2 mb-0">Loading leaderboard...</p>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Your Rank -->
-        <div class="row mt-4">
-            <div class="col-lg-12">
-                <div class="card leaderboard-card my-rank-card" id="myRankCard">
-                    <div class="card-header d-flex align-items-center">
-                        <i class="fas fa-user-circle me-2"></i>
-                        <h5 class="mb-0">Your Rank</h5>
-                    </div>
-                    <div class="card-body">
-                        <div class="row align-items-center">
-                            <div class="col-auto">
-                                <img id="myAvatar" src="" alt="Avatar" class="rounded-circle" width="80" height="80" style="border: 3px solid var(--primary-color);">
-                            </div>
-                            <div class="col">
-                                <h5 id="myUsername" class="mb-1 fw-bold">Loading...</h5>
-                                <p class="text-muted mb-2" id="myRankText">-</p>
-                                <div class="progress" style="height: 8px;">
-                                    <div id="myProgressBar" class="progress-bar" role="progressbar" style="width: 0%"></div>
-                                </div>
-                                <small class="text-muted" id="myPointsText">-</small>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
 {% endblock %}
 
 {% block modals %}
@@ -291,12 +228,6 @@
                     </div>
                     
                     <div class="row text-center mb-4">
-                        <div class="col-4">
-                            <div class="p-2 bg-light rounded">
-                                <h5 class="mb-0 text-primary" id="viewUserPoints">0</h5>
-                                <small class="text-muted">Points</small>
-                            </div>
-                        </div>
                         <div class="col-4">
                             <div class="p-2 bg-light rounded">
                                 <h5 class="mb-0 text-success" id="viewUserGroups">0</h5>
@@ -387,141 +318,6 @@
             }
         }
 
-        const medals = ['🥇', '🥈', '🥉'];
-
-        async function loadLeaderboard() {
-            try {
-                const period = document.getElementById('filterPeriod').value;
-                const groupId = document.getElementById('filterGroup') ? document.getElementById('filterGroup').value : '';
-                let url = `/api/users/leaderboard?period=${period}`;
-                if (groupId) url += `&group_id=${groupId}`;
-                const res = await fetch(url, {
-                    headers: { 'Authorization': `Bearer ${token}` }
-                });
-
-                // Handle non-OK responses explicitly so the loading spinner isn't left forever
-                if (!res.ok) {
-                    if (res.status === 401) {
-                        // Not authorized - redirect to login
-                        sessionStorage.setItem('redirectAfterLogin', window.location.href);
-                        window.location.href = "{{ url_for('auth_page') }}";
-                        return;
-                    }
-                    document.getElementById('leaderboardBody').innerHTML = `<div class="list-group-item text-center py-4 text-danger">Failed to load leaderboard</div>`;
-                    return;
-                }
-
-                const data = await res.json();
-                const users = data.data?.leaderboard || [];
-
-                const tbody = document.getElementById('leaderboardBody');
-                const rows = users.map((user, index) => {
-                    const medal = index < 3 ? medals[index] : `${index + 1}`;
-                    const isCurrentUser = (user.id == userId) ? 'active' : '';
-                    return `
-                        <div class="list-group-item d-flex align-items-center justify-content-between ${isCurrentUser}">
-                            <div class="d-flex align-items-center">
-                                <div class="me-3">
-                                    <div class="rank-num">${medal}</div>
-                                </div>
-                                <img src="${user.avatar_url || 'https://api.dicebear.com/7.x/avataaars/svg?seed=' + user.username}" 
-                                     alt="Avatar" class="rounded-circle me-3" width="48" height="48">
-                                <div>
-                                    <div><strong>${user.username}</strong></div>
-                                    <div class="text-muted small">
-                                        <span class="badge bg-success">${user.points || 0}</span>
-                                        &nbsp;·&nbsp; Badges: ${user.badges?.length || 0}
-                                        &nbsp;·&nbsp; Groups: ${user.groups_count || 0}
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    `;
-                }).join('');
-
-                tbody.innerHTML = rows || '<div class="list-group-item text-center text-muted">No users found</div>';
-
-                // Load current user rank
-                loadMyRank(users);
-            } catch (error) {
-                console.error('Error loading leaderboard:', error);
-                document.getElementById('leaderboardBody').innerHTML = `<div class="list-group-item text-center py-4 text-danger">Failed to load leaderboard</div>`;
-            }
-        }
-
-        async function loadMyRank(allUsers) {
-            try {
-                const res = await fetch('/api/users/profile', {
-                    headers: { 'Authorization': `Bearer ${token}` }
-                });
-                const data = await res.json();
-                const user = data.data;
-
-                document.getElementById('myAvatar').src = user.avatar_url || 'https://api.dicebear.com/7.x/avataaars/svg?seed=' + user.username;
-                document.getElementById('myUsername').textContent = user.username;
-                document.getElementById('myPointsText').textContent = `${user.points || 0} points`;
-
-                // Find rank
-                const rank = allUsers.findIndex(u => u.id === userId) + 1;
-                if (rank > 0) {
-                    document.getElementById('myRankText').textContent = `You are ranked #${rank} of ${allUsers.length}`;
-                    const percentage = (rank / allUsers.length) * 100;
-                    document.getElementById('myProgressBar').style.width = (100 - percentage) + '%';
-                } else {
-                    document.getElementById('myRankText').textContent = 'Not ranked yet';
-                    document.getElementById('myProgressBar').style.width = '0%';
-                }
-            } catch (error) {
-                console.error('Error loading user rank:', error);
-            }
-        }
-
-        document.getElementById('filterPeriod').addEventListener('change', loadLeaderboard);
-
-        document.getElementById('searchUser').addEventListener('input', async (e) => {
-            const query = e.target.value;
-            if (query.length < 2) {
-                loadLeaderboard();
-                return;
-            }
-
-            try {
-                const res = await fetch(`/api/users/search?q=${encodeURIComponent(query)}`, {
-                    headers: { 'Authorization': `Bearer ${token}` }
-                });
-                const data = await res.json();
-                const users = data.data || [];
-
-                const tbody = document.getElementById('leaderboardBody');
-                const rows = users.map((user, index) => {
-                    const medal = index < 3 ? medals[index] : `${index + 1}`;
-                    const isCurrentUser = (user._id == userId || user.id == userId) ? 'active' : '';
-                    return `
-                        <div class="list-group-item d-flex align-items-center justify-content-between ${isCurrentUser}">
-                            <div class="d-flex align-items-center">
-                                <div class="me-3">
-                                    <div class="rank-num">${medal}</div>
-                                </div>
-                                <img src="${user.avatar_url || 'https://api.dicebear.com/7.x/avataaars/svg?seed=' + user.username}" 
-                                     alt="Avatar" class="rounded-circle me-3" width="48" height="48">
-                                <div>
-                                    <div><strong>${user.username}</strong></div>
-                                    <div class="text-muted small">
-                                        <span class="badge bg-success">${user.points || 0}</span>
-                                        &nbsp;·&nbsp; Badges: ${user.badges?.length || 0}
-                                        &nbsp;·&nbsp; Groups: ${user.groups_count || 0}
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    `;
-                }).join('');
-
-                tbody.innerHTML = rows || '<div class="list-group-item text-center text-muted">No users found</div>';
-            } catch (error) {
-                console.error('Error searching users:', error);
-            }
-        });
         document.addEventListener('DOMContentLoaded', async () => {
             if (!token) {
                 sessionStorage.setItem('redirectAfterLogin', window.location.href);
@@ -529,27 +325,8 @@
                 return;
             }
 
-            // Load groups for group filter
-            try {
-                const groupRes = await fetch('/api/users/groups', { headers: { 'Authorization': `Bearer ${token}` } });
-                if (groupRes.ok) {
-                    const groupData = await groupRes.json();
-                    const groups = groupData.data?.groups || [];
-                    const filterGroupSelect = document.getElementById('filterGroup');
-                    groups.forEach(g => {
-                        const opt = document.createElement('option');
-                        opt.value = g.id || g._id;
-                        opt.textContent = g.name;
-                        filterGroupSelect.appendChild(opt);
-                    });
-                    // When group filter changes, reload leaderboard
-                    filterGroupSelect.addEventListener('change', loadLeaderboard);
-                }
-            } catch (e) {
-                console.error('Error loading groups for leaderboard filter', e);
-            }
-
-            loadLeaderboard();
+            // Load groups leaderboard
+            loadGroupsLeaderboard();
         });
     </script>
 {% endblock %}

@@ -219,12 +219,6 @@ def join_competition(comp_id):
     
     db.push_to_array('competitions', {'_id': comp_id_obj}, 'participants', participant_data)
     
-    # Award points
-    try:
-        points = current_app.config['POINTS_CONFIG']['JOIN_COMPETITION']
-        db.increment('users', {'_id': ObjectId(g.user_id)}, 'points', points)
-    except Exception as e:
-        print(f"Error awarding points: {e}")
     
     return success_response(None, 'Joined competition successfully', 200)
 
