@@ -398,6 +398,19 @@
                 const res = await fetch(url, {
                     headers: { 'Authorization': `Bearer ${token}` }
                 });
+
+                // Handle non-OK responses explicitly so the loading spinner isn't left forever
+                if (!res.ok) {
+                    if (res.status === 401) {
+                        // Not authorized - redirect to login
+                        sessionStorage.setItem('redirectAfterLogin', window.location.href);
+                        window.location.href = "{{ url_for('auth_page') }}";
+                        return;
+                    }
+                    document.getElementById('leaderboardBody').innerHTML = `<div class="list-group-item text-center py-4 text-danger">Failed to load leaderboard</div>`;
+                    return;
+                }
+
                 const data = await res.json();
                 const users = data.data?.leaderboard || [];
 
@@ -432,6 +445,7 @@
                 loadMyRank(users);
             } catch (error) {
                 console.error('Error loading leaderboard:', error);
+                document.getElementById('leaderboardBody').innerHTML = `<div class="list-group-item text-center py-4 text-danger">Failed to load leaderboard</div>`;
             }
         }
 

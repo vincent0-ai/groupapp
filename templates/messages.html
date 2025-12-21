@@ -875,10 +875,8 @@
                     
                     // Time formatting
                     const msgDate = new Date(m.created_at);
-                    const timeStr = msgDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-                    const dateStr = msgDate.toLocaleDateString();
-                    const isToday = new Date().toLocaleDateString() === dateStr;
-                    const displayTime = isToday ? timeStr : `${dateStr} ${timeStr}`;
+                    // Show only the time (no date)
+                    const displayTime = msgDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
                     
                     // Announcement rendering
                     if (isAnnouncement) {
@@ -928,9 +926,7 @@
                                     <p class="mb-0 message-content">${formattedContent}</p>
                                     ${renderReactions(m)}
                                 </div>
-
-                                </div>
-                                <small class="text-muted mt-1" style="font-size: 0.7rem;">
+                                <small class="text-muted mt-1 ${isMine ? 'text-end' : ''}" style="font-size: 0.7rem;">
                                     ${isMine ? 'You' : (m.user_first_name || 'User ' + m.user_id.substr(-4))} • ${displayTime}
                                 </small>
                             </div>
