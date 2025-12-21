@@ -254,7 +254,12 @@
                             </div>
                             <div class="col-md-6 mb-3">
                                 <label for="compGroup" class="form-label">Group</label>
+                                <div class="form-text small text-muted mb-1">If you want multiple groups to compete, check "General competition" and select groups below.</div>
                                 <select class="form-control" id="compGroup" required></select>
+                                <div class="form-check form-switch mt-2">
+                                    <input class="form-check-input" type="checkbox" id="compIsGeneral">
+                                    <label class="form-check-label small" for="compIsGeneral">General competition (multi-group)</label>
+                                </div>
                             </div>
                         </div>
                         <div class="mb-3">
@@ -337,7 +342,7 @@
                         <p id="viewCompParticipants">0</p>
                     </div>
                     <hr>
-                    <h6>Group Leaderboard</h6>
+                    <h6 id="viewCompLeaderboardTitle">Group Leaderboard</h6>
                     <div id="viewCompLeaderboard" class="list-group list-group-flush"></div>
                     <hr>
                     <h6>Questions</h6>
@@ -346,6 +351,26 @@
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
                     <button type="button" class="btn btn-success" id="viewCompJoinBtn">Join Competition</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Choose group modal (when joining a general/multi-group competition) -->
+    <div class="modal fade" id="chooseGroupModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Choose Group</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <p class="text-muted">Select which group you will represent in this competition.</p>
+                    <select id="chooseGroupSelect" class="form-select"></select>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-primary" id="confirmChooseGroupBtn">Join as selected group</button>
                 </div>
             </div>
         </div>
@@ -634,7 +659,54 @@
                 document.getElementById('viewCompQuestions').innerHTML = questionsHtml || '<p class="text-muted">No questions available.</p>';
 
                 const joinBtn = document.getElementById('viewCompJoinBtn');
-                joinBtn.onclick = () => joinCompetition(comp.id);
+                // Prepare join behavior: check user's groups and let them choose if needed
+                joinBtn.onclick = async () => {
+                    try {
+                        const userGroupsRes = await fetch('/api/users/groups', { headers: { 'Authorization': `Bearer ${token}` } });
+                        const userGroupsData = await userGroupsRes.json();
+                        const userGroups = userGroupsData.data?.groups || [];
+
+                        // Competition groups (ids as strings)
+                        const compGroupIds = (comp.group_ids || []).map(g => String(g));
+
+                        // Find intersection of user's groups with competition groups
+                        const eligible = userGroups.filter(g => compGroupIds.includes(g.id));
+
+                        if (eligible.length === 0) {
+                            await showCustomAlert('You must be a member of a participating group to join this competition.', 'Info');
+                            return;
+                        }
+
+                        if (eligible.length === 1) {
+                            // Auto-join with that group
+                            await joinCompetition(comp.id, eligible[0].id);
+                            await playCompetition(comp.id);
+                            return;
+                        }
+
+                        // Multiple eligible groups - show chooser modal
+                        const chooseSelect = document.getElementById('chooseGroupSelect');
+                        chooseSelect.innerHTML = '';
+                        eligible.forEach(g => {
+                            const opt = document.createElement('option');
+                            opt.value = g.id;
+                            opt.textContent = g.name;
+                            chooseSelect.appendChild(opt);
+                        });
+                        const chooseModal = new bootstrap.Modal(document.getElementById('chooseGroupModal'));
+                        document.getElementById('confirmChooseGroupBtn').onclick = async () => {
+                            const selected = chooseSelect.value;
+                            if (!selected) return;
+                            chooseModal.hide();
+                            await joinCompetition(comp.id, selected);
+                            await playCompetition(comp.id);
+                        };
+                        chooseModal.show();
+                    } catch (err) {
+                        console.error('Error preparing join:', err);
+                        await showCustomAlert('Could not prepare join. Please try again.', 'Error');
+                    }
+                };
                 
                 if (new Date(comp.end_time) < new Date()) {
                      joinBtn.style.display = 'none';
@@ -642,35 +714,57 @@
                      joinBtn.style.display = 'block';
                 }
 
-                // Fetch and display leaderboard
-                const leaderboardRes = await fetch(`/api/competitions/${compId}/leaderboard`, {
-                    headers: { 'Authorization': `Bearer ${token}` }
-                });
-                const leaderboardData = await leaderboardRes.json();
-                let leaderboard = leaderboardData.data || [];
-                // Ensure sorted by score desc (server should already do this)
-                leaderboard = leaderboard.sort((a, b) => (b.score || 0) - (a.score || 0));
+                // Decide whether to show group leaderboard (for general/intergroup) or individual leaderboard (for single-group)
+                let showGroup = comp.is_general || (comp.group_ids && comp.group_ids.length > 1);
 
-                const leaderboardHtml = leaderboard.map((entry, index) => {
-                    const rank = index + 1;
-                    const medalClass = rank === 1 ? 'gold' : rank === 2 ? 'silver' : rank === 3 ? 'bronze' : '';
-                    const avatar = entry.group?.avatar_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(entry.group?.name || 'G')}&background=6366f1&color=fff`;
-                    return `
+                if (showGroup) {
+                    document.getElementById('viewCompLeaderboardTitle').textContent = 'Group Leaderboard';
+                    const leaderboardRes = await fetch(`/api/competitions/${compId}/leaderboard`, { headers: { 'Authorization': `Bearer ${token}` } });
+                    const leaderboardData = await leaderboardRes.json();
+                    let leaderboard = leaderboardData.data || [];
+                    leaderboard = leaderboard.sort((a, b) => (b.score || 0) - (a.score || 0));
+
+                    const leaderboardHtml = leaderboard.map((entry, index) => {
+                        const rank = index + 1;
+                        const medalClass = rank === 1 ? 'gold' : rank === 2 ? 'silver' : rank === 3 ? 'bronze' : '';
+                        const avatar = entry.group?.avatar_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(entry.group?.name || 'G')}&background=6366f1&color=fff`;
+                        return `
+                            <div class="list-group-item d-flex justify-content-between align-items-center">
+                                <div class="d-flex align-items-center">
+                                    <div class="rank-badge ${medalClass}">${rank}</div>
+                                    <img src="${avatar}" class="rounded-circle me-3" width="40" height="40" alt="${entry.group?.name}">
+                                    <div>
+                                        <strong>${entry.group?.name || 'Unknown Group'}</strong>
+                                        <div class="text-muted small">${entry.group?.member_count || ''} members</div>
+                                    </div>
+                                </div>
+                                <span class="badge bg-primary rounded-pill">${entry.score} points</span>
+                            </div>
+                        `;
+                    }).join('');
+
+                    document.getElementById('viewCompLeaderboard').innerHTML = leaderboardHtml || '<p class="text-muted">Leaderboard not available yet.</p>';
+                } else {
+                    // Single-group competition -> show individual leaderboard
+                    document.getElementById('viewCompLeaderboardTitle').textContent = 'Individual Leaderboard';
+                    const indRes = await fetch(`/api/competitions/${compId}/individual-leaderboard`, { headers: { 'Authorization': `Bearer ${token}` } });
+                    const indData = await indRes.json();
+                    const indiv = indData.data || [];
+                    indiv.sort((a,b) => (b.score||0) - (a.score||0));
+                    const leaderboardHtml = indiv.map((entry, index) => `
                         <div class="list-group-item d-flex justify-content-between align-items-center">
                             <div class="d-flex align-items-center">
-                                <div class="rank-badge ${medalClass}">${rank}</div>
-                                <img src="${avatar}" class="rounded-circle me-3" width="40" height="40" alt="${entry.group?.name}">
+                                <div class="rank-num me-3">${index+1}</div>
+                                <img src="${entry.user?.avatar_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(entry.user?.username || 'U')}&background=6366f1&color=fff`}" class="rounded-circle me-3" width="40" height="40" alt="${entry.user?.username}">
                                 <div>
-                                    <strong>${entry.group?.name || 'Unknown Group'}</strong>
-                                    <div class="text-muted small">${entry.group?.member_count || ''} members</div>
+                                    <strong>${entry.user?.full_name || entry.user?.username || 'User'}</strong>
+                                    <div class="text-muted small">Score: ${entry.score}</div>
                                 </div>
                             </div>
-                            <span class="badge bg-primary rounded-pill">${entry.score} points</span>
                         </div>
-                    `;
-                }).join('');
-
-                document.getElementById('viewCompLeaderboard').innerHTML = leaderboardHtml || '<p class="text-muted">Leaderboard not available yet.</p>';
+                    `).join('');
+                    document.getElementById('viewCompLeaderboard').innerHTML = leaderboardHtml || '<p class="text-muted">Leaderboard not available yet.</p>';
+                }
 
                 new bootstrap.Modal(document.getElementById('viewCompModal')).show();
             } catch (error) {
@@ -789,19 +883,19 @@
                 const completedHtml = completedComps.length ? completedComps.map(c => compCard(c, true)).join('') : '<div class="col-12 text-center text-secondary"><p>No completed competitions</p></div>';
                 document.getElementById('completedCompsList').innerHTML = completedHtml;
 
-                // Populate group dropdown with only groups where user is moderator/owner
+                // Populate group dropdown with groups where the user is owner or moderator
                 const groupRes = await fetch('/api/users/groups', {
                     headers: { 'Authorization': `Bearer ${token}` }
                 });
                 const groupData = await groupRes.json();
                 const groupSelect = document.getElementById('compGroup');
                 const allGroups = groupData.data?.groups || [];
-                // Filter to groups where the user is owner (moderator)
-                const myModeratedGroups = allGroups.filter(g => g.owner_id === userId);
-                
+                // Filter to groups where the user is owner or a moderator
+                const myModeratedGroups = allGroups.filter(g => g.owner_id === userId || (Array.isArray(g.moderators) && g.moderators.includes(userId)));
+
                 groupSelect.innerHTML = '<option value="">Select a group</option>';
                 if (myModeratedGroups.length === 0) {
-                    groupSelect.innerHTML = '<option value="">No groups (you must be a group owner)</option>';
+                    groupSelect.innerHTML = '<option value="">No groups (you must be a group owner or moderator)</option>';
                 } else {
                     myModeratedGroups.forEach(g => {
                         const option = document.createElement('option');
@@ -810,6 +904,18 @@
                         groupSelect.appendChild(option);
                     });
                 }
+
+                // Toggle multi-select when 'general competition' is checked
+                const isGeneralCheckbox = document.getElementById('compIsGeneral');
+                isGeneralCheckbox.addEventListener('change', (e) => {
+                    if (e.target.checked) {
+                        groupSelect.multiple = true;
+                        groupSelect.size = Math.min(6, myModeratedGroups.length || 4);
+                    } else {
+                        groupSelect.multiple = false;
+                        groupSelect.size = 0;
+                    }
+                });
                 
                 // Load "My Competitions" - those created by the user
                 const myComps = competitions.filter(c => c.created_by === userId);
@@ -820,11 +926,13 @@
             }
         }
 
-        async function joinCompetition(compId) {
+        async function joinCompetition(compId, groupId = null) {
             try {
+                const body = groupId ? { group_id: groupId } : null;
                 const res = await fetch(`/api/competitions/${compId}/join`, {
                     method: 'POST',
-                    headers: { 'Authorization': `Bearer ${token}` }
+                    headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+                    body: body ? JSON.stringify(body) : null
                 });
                 if (res.ok) {
                     await showCustomAlert('Joined competition!', 'Success');
@@ -931,17 +1039,28 @@
                     return;
                 }
 
-                const groupId = document.getElementById('compGroup').value;
+                const selectEl = document.getElementById('compGroup');
                 const seasonId = document.getElementById('compSeason').value;
-                if (!groupId) {
-                    await showCustomAlert('Please select a group', 'Error');
+
+                // Gather selected group ids (support multi-select for general competitions)
+                let selectedGroups = [];
+                if (selectEl.multiple) {
+                    selectedGroups = Array.from(selectEl.selectedOptions).map(o => o.value).filter(v => v);
+                } else {
+                    const val = selectEl.value;
+                    if (val) selectedGroups = [val];
+                }
+
+                if (!selectedGroups || selectedGroups.length === 0) {
+                    await showCustomAlert('Please select at least one group', 'Error');
                     return;
                 }
 
                 const payload = {
                     title: document.getElementById('compName').value,
                     description: document.getElementById('compDescription').value,
-                    group_ids: [groupId],
+                    group_ids: selectedGroups,
+                    is_general: document.getElementById('compIsGeneral').checked,
                     start_time: startTime.toISOString(),
                     end_time: endTime.toISOString(),
                     questions: questions

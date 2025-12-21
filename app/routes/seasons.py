@@ -2,6 +2,7 @@ from flask import Blueprint, request, g, current_app
 from app.utils import success_response, error_response, serialize_document
 from app.services import Database
 from app.models import Season
+from app.routes.notifications import create_bulk_notifications
 from bson import ObjectId
 from datetime import timedelta
 from app.utils.decorators import require_auth
@@ -57,6 +58,22 @@ def create_season():
     if not sid:
         return error_response('Failed to create season', 500)
     season_doc['_id'] = sid
+
+    # Notify all group owners/admins that a new season is open and they may create general competitions
+    try:
+        groups = list(db.find('groups', {}))
+        owner_ids = []
+        for gdoc in groups:
+            owner_id = gdoc.get('owner_id')
+            if owner_id:
+                owner_ids.append(str(owner_id))
+        if owner_ids:
+            msg = f"A new season '{title}' has started ({start_dt.date().isoformat()} - {end_dt.date().isoformat()}). Group admins may create general competitions during this season."
+            create_bulk_notifications(owner_ids, 'announcement', msg, link='/seasons')
+    except Exception as e:
+        # Best-effort, don't fail season creation if notifications fail
+        print(f"Failed to notify group owners about season creation: {e}")
+
     return success_response(serialize_document(season_doc), 'Season created successfully', 201)
 
 @seasons_bp.route('/<season_id>/close', methods=['POST'])

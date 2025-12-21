@@ -961,10 +961,11 @@ def create_app(config_name='development'):
                             active_count = len(active_user_ids)
 
                             today_str = now.date().isoformat()
-                            yesterday_str = (now.date() - timedelta(days=1)).isoformat()
 
                             if active_count >= threshold:
-                                # increment or set streak
+                                # increment or set streak (allow small gaps before considering streak broken)
+                                allowed_gap = app.config.get('GROUP_STREAK_MAX_GAP_DAYS', 7)
+
                                 if not gs:
                                     db.insert_one('group_streaks', {
                                         '_id': ObjectId(),
@@ -982,14 +983,35 @@ def create_app(config_name='development'):
                                         # already updated today
                                         pass
                                     else:
-                                        if last_day == yesterday_str:
+                                        # compute days since last active (robust to missing/invalid data)
+                                        try:
+                                            from datetime import date
+                                            last_date = date.fromisoformat(last_day) if last_day else None
+                                            days_since = (now.date() - last_date).days if last_date else None
+                                        except Exception:
+                                            days_since = None
+
+                                        # If we have a valid last_active_day and it's within the allowed gap, increment the streak
+                                        if days_since is not None and days_since <= int(allowed_gap):
                                             db.update_one('group_streaks', {'_id': gs['_id']}, {'streak_count': gs.get('streak_count', 0) + 1, 'last_active_day': today_str, 'updated_at': now})
                                         else:
+                                            # gap longer than allowed (or unknown last_day) -> reset streak to 1
                                             db.update_one('group_streaks', {'_id': gs['_id']}, {'streak_count': 1, 'last_active_day': today_str, 'updated_at': now})
                             else:
-                                # streak broken -> reset to 0 and clear last_active_day
+                                # streak may be broken; only reset if the last active day is older than the allowed gap
                                 if gs and gs.get('streak_count', 0) > 0:
-                                    db.update_one('group_streaks', {'_id': gs['_id']}, {'streak_count': 0, 'last_active_day': None, 'updated_at': now})
+                                    allowed_gap = app.config.get('GROUP_STREAK_MAX_GAP_DAYS', 7)
+                                    last_day = gs.get('last_active_day')
+                                    try:
+                                        from datetime import date
+                                        last_date = date.fromisoformat(last_day) if last_day else None
+                                        days_since = (now.date() - last_date).days if last_date else None
+                                    except Exception:
+                                        days_since = None
+
+                                    # Reset only if the last active day is older than allowed_gap days
+                                    if days_since is None or days_since > int(allowed_gap):
+                                        db.update_one('group_streaks', {'_id': gs['_id']}, {'streak_count': 0, 'last_active_day': None, 'updated_at': now})
 
                         except Exception as e:
                             print(f"Error processing group streak for {group.get('_id')}: {e}")
