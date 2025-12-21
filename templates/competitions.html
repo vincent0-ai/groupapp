@@ -990,6 +990,7 @@
         }
 
         async function loadCompetitions() {
+            console.debug('loadCompetitions started', { tokenPresent: !!token, time: new Date().toISOString() });
             try {
                 const res = await fetch('/api/competitions', {
                     headers: { 'Authorization': `Bearer ${token}` }
@@ -1157,6 +1158,19 @@
                 document.getElementById('myCompsList').innerHTML = myHtml;
             } catch (error) {
                 console.error('Error loading competitions:', error);
+                const errHtml = `<div class="col-12 text-center text-danger"><p>Failed to load competitions. <button class="btn btn-sm btn-outline-light retry-load-comps">Retry</button></p></div>`;
+                document.getElementById('activeCompsList').innerHTML = errHtml;
+                document.getElementById('completedCompsList').innerHTML = errHtml;
+                document.getElementById('myCompsList').innerHTML = errHtml;
+
+                // Attach retry handlers
+                document.querySelectorAll('.retry-load-comps').forEach(btn => {
+                    btn.addEventListener('click', (e) => {
+                        // simple debounce to avoid duplicate clicks
+                        btn.disabled = true;
+                        loadCompetitions();
+                    });
+                });
             }
         }
 
