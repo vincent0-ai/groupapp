@@ -52,6 +52,9 @@ class Config:
     GROUP_STREAK_MIN_PERCENT = float(os.getenv('GROUP_STREAK_MIN_PERCENT', '0.2'))  # fraction of members
     GROUP_STREAK_MIN_ABSOLUTE = int(os.getenv('GROUP_STREAK_MIN_ABSOLUTE', '2'))
     GROUP_STREAK_CHECK_INTERVAL_SECONDS = int(os.getenv('GROUP_STREAK_CHECK_INTERVAL_SECONDS', '3600'))
+    # Allow streaks to tolerate short inactivity windows (days). If there is no sufficient activity
+    # for more than this number of days, the streak will be reset. Default: 7 days.
+    GROUP_STREAK_MAX_GAP_DAYS = int(os.getenv('GROUP_STREAK_MAX_GAP_DAYS', '7'))
 
     # Seasons
     SEASON_LENGTH_DAYS = int(os.getenv('SEASON_LENGTH_DAYS', '7'))  # weeks are 7 days by default

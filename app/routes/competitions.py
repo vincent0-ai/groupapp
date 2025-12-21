@@ -67,6 +67,8 @@ def create_competition():
     if not isinstance(group_ids, list) or not group_ids:
         return error_response('group_ids must be a non-empty list', 400)
 
+    is_general = bool(data.get('is_general', False))
+
     try:
         group_id_objs = [ObjectId(gid) for gid in group_ids]
         # Handle ISO strings with 'Z' suffix (JavaScript format)
@@ -117,7 +119,7 @@ def create_competition():
 
     competition_doc = Competition.create_competition_doc(
         title, description, group_ids, g.user_id, start_time, end_time, 
-        questions, competition_type, str(channel_id) if channel_id else None, channel_name or 'General', season_id=season_id
+        questions, competition_type, str(channel_id) if channel_id else None, channel_name or 'General', season_id=season_id, is_general=is_general
     )
     
     comp_id = db.insert_one('competitions', competition_doc)
@@ -174,7 +176,7 @@ def get_group_competitions(group_id):
 @competitions_bp.route('/<comp_id>/join', methods=['POST'])
 @require_auth
 def join_competition(comp_id):
-    """Join a competition"""
+    """Join a competition - optionally specifying which group the user represents (for general/multi-group competitions)."""
     try:
         comp_id_obj = ObjectId(comp_id)
     except:
@@ -191,30 +193,53 @@ def join_competition(comp_id):
     
     user_id_obj = ObjectId(g.user_id)
     
-    # Check if user is in any of the competition's groups
+    # Check if user exists
     user = db.find_one('users', {'_id': user_id_obj})
     if not user:
         return error_response('User not found', 404)
-        
+
     user_groups = user.get('groups', [])
     competition_groups = competition.get('group_ids', [])
-    
-    can_join = any(gid in user_groups for gid in competition_groups)
 
+    # Ensure user is a member of at least one participating group
+    can_join = any(gid in user_groups for gid in competition_groups)
     if not can_join:
         return error_response('You must be a member of a participating group to join this competition', 403)
+
+    # Accept optional representing group from request body
+    data = request.get_json() or {}
+    represent_group = data.get('group_id')
+
+    # If competition is single-group, auto-assign
+    selected_group_obj = None
+    if len(competition_groups) == 1 and not competition.get('is_general'):
+        selected_group_obj = competition_groups[0]
+    else:
+        # require represent_group to be provided and valid
+        if not represent_group:
+            return error_response('Please specify which group you represent when joining this competition', 400)
+        try:
+            selected_group_obj = ObjectId(represent_group)
+        except Exception:
+            return error_response('Invalid group id', 400)
+        # Check that selected group is part of competition and user is a member
+        if selected_group_obj not in competition_groups:
+            return error_response('Selected group is not part of this competition', 400)
+        if selected_group_obj not in user_groups:
+            return error_response('You are not a member of the selected group', 403)
 
     # Check if already participating
     for participant in competition.get('participants', []):
         if participant.get('user_id') == user_id_obj:
             return error_response('Already participating in this competition', 400)
     
-    # Add participant
+    # Add participant with representing group
     participant_data = {
         'user_id': user_id_obj,
         'joined_at': datetime.utcnow(),
         'score': 0,
-        'answers': []
+        'answers': [],
+        'group_id': selected_group_obj  # store ObjectId of group they represent
     }
     
     db.push_to_array('competitions', {'_id': comp_id_obj}, 'participants', participant_data)
@@ -276,8 +301,13 @@ def submit_answer(comp_id):
             return error_response('Invalid question ID', 400)
         
         question = questions[q_idx]
-        is_correct = str(answer).strip().lower() == str(question.get('correct_answer')).strip().lower()
-        points_awarded = 1 if is_correct else 0  # 1 point per correct answer
+        # If question is a discussion type, it is submitted for manual review and not auto-scored
+        if question.get('type') == 'discussion' or question.get('type') == 'Discussion':
+            is_correct = False
+            points_awarded = 0
+        else:
+            is_correct = str(answer).strip().lower() == str(question.get('correct_answer')).strip().lower()
+            points_awarded = 1 if is_correct else 0  # 1 point per correct answer
         
     except ValueError:
         return error_response('Invalid question ID format', 400)
@@ -291,6 +321,14 @@ def submit_answer(comp_id):
         'submitted_at': datetime.utcnow(),
         'discussion': data.get('discussion', '') if isinstance(data, dict) else ''
     }
+
+    # For discussion questions, add review metadata
+    try:
+        if question.get('type') == 'discussion':
+            answer_data['is_reviewed'] = False
+            answer_data['comments'] = []
+    except Exception:
+        pass
     
     update_op = {
         '$push': {'participants.$.answers': answer_data},
@@ -299,26 +337,40 @@ def submit_answer(comp_id):
 
     # If correct answer, update group scores
     if is_correct and points_awarded > 0:
-        user = db.find_one('users', {'_id': user_id_obj})
-        if user:
-            user_groups = user.get('groups', [])
-            comp_groups = competition.get('group_ids', [])
-            
-            # Find which of the user's groups are in this competition
-            groups_to_update = [gid for gid in user_groups if gid in comp_groups]
-            
-            for group_id in groups_to_update:
-                update_op['$inc'][f'group_scores.{group_id}'] = points_awarded
+        # Determine which group to credit: prefer participant's selected group, otherwise fallback to user's groups
+        selected_group = None
+        try:
+            # Find participant record in competition to get their group_id
+            for p in competition.get('participants', []):
+                if p.get('user_id') == user_id_obj:
+                    selected_group = p.get('group_id')
+                    break
+        except Exception:
+            selected_group = None
 
-                # Also update season aggregates if this competition is part of a season
-                season_id = competition.get('season_id')
-                if season_id:
-                    # Increment the season's group_scores map (use string keys)
-                    try:
-                        db.update_one('seasons', {'_id': season_id}, {'$inc': {f'group_scores.{str(group_id)}': points_awarded}}, raw=True)
-                    except Exception:
-                        # Best-effort: don't fail the whole request if season update fails
-                        pass
+        # If participant didn't choose a group (older comps), fall back to intersection of user groups and comp groups
+        if not selected_group:
+            user = db.find_one('users', {'_id': user_id_obj})
+            if user:
+                user_groups = user.get('groups', [])
+                comp_groups = competition.get('group_ids', [])
+                for gid in user_groups:
+                    if gid in comp_groups:
+                        selected_group = gid
+                        break
+
+        if selected_group:
+            # Use string key for group_scores map
+            update_op['$inc'][f'group_scores.{str(selected_group)}'] = points_awarded
+
+            # Also update season aggregates if this competition is part of a season
+            season_id = competition.get('season_id')
+            if season_id:
+                try:
+                    db.update_one('seasons', {'_id': season_id}, {'$inc': {f'group_scores.{str(selected_group)}': points_awarded}}, raw=True)
+                except Exception:
+                    # Best-effort: don't fail the whole request if season update fails
+                    pass
 
     # Update participant answers and score, and group scores
     db.update_one('competitions', 
@@ -417,6 +469,153 @@ def get_group_leaderboard(comp_id):
     leaderboard.sort(key=lambda x: x['score'], reverse=True)
     
     return success_response(leaderboard, 'Leaderboard retrieved successfully', 200)
+
+
+@competitions_bp.route('/<comp_id>/answers/<user_id>/<int:question_index>/mark', methods=['POST'])
+@require_auth
+def mark_answer(comp_id, user_id, question_index):
+    """Mark a discussion answer and award points (competition owner or admin only)"""
+    try:
+        comp_id_obj = ObjectId(comp_id)
+        participant_id_obj = ObjectId(user_id)
+    except Exception:
+        return error_response('Invalid id format', 400)
+
+    db = Database()
+    competition = db.find_one('competitions', {'_id': comp_id_obj})
+    if not competition:
+        return error_response('Competition not found', 404)
+
+    # Check permissions: creator or admin
+    requester = db.find_one('users', {'_id': ObjectId(g.user_id)})
+    is_admin = requester.get('is_admin', False) if requester else False
+    if str(competition.get('created_by')) != g.user_id and not is_admin:
+        return error_response('Only competition creator or admins can mark answers', 403)
+
+    # Find participant and specific answer
+    participants = competition.get('participants', [])
+    participant = None
+    for p in participants:
+        if p.get('user_id') == participant_id_obj:
+            participant = p
+            break
+    if not participant:
+        return error_response('Participant not found', 404)
+
+    # Find answer
+    answer_obj = None
+    for a in participant.get('answers', []):
+        if str(a.get('question_id')) == str(question_index):
+            answer_obj = a
+            break
+    if not answer_obj:
+        return error_response('Answer not found', 404)
+
+    data = request.get_json() or {}
+    try:
+        points = int(data.get('points', 0))
+    except Exception:
+        return error_response('Invalid points value', 400)
+    comment = data.get('comment', '').strip()
+
+    # compute delta points to update participant score and group scores accordingly
+    prev_points = int(answer_obj.get('points', 0) or 0)
+    delta = points - prev_points
+
+    # Update answer fields
+    answer_obj['points'] = points
+    answer_obj['is_reviewed'] = True
+    answer_obj['marked_by'] = ObjectId(g.user_id)
+    answer_obj['marked_at'] = __import__('datetime').datetime.utcnow()
+    if comment:
+        c = {'user_id': ObjectId(g.user_id), 'text': comment, 'created_at': __import__('datetime').datetime.utcnow()}
+        answer_obj.setdefault('comments', []).append(c)
+
+    # Update participant score
+    participant['score'] = participant.get('score', 0) + delta
+
+    # Update group_scores for participant's selected group if applicable
+    selected_group = participant.get('group_id')
+    if not selected_group:
+        # fallback: choose first of competition groups that the user is a member of
+        user = db.find_one('users', {'_id': participant.get('user_id')})
+        if user:
+            for gid in user.get('groups', []):
+                if gid in competition.get('group_ids', []):
+                    selected_group = gid
+                    break
+    if delta != 0 and selected_group:
+        # apply delta to competition group_scores
+        key = f'group_scores.{str(selected_group)}'
+        try:
+            db.update_one('competitions', {'_id': comp_id_obj}, { '$inc': { key: delta } }, raw=True)
+        except Exception:
+            pass
+        # also update season aggregate if present
+        season_id = competition.get('season_id')
+        if season_id:
+            try:
+                db.update_one('seasons', {'_id': season_id}, {'$inc': {f'group_scores.{str(selected_group)}': delta}}, raw=True)
+            except Exception:
+                pass
+
+    # Persist participants array back to DB
+    try:
+        db.update_one('competitions', {'_id': comp_id_obj}, {'participants': participants, 'updated_at': __import__('datetime').datetime.utcnow()})
+    except Exception as e:
+        return error_response('Failed to save mark', 500)
+
+    return success_response({'answer': answer_obj, 'participant_score': participant['score']}, 'Answer marked', 200)
+
+
+@competitions_bp.route('/<comp_id>/answers/<user_id>/<int:question_index>/comment', methods=['POST'])
+@require_auth
+def comment_on_answer(comp_id, user_id, question_index):
+    """Add a threaded comment to an answer"""
+    try:
+        comp_id_obj = ObjectId(comp_id)
+        participant_id_obj = ObjectId(user_id)
+    except Exception:
+        return error_response('Invalid id format', 400)
+
+    data = request.get_json() or {}
+    text = (data.get('text') or '').strip()
+    if not text:
+        return error_response('Comment text required', 400)
+
+    db = Database()
+    competition = db.find_one('competitions', {'_id': comp_id_obj})
+    if not competition:
+        return error_response('Competition not found', 404)
+
+    # Find participant and answer
+    participants = competition.get('participants', [])
+    participant = None
+    for p in participants:
+        if p.get('user_id') == participant_id_obj:
+            participant = p
+            break
+    if not participant:
+        return error_response('Participant not found', 404)
+
+    answer_obj = None
+    for a in participant.get('answers', []):
+        if str(a.get('question_id')) == str(question_index):
+            answer_obj = a
+            break
+    if not answer_obj:
+        return error_response('Answer not found', 404)
+
+    comment = {'user_id': ObjectId(g.user_id), 'text': text, 'created_at': __import__('datetime').datetime.utcnow()}
+    answer_obj.setdefault('comments', []).append(comment)
+
+    # Persist
+    try:
+        db.update_one('competitions', {'_id': comp_id_obj}, {'participants': participants, 'updated_at': __import__('datetime').datetime.utcnow()})
+    except Exception:
+        return error_response('Failed to save comment', 500)
+
+    return success_response({'comment': comment}, 'Comment added', 201)
 
 
 @competitions_bp.route('/<comp_id>', methods=['DELETE'])

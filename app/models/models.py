@@ -131,8 +131,12 @@ class Competition:
                               end_time: datetime, questions: List = None,
                               competition_type: str = 'quiz',
                               channel_id: Optional[str] = None, category: str = 'General',
-                              season_id: Optional[str] = None) -> Dict:
-        """Create a new competition (optionally tied to a channel/category or season)"""
+                              season_id: Optional[str] = None, is_general: bool = False) -> Dict:
+        """Create a new competition (optionally tied to a channel/category or season)
+
+        is_general: if True, competition is a 'general' inter-group competition where
+        participants choose which group they represent when joining.
+        """
         is_intergroup = len(group_ids) > 1
         group_scores = {gid: 0 for gid in group_ids}
         doc = {
@@ -141,6 +145,7 @@ class Competition:
             'description': description,
             'group_ids': [ObjectId(gid) for gid in group_ids],
             'is_intergroup': is_intergroup,
+            'is_general': bool(is_general),
             'channel_id': ObjectId(channel_id) if channel_id else None,
             'category': category,
             'created_by': ObjectId(created_by),
