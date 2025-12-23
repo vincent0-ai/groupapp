@@ -60,12 +60,22 @@ def generate_refresh_token(user_id: str, expires_in: int = 604800) -> str:
     return token
 
 def get_current_user():
-    """Get the current user from the JWT token in the request header"""
+    """Get the current user from the JWT token.
+
+    Prefer the Authorization header (Bearer token) for API calls. If not present,
+    fall back to the `auth_token` cookie for server-rendered page requests so
+    users who have a stored cookie can navigate directly to pages without an
+    Authorization header. Cookie acceptance is limited to this helper and
+    cookie is set as HttpOnly/SameSite to reduce CSRF/XSS risk.
+    """
     token = None
     if 'Authorization' in request.headers and request.headers['Authorization'].startswith('Bearer '):
         token = request.headers['Authorization'].split(' ')[1]
 
-    # Do not accept tokens from cookies (CSRF risk). API should use Authorization header bearer tokens.
+    # If header not present, allow fallback to cookie named 'auth_token'
+    if not token:
+        token = request.cookies.get('auth_token')
+
     if not token:
         return None
 

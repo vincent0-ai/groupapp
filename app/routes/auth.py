@@ -276,10 +276,13 @@ def login():
     token = generate_token(str(user["_id"]), expires_in=expires_in)
 
     del user["password_hash"]
-    return success_response(
-        {"user": serialize_document(user), "token": token},
-        "Login successful"
-    )
+    # Set auth cookie for browser navigations; keep session storage behavior for SPA/API
+    from flask import make_response
+    resp, status = success_response({"user": serialize_document(user), "token": token}, "Login successful")
+    resp = make_response(resp, status)
+    secure_flag = not current_app.config.get('DEBUG', False)
+    resp.set_cookie('auth_token', token, httponly=True, secure=secure_flag, samesite='Lax', path='/')
+    return resp
 
 
 @auth_bp.route("/verify-email/<token>", methods=["GET"])
@@ -614,10 +617,13 @@ def google_login():
     token = generate_token(str(user["_id"]), expires_in=expires_in)
 
     del user["password_hash"]
-    return success_response(
-        {"user": serialize_document(user), "token": token},
-        "Google login successful"
-    )
+    # Set auth cookie for browser navigations; keep session storage behavior for SPA/API
+    from flask import make_response
+    resp, status = success_response({"user": serialize_document(user), "token": token}, "Google login successful")
+    resp = make_response(resp, status)
+    secure_flag = not current_app.config.get('DEBUG', False)
+    resp.set_cookie('auth_token', token, httponly=True, secure=secure_flag, samesite='Lax', path='/')
+    return resp
 
 
 # =========================
@@ -625,5 +631,10 @@ def google_login():
 # =========================
 @auth_bp.route("/logout", methods=["GET", "POST"])
 def logout():
-    return success_response(None, "Logout successful")
+    from flask import make_response
+    resp, status = success_response(None, "Logout successful")
+    resp = make_response(resp, status)
+    # Clear auth cookie
+    resp.set_cookie('auth_token', '', expires=0, path='/')
+    return resp
 # Note: Actual logout is handled client-side by deleting the JWT token.
