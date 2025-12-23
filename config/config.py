@@ -44,8 +44,8 @@ class Config:
     MAX_PARTICIPANTS_PER_ROOM = int(os.getenv('MAX_PARTICIPANTS_PER_ROOM', '10'))
     
     # CORS / SocketIO allowed origins (set via env in production)
-    CORS_ALLOWED_ORIGINS = os.getenv('CORS_ALLOWED_ORIGINS', 'http://localhost:5000')
-    SOCKETIO_CORS_ALLOWED_ORIGINS = os.getenv('SOCKETIO_CORS_ALLOWED_ORIGINS', 'http://localhost:5000')
+    CORS_ALLOWED_ORIGINS = os.getenv('CORS_ALLOWED_ORIGINS', 'https://discussio.echowithin.xyz')
+    SOCKETIO_CORS_ALLOWED_ORIGINS = os.getenv('SOCKETIO_CORS_ALLOWED_ORIGINS', 'https://discussio.echowithin.xyz')
 
 
     # Group Streaks
