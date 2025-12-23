@@ -108,15 +108,20 @@ def create_competition():
     
     # Optionally attach to a season
     season_id = data.get('season_id')
+    # Normalize empty values
+    if season_id in (None, '', 'null', 'None', 'undefined'):
+        season_id = None
     if season_id:
         # Validate season exists and is active
         try:
             season_obj = ObjectId(season_id)
-            season = db.find_one('seasons', {'_id': season_obj})
-            if not season or not season.get('is_active'):
-                return error_response('Invalid or inactive season', 400)
         except Exception:
-            return error_response('Invalid season id', 400)
+            return error_response(f'Invalid season id: {season_id}', 400)
+        season = db.find_one('seasons', {'_id': season_obj})
+        if not season:
+            return error_response(f'Season not found: {season_id}', 400)
+        if not season.get('is_active'):
+            return error_response('Season is not active', 400)
 
     competition_doc = Competition.create_competition_doc(
         title, description, group_ids, g.user_id, start_time, end_time, 

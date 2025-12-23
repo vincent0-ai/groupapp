@@ -945,9 +945,26 @@
         async function loadCompetitions() {
             console.debug('loadCompetitions started', { tokenPresent: !!token, time: new Date().toISOString() });
             try {
-                const res = await fetch('/api/competitions', {
-                    headers: getAuthHeaders()
-                });
+                // Use timeout so a hung/frozen request doesn't leave the spinner forever
+                const controller = new AbortController();
+                const timeout = setTimeout(() => controller.abort(), 10000);
+                let res;
+                try {
+                    res = await fetch('/api/competitions', { headers: getAuthHeaders(), signal: controller.signal });
+                } catch (e) {
+                    if (e.name === 'AbortError') {
+                        const errMsg = 'Request timed out while loading competitions.';
+                        console.error(errMsg);
+                        document.getElementById('activeCompsList').innerHTML = `<div class="col-12 text-center text-danger"><p>${escapeHtml(errMsg)} <button class="btn btn-sm btn-outline-light retry-load-comps">Retry</button></p></div>`;
+                        document.getElementById('completedCompsList').innerHTML = document.getElementById('activeCompsList').innerHTML;
+                        document.getElementById('myCompsList').innerHTML = document.getElementById('activeCompsList').innerHTML;
+                        document.querySelectorAll('.retry-load-comps').forEach(btn => btn.addEventListener('click', () => loadCompetitions()));
+                        return;
+                    }
+                    throw e;
+                } finally {
+                    clearTimeout(timeout);
+                }
 
                 // Handle auth errors explicitly
                 if (res.status === 401) {
