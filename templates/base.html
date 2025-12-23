@@ -424,6 +424,29 @@
         });
     };
 
+    // Sync auth cookie to localStorage so server-rendered pages and legacy scripts
+    // that read localStorage 'token' continue to function when the app uses
+    // HttpOnly cookie-based auth for browser navigation.
+    (function syncAuthCookie() {
+        try {
+            if (!localStorage.getItem('token')) {
+                const cookie = document.cookie.split('; ').find(r => r.startsWith('auth_token='));
+                if (cookie) {
+                    const val = cookie.split('=')[1];
+                    if (val) {
+                        localStorage.setItem('token', val);
+                        try {
+                            const payload = JSON.parse(atob(val.split('.')[1].replace(/-/g, '+').replace(/_/g, '/')));
+                            if (payload && payload.user_id) localStorage.setItem('userId', String(payload.user_id));
+                        } catch (e) { /* ignore parse errors */ }
+                    }
+                }
+            }
+        } catch (e) {
+            console.debug('Auth cookie sync failed:', e);
+        }
+    })();
+
     window.showCustomConfirm = function(message, title = 'Confirmation') {
         return new Promise((resolve) => {
             document.getElementById('globalConfirmTitle').textContent = title;
