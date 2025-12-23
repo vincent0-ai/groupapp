@@ -278,12 +278,14 @@ def get_livekit_token(wb_id):
 
     # Define LiveKit permissions based on app logic
     # can_publish allows audio/video, can_publish_data for things like chat
+    # Ensure participants remain visible in the room; control speaking via can_publish
     lk_permissions = VideoGrants(
         room_join=True,
         room=f'whiteboard:{wb_id}',
+        can_publish=can_speak,  # allow publishing (audio/video) only if user may speak
         can_publish_data=True,
         can_subscribe=True, # Always allow users to subscribe to others
-        hidden=not can_speak # Hide participant if they don't have speaking perms
+        hidden=False  # Keep participants visible so moderators can manage permissions
     )
 
     try:
