@@ -9,6 +9,8 @@ class Config:
     JWT_ALGORITHM = os.getenv('JWT_ALGORITHM', 'HS256')
     JWT_ACCESS_TOKEN_EXPIRES = timedelta(hours=3)
     BCRYPT_ROUNDS = int(os.getenv('BCRYPT_ROUNDS', '12'))
+    GOOGLE_CLIENT_ID = os.getenv('GOOGLE_CLIENT_ID')
+    GOOGLE_CLIENT_SECRET = os.getenv('GOOGLE_CLIENT_SECRET')
 
     # MongoDB
     MONGODB_URI = os.getenv('MONGODB_URI', 'mongodb://localhost:27017/Discussio')

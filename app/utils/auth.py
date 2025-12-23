@@ -13,8 +13,18 @@ def hash_password(password: str) -> str:
     return bcrypt.hashpw(password.encode('utf-8'), salt).decode('utf-8')
 
 def verify_password(password: str, password_hash: str) -> bool:
-    """Verify a password against its hash"""
-    return bcrypt.checkpw(password.encode('utf-8'), password_hash.encode('utf-8'))
+    """Verify a password against its hash.
+
+    Returns False when the stored hash is missing or malformed to avoid
+    raising in the authentication flow (e.g., invalid salt, None, empty string).
+    """
+    if not password_hash or not isinstance(password_hash, str):
+        return False
+    try:
+        return bcrypt.checkpw(password.encode('utf-8'), password_hash.encode('utf-8'))
+    except (ValueError, TypeError):
+        # Invalid salt or unexpected format — treat as non-matching password
+        return False
 
 def generate_token(user_id: str, expires_in: int = 3600) -> str:
     """Generate a JWT token for a user"""
