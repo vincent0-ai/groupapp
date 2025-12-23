@@ -69,9 +69,15 @@ def end_whiteboard(wb_id):
     
     # Emit socket event to notify all users in the session
     try:
-        from app import socketio
-        room = f'whiteboard:{wb_id}'
-        socketio.emit('session_ended', {'session_id': wb_id}, room=room)
+        # Prefer retrieving SocketIO instance from the running app to avoid circular import issues
+        try:
+            from app import socketio as app_socketio
+            socketio_inst = app_socketio
+        except Exception:
+            socketio_inst = getattr(current_app, 'socketio', None) or current_app.extensions.get('socketio')
+        if socketio_inst:
+            room = f'whiteboard:{wb_id}'
+            socketio_inst.emit('session_ended', {'session_id': wb_id}, room=room)
     except Exception as e:
         print(f"Error emitting session_ended event: {e}")
     
@@ -149,9 +155,14 @@ def update_permissions(wb_id):
 
     # Emit socket event to notify all users in the session about permission changes
     try:
-        from app import socketio
-        room = f'whiteboard:{wb_id}'
-        socketio.emit('permissions_updated', {'whiteboard_id': wb_id, 'permissions': serialize_document(wb)}, room=room)
+        try:
+            from app import socketio as app_socketio
+            socketio_inst = app_socketio
+        except Exception:
+            socketio_inst = getattr(current_app, 'socketio', None) or current_app.extensions.get('socketio')
+        if socketio_inst:
+            room = f'whiteboard:{wb_id}'
+            socketio_inst.emit('permissions_updated', {'whiteboard_id': wb_id, 'permissions': serialize_document(wb)}, room=room)
     except Exception as e:
         print(f"Error emitting permissions_updated event: {e}")
 

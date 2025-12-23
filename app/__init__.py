@@ -61,6 +61,7 @@ def create_app(config_name='development'):
             response.headers.setdefault('Strict-Transport-Security', 'max-age=63072000; includeSubDomains; preload')
         return response
 
+    from app.routes.main import main_bp
     from app.routes.auth import auth_bp
     from app.routes.groups import groups_bp
     from app.routes.messages import messages_bp
@@ -75,6 +76,7 @@ def create_app(config_name='development'):
     from app.routes.groups_leaderboard import leaderboard_bp
     from app.routes.seasons import seasons_bp
     
+    app.register_blueprint(main_bp)
     app.register_blueprint(auth_bp)
     app.register_blueprint(groups_bp)
     app.register_blueprint(messages_bp)
