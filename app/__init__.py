@@ -54,7 +54,8 @@ def create_app(config_name='development'):
         # Basic Content-Security-Policy (adjust as needed for your static assets / CDNs)
         if 'Content-Security-Policy' not in response.headers:
             # Allow fonts from self, secure origins and data URIs so icon fonts (FontAwesome, Google fonts, etc.) can load
-            csp = "default-src 'self'; script-src 'self' 'unsafe-inline' https:; style-src 'self' 'unsafe-inline' https:; font-src 'self' https: data:; img-src 'self' data: https:; connect-src 'self' https: ws: wss:;"
+            # Allow Google accounts for embedded Google Identity frames (gsi/client) used on the auth page
+            csp = "default-src 'self'; script-src 'self' 'unsafe-inline' https:; style-src 'self' 'unsafe-inline' https:; font-src 'self' https: data:; img-src 'self' data: https:; connect-src 'self' https: ws: wss:; frame-src https://accounts.google.com;"
             response.headers.setdefault('Content-Security-Policy', csp)
         # HSTS only in non-debug (i.e., production)
         if not app.debug:
