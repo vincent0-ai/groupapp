@@ -70,7 +70,9 @@
 
 {% block scripts %}
 <script>
-const token = localStorage.getItem('token') || sessionStorage.getItem('token');
+// Auth helpers (use cookie fallback when needed)}
+function getAuthToken() { return localStorage.getItem('token') || sessionStorage.getItem('token') || (document.cookie.split('; ').find(r=>r.startsWith('auth_token='))||'').split('=')[1] || null; }
+function getAuthHeaders(extra={}) { const t = getAuthToken(); return t ? Object.assign({'Authorization': `Bearer ${t}`}, extra) : extra; }
 let questionCount = 0;
 
 function addQuestionField() {
@@ -128,7 +130,7 @@ function addQuestionField() {
 
 async function loadSeasonsForCreate() {
     try {
-        const res = await fetch('/api/seasons', { headers: { 'Authorization': `Bearer ${token}` } });
+        const res = await fetch('/api/seasons', { headers: getAuthHeaders() });
         if (!res.ok) return;
         const data = await res.json();
         const seasons = data.data?.seasons || [];
@@ -147,7 +149,7 @@ async function loadSeasonsForCreate() {
 
 async function loadGroupsForCreate() {
     try {
-        const res = await fetch('/api/users/groups', { headers: { 'Authorization': `Bearer ${token}` } });
+        const res = await fetch('/api/users/groups', { headers: getAuthHeaders() });
         if (!res.ok) return;
         const data = await res.json();
         const groups = data.data?.groups || [];
@@ -231,10 +233,7 @@ document.getElementById('createCompForm').addEventListener('submit', async (e) =
         if (seasonId) payload.season_id = seasonId;
         const res = await fetch('/api/competitions', {
             method: 'POST',
-            headers: {
-                'Authorization': `Bearer ${token}`,
-                'Content-Type': 'application/json'
-            },
+            headers: getAuthHeaders({'Content-Type': 'application/json'}),
             body: JSON.stringify(payload)
         });
         const data = await res.json();

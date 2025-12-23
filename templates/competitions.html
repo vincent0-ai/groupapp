@@ -352,7 +352,14 @@
 
 {% block scripts %}
     <script>
-        const token = localStorage.getItem('token');
+        // Helper to get auth token from localStorage, sessionStorage, or cookie fallback
+        function getAuthToken() {
+            return localStorage.getItem('token') || sessionStorage.getItem('token') || (document.cookie.split('; ').find(r=>r.startsWith('auth_token=')) || '').split('=')[1] || null;
+        }
+        function getAuthHeaders(extra = {}) {
+            const t = getAuthToken();
+            return t ? Object.assign({'Authorization': `Bearer ${t}`}, extra) : extra;
+        }
 
         // Some sessions may have a token but no cached userId.
         // Derive it from the JWT payload to keep UI state (answer marking, creator actions) consistent.
@@ -939,7 +946,7 @@
             console.debug('loadCompetitions started', { tokenPresent: !!token, time: new Date().toISOString() });
             try {
                 const res = await fetch('/api/competitions', {
-                    headers: { 'Authorization': `Bearer ${token}` }
+                    headers: getAuthHeaders()
                 });
 
                 // Handle auth errors explicitly
@@ -1068,7 +1075,7 @@
 
                 // Populate group dropdown with groups where the user is owner or moderator
                 const groupRes = await fetch('/api/users/groups', {
-                    headers: { 'Authorization': `Bearer ${token}` }
+                    headers: getAuthHeaders()
                 });
                 const groupData = await groupRes.json();
                 const groupSelect = document.getElementById('compGroup');
@@ -1150,7 +1157,7 @@
             try {
                 const res = await fetch(`/api/competitions/${compId}/end`, {
                     method: 'POST',
-                    headers: { 'Authorization': `Bearer ${token}` }
+                    headers: getAuthHeaders()
                 });
                 
                 if (res.ok) {
@@ -1174,7 +1181,7 @@
             try {
                 const res = await fetch(`/api/competitions/${compId}`, {
                     method: 'DELETE',
-                    headers: { 'Authorization': `Bearer ${token}` }
+                    headers: getAuthHeaders()
                 });
                 
                 if (res.ok) {
@@ -1265,25 +1272,33 @@
 
                 if (seasonId) payload.season_id = seasonId;
 
+                // Defensive check: ensure we have a token (from storage or cookie)
+                const t = getAuthToken();
+                if (!t) {
+                    await showCustomAlert('You must be logged in to create a competition. Please login and try again.', 'Not authenticated');
+                    window.location.href = "{{ url_for('auth_page') }}";
+                    return;
+                }
+
                 const res = await fetch('/api/competitions', {
                     method: 'POST',
-                    headers: {
-                        'Authorization': `Bearer ${token}`,
-                        'Content-Type': 'application/json'
-                    },
+                    headers: getAuthHeaders({'Content-Type': 'application/json'}),
                     body: JSON.stringify(payload)
                 });
                 
-                const data = await res.json();
+                let data = null;
+                try { data = await res.json(); } catch (e) { /* ignore */ }
                 
                 if (res.ok) {
                     await showCustomAlert('Competition created!', 'Success');
                     document.getElementById('createCompForm').reset();
                     document.getElementById('questionsContainer').innerHTML = '';
                     questionCount = 0;
-                    const modal = bootstrap.Modal.getInstance(document.getElementById('createCompModal'));
-                    if (modal) {
-                        modal.hide();
+                    // If modal exists, hide it
+                    const modalEl = document.getElementById('createCompModal');
+                    if (modalEl) {
+                        const modal = bootstrap.Modal.getInstance(modalEl);
+                        if (modal) modal.hide();
                     }
                     loadCompetitions();
                 } else if (res.status === 401) {
@@ -1291,7 +1306,8 @@
                     sessionStorage.setItem('redirectAfterLogin', window.location.href);
                     window.location.href = "{{ url_for('auth_page') }}";
                 } else {
-                    await showCustomAlert(data.message || 'Failed to create competition', 'Error');
+                    console.error('Create competition failed', res.status, data);
+                    await showCustomAlert(data?.message || 'Failed to create competition', 'Error');
                 }
             } catch (error) {
                 console.error('Error creating competition:', error);
