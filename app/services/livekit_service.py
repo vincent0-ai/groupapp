@@ -281,7 +281,15 @@ class LiveKitService:
             else:
                 return []
 
-        coro = self.lkapi.room.list_participants(room=room_name)
+        # The SDK's list_participants signature varies between versions (kwarg 'room' vs positional).
+        try:
+            coro = self.lkapi.room.list_participants(room=room_name)
+        except TypeError:
+            try:
+                coro = self.lkapi.room.list_participants(room_name)
+            except TypeError:
+                # Fall back to calling without args
+                coro = self.lkapi.room.list_participants()
         result = self._run_coro(coro)
         # Try to close any underlying aiohttp session to avoid 'Unclosed client session' warnings
         try:
@@ -301,23 +309,32 @@ class LiveKitService:
         if sess is None:
             return
         try:
-            # If session has an async close method, try to run it on the running loop
-            coro = None
-            if hasattr(sess, 'close') and asyncio.iscoroutinefunction(sess.close):
-                coro = sess.close()
-            elif hasattr(sess, 'close'):
-                # synchronous close
+            # Attempt to call close() and handle both coroutine and synchronous variants
+            if hasattr(sess, 'close'):
                 try:
-                    sess.close()
-                    return
-                except Exception:
-                    pass
-            if coro is not None:
-                if self._loop and self._loop.is_running():
-                    fut = asyncio.run_coroutine_threadsafe(coro, self._loop)
-                    fut.result(timeout=5)
-                else:
-                    asyncio.run(coro)
+                    ret = sess.close()
+                    # If calling close() returned a coroutine, ensure it runs to completion
+                    if asyncio.iscoroutine(ret):
+                        if self._loop and self._loop.is_running():
+                            fut = asyncio.run_coroutine_threadsafe(ret, self._loop)
+                            fut.result(timeout=5)
+                        else:
+                            asyncio.run(ret)
+                    else:
+                        # close executed synchronously (no coroutine returned)
+                        pass
+                except TypeError:
+                    # In some environments close may need to be called to get a coroutine
+                    try:
+                        coro = sess.close()
+                        if asyncio.iscoroutine(coro):
+                            if self._loop and self._loop.is_running():
+                                fut = asyncio.run_coroutine_threadsafe(coro, self._loop)
+                                fut.result(timeout=5)
+                            else:
+                                asyncio.run(coro)
+                    except Exception:
+                        pass
         except Exception:
             pass
 
