@@ -461,8 +461,12 @@
         // Logout
         const logoutBtn = document.getElementById('logoutBtn');
         if (logoutBtn) {
-            logoutBtn.addEventListener('click', (e) => {
+            logoutBtn.addEventListener('click', async (e) => {
                 e.preventDefault();
+                // Attempt server-side logout to clear cookie, then clear local storage
+                try {
+                    await fetch('/api/auth/logout', { method: 'POST' });
+                } catch (err) { /* ignore */ }
                 localStorage.removeItem('token');
                 localStorage.removeItem('userId');
                 window.location.href = "{{ url_for('auth_page') }}";
