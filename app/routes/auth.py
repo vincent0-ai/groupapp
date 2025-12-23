@@ -590,7 +590,9 @@ def google_login():
             full_name=id_info.get("name"),
             avatar_url=id_info.get("picture")
         )
+        # Users created via Google are treated as verified automatically
         user_doc["auth_provider"] = "google"
+        user_doc["is_verified"] = True
 
         user_doc["last_login"] = datetime.utcnow()
         user_id = db.insert_one("users", user_doc)
