@@ -259,10 +259,10 @@
                                 <i class="fas fa-plus-circle"></i>
                                 <span>Create Group</span>
                             </div>
-                            <div class="quick-action-item" data-bs-toggle="modal" data-bs-target="#createCompModal">
+                            <a href="{{ url_for('main.create_competition_page') }}" class="quick-action-item">
                                 <i class="fas fa-trophy"></i>
                                 <span>New Competition</span>
-                            </div>
+                            </a>
                             <a href="{{ url_for('messages_page') }}" class="quick-action-item">
                                 <i class="fas fa-comments"></i>
                                 <span>Start Chat</span>
@@ -319,54 +319,7 @@
         </div>
     </div>
 
-    <!-- Create Competition Modal -->
-    <div class="modal fade" id="createCompModal" tabindex="-1">
-        <div class="modal-dialog modal-lg modal-dialog-scrollable modal-fullscreen-sm-down">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title">Create Competition</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                </div>
-                <form id="createCompForm">
-                    <div class="modal-body">
-                        <div class="row">
-                            <div class="col-md-6 mb-3">
-                                <label for="compName" class="form-label">Competition Name</label>
-                                <input type="text" class="form-control" id="compName" required>
-                            </div>
-                            <div class="col-md-6 mb-3">
-                                <label for="compGroup" class="form-label">Group</label>
-                                <select class="form-control" id="compGroup" required></select>
-                            </div>
-                        </div>
-                        <div class="mb-3">
-                            <label for="compDescription" class="form-label">Description</label>
-                            <textarea class="form-control" id="compDescription" rows="2"></textarea>
-                        </div>
-                        <div class="mb-3">
-                            <label for="compDuration" class="form-label">Duration (minutes)</label>
-                            <input type="number" class="form-control" id="compDuration" value="60" required>
-                        </div>
-                        
-                        <hr>
-                        <div class="d-flex justify-content-between align-items-center mb-3">
-                            <h6>Questions</h6>
-                            <button type="button" class="btn btn-sm btn-outline-primary" onclick="addQuestionField()">
-                                <i class="fas fa-plus"></i> Add Question
-                            </button>
-                        </div>
-                        <div id="questionsContainer">
-                            <!-- Questions will be added here -->
-                        </div>
-                    </div>
-                    <div class="modal-footer">
-                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                        <button type="submit" class="btn btn-primary">Create</button>
-                    </div>
-                </form>
-            </div>
-        </div>
-    </div>
+
 
 {% endblock %}
 
@@ -550,99 +503,7 @@
             }
         });
 
-        // Create competition
-        document.getElementById('createCompForm').addEventListener('submit', async (e) => {
-            e.preventDefault();
-            try {
-                const duration = parseInt(document.getElementById('compDuration').value);
-                const startTime = new Date();
-                const endTime = new Date(startTime.getTime() + duration * 60000);
 
-                // Gather questions
-                const questions = [];
-                const questionCards = document.querySelectorAll('#questionsContainer .card');
-                
-                if (questionCards.length === 0) {
-                    await showCustomAlert('Please add at least one question', 'Error');
-                    return;
-                }
-                
-                let hasError = false;
-                questionCards.forEach(card => {
-                    const text = card.querySelector('.question-text').value.trim();
-                    const optionsStr = card.querySelector('.question-options').value.trim();
-                    const answer = card.querySelector('.question-answer').value.trim();
-                    
-                    if (!text || !optionsStr || !answer) {
-                        hasError = true;
-                        return;
-                    }
-                    
-                    const options = optionsStr.split(',').map(o => o.trim()).filter(o => o);
-                    if (options.length < 2) {
-                        hasError = true;
-                        return;
-                    }
-                    
-                    questions.push({
-                        text: text,
-                        options: options,
-                        correct_answer: answer
-                    });
-                });
-                
-                if (hasError) {
-                    await showCustomAlert('Please fill in all question fields. Each question needs text, at least 2 options (comma-separated), and a correct answer.', 'Validation Error');
-                    return;
-                }
-
-                const groupId = document.getElementById('compGroup').value;
-                if (!groupId) {
-                    await showCustomAlert('Please select a group', 'Error');
-                    return;
-                }
-
-                const res = await fetch('/api/competitions', {
-                    method: 'POST',
-                    headers: {
-                        'Authorization': `Bearer ${token}`,
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({
-                        title: document.getElementById('compName').value,
-                        description: document.getElementById('compDescription').value,
-                        group_id: groupId,
-                        start_time: startTime.toISOString(),
-                        end_time: endTime.toISOString(),
-                        questions: questions
-                    })
-                });
-                
-                const data = await res.json();
-                
-                if (res.ok) {
-                    await showCustomAlert('Competition created!', 'Success');
-                    document.getElementById('createCompForm').reset();
-                    document.getElementById('questionsContainer').innerHTML = '';
-                    questionCount = 0;
-                    const modal = bootstrap.Modal.getInstance(document.getElementById('createCompModal'));
-                    if (modal) {
-                        modal.hide();
-                    }
-                    loadDashboard();
-                } else if (res.status === 401) {
-                    localStorage.removeItem('token');
-                    sessionStorage.removeItem('token');
-                    sessionStorage.setItem('redirectAfterLogin', window.location.href);
-                    window.location.href = "{{ url_for('auth_page') }}";
-                } else {
-                    await showCustomAlert(data.message || 'Failed to create competition', 'Error');
-                }
-            } catch (error) {
-                console.error('Error creating competition:', error);
-                await showCustomAlert('An error occurred while creating the competition', 'Error');
-            }
-        });
 
         // Load dashboard on page load
         document.addEventListener('DOMContentLoaded', loadDashboard);

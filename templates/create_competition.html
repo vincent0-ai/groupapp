@@ -1,0 +1,257 @@
+{% extends "base.html" %}
+
+{% block title %}Create Competition - Discussio{% endblock %}
+
+{% block head %}
+<style>
+    .form-section {
+        background: var(--primary-ultra-light);
+        border-radius: 20px;
+        padding: 2rem 2.5rem;
+        margin-bottom: 2rem;
+        border: 1px solid rgba(79, 70, 229, 0.1);
+        max-width: 800px;
+        margin-left: auto;
+        margin-right: auto;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="form-section mt-4">
+    <h2 class="mb-4"><i class="fas fa-trophy me-2"></i>Create Competition</h2>
+    <form id="createCompForm">
+        <div class="row">
+            <div class="col-md-6 mb-3">
+                <label for="compName" class="form-label">Competition Name</label>
+                <input type="text" class="form-control" id="compName" required>
+            </div>
+            <div class="col-md-6 mb-3">
+                <label for="compGroup" class="form-label">Group</label>
+                <div class="form-text small text-muted mb-1">If you want multiple groups to compete, check "General competition" and select groups below.</div>
+                <select class="form-control" id="compGroup" required></select>
+                <div class="form-check form-switch mt-2">
+                    <input class="form-check-input" type="checkbox" id="compIsGeneral">
+                    <label class="form-check-label small" for="compIsGeneral">General competition (multi-group)</label>
+                </div>
+            </div>
+        </div>
+        <div class="mb-3">
+            <label for="compDescription" class="form-label">Description</label>
+            <textarea class="form-control" id="compDescription" rows="2"></textarea>
+        </div>
+        <div class="row">
+            <div class="col-md-6 mb-3">
+                <label for="compDuration" class="form-label">Duration (minutes)</label>
+                <input type="number" class="form-control" id="compDuration" value="60" required>
+            </div>
+            <div class="col-md-6 mb-3">
+                <label for="compSeason" class="form-label">Season (optional)</label>
+                <select class="form-control" id="compSeason"><option value="">None</option></select>
+            </div>
+        </div>
+        <hr>
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <h6>Questions</h6>
+            <button type="button" class="btn btn-sm btn-outline-primary" onclick="addQuestionField()">
+                <i class="fas fa-plus"></i> Add Question
+            </button>
+        </div>
+        <div id="questionsContainer">
+            <!-- Questions will be added here -->
+        </div>
+        <div class="d-flex justify-content-end mt-4">
+            <a href="{{ url_for('main.competitions_page') }}" class="btn btn-secondary me-2">Cancel</a>
+            <button type="submit" class="btn btn-primary">Create</button>
+        </div>
+    </form>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const token = localStorage.getItem('token') || sessionStorage.getItem('token');
+let questionCount = 0;
+
+function addQuestionField() {
+    questionCount++;
+    const container = document.getElementById('questionsContainer');
+    const div = document.createElement('div');
+    div.className = 'card mb-3 bg-light';
+    div.innerHTML = `
+        <div class="card-body">
+            <div class="d-flex justify-content-between mb-2">
+                <h6>Question ${questionCount}</h6>
+                <button type="button" class="btn btn-sm btn-danger" onclick="this.closest('.card').remove()">
+                    <i class="fas fa-trash"></i>
+                </button>
+            </div>
+            <div class="mb-2">
+                <input type="text" class="form-control form-control-sm question-text" placeholder="Question Text" required>
+            </div>
+            <div class="mb-2">
+                <select class="form-select form-select-sm question-type">
+                    <option value="choices" selected>Choices (auto-graded)</option>
+                    <option value="discussion">Discussion (manual review)</option>
+                </select>
+            </div>
+            <div class="mb-2 question-options-row">
+                <input type="text" class="form-control form-control-sm question-options" placeholder="Options (comma separated, e.g. A,B,C,D)" required>
+            </div>
+            <div class="question-answer-row">
+                <input type="text" class="form-control form-control-sm question-answer" placeholder="Correct Answer" required>
+            </div>
+        </div>
+    `;
+    // Wire up type toggle to show/hide options/answer rows
+    const typeSel = div.querySelector('.question-type');
+    const optionsRow = div.querySelector('.question-options-row');
+    const answerRow = div.querySelector('.question-answer-row');
+    typeSel.addEventListener('change', (e) => {
+        if (e.target.value === 'discussion') {
+            optionsRow.style.display = 'none';
+            answerRow.style.display = 'none';
+        } else {
+            optionsRow.style.display = '';
+            answerRow.style.display = '';
+        }
+    });
+    if (typeSel.value === 'discussion') { optionsRow.style.display = 'none'; answerRow.style.display = 'none'; }
+    container.appendChild(div);
+    try {
+        container.scrollTop = container.scrollHeight;
+        div.scrollIntoView({ behavior: 'smooth', block: 'end' });
+        const qInput = div.querySelector('.question-text');
+        if (qInput) qInput.focus();
+    } catch (e) {}
+}
+
+async function loadSeasonsForCreate() {
+    try {
+        const res = await fetch('/api/seasons', { headers: { 'Authorization': `Bearer ${token}` } });
+        if (!res.ok) return;
+        const data = await res.json();
+        const seasons = data.data?.seasons || [];
+        const select = document.getElementById('compSeason');
+        select.innerHTML = '<option value="">None</option>';
+        seasons.filter(s => s.is_active).forEach(s => {
+            const start = new Date(s.start_time).toLocaleDateString();
+            const end = new Date(s.end_time).toLocaleDateString();
+            const opt = document.createElement('option');
+            opt.value = s.id;
+            opt.textContent = `${s.title} (${start} - ${end})`;
+            select.appendChild(opt);
+        });
+    } catch (e) {}
+}
+
+async function loadGroupsForCreate() {
+    try {
+        const res = await fetch('/api/users/groups', { headers: { 'Authorization': `Bearer ${token}` } });
+        if (!res.ok) return;
+        const data = await res.json();
+        const groups = data.data?.groups || [];
+        const select = document.getElementById('compGroup');
+        select.innerHTML = '';
+        groups.forEach(g => {
+            const opt = document.createElement('option');
+            opt.value = g.id || g._id;
+            opt.textContent = g.name;
+            select.appendChild(opt);
+        });
+    } catch (e) {}
+}
+
+document.addEventListener('DOMContentLoaded', async () => {
+    if (!token) {
+        sessionStorage.setItem('redirectAfterLogin', window.location.href);
+        window.location.href = "{{ url_for('auth_page') }}";
+        return;
+    }
+    loadGroupsForCreate();
+    loadSeasonsForCreate();
+});
+
+document.getElementById('createCompForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    try {
+        const duration = parseInt(document.getElementById('compDuration').value);
+        const startTime = new Date();
+        const endTime = new Date(startTime.getTime() + duration * 60000);
+        const questions = [];
+        const questionCards = document.querySelectorAll('#questionsContainer .card');
+        if (questionCards.length === 0) {
+            await showCustomAlert('Please add at least one question', 'Error');
+            return;
+        }
+        let hasError = false;
+        questionCards.forEach(card => {
+            const text = card.querySelector('.question-text').value.trim();
+            const qtype = card.querySelector('.question-type') ? card.querySelector('.question-type').value : 'choices';
+            const optionsInput = card.querySelector('.question-options');
+            const answerInput = card.querySelector('.question-answer');
+            const optionsStr = optionsInput ? optionsInput.value.trim() : '';
+            const answer = answerInput ? answerInput.value.trim() : '';
+            if (!text) { hasError = true; return; }
+            if (qtype === 'choices') {
+                if (!optionsStr || !answer) { hasError = true; return; }
+                const options = optionsStr.split(',').map(o => o.trim()).filter(o => o);
+                if (options.length < 2) { hasError = true; return; }
+                questions.push({ text: text, type: 'choices', options: options, correct_answer: answer });
+            } else {
+                questions.push({ text: text, type: 'discussion' });
+            }
+        });
+        if (hasError) {
+            await showCustomAlert('Please fill in all question fields. Each question needs text, at least 2 options (comma-separated), and a correct answer.', 'Validation Error');
+            return;
+        }
+        const selectEl = document.getElementById('compGroup');
+        const seasonId = document.getElementById('compSeason').value;
+        let selectedGroups = [];
+        if (selectEl.multiple) {
+            selectedGroups = Array.from(selectEl.selectedOptions).map(o => o.value).filter(v => v);
+        } else {
+            const val = selectEl.value;
+            if (val) selectedGroups = [val];
+        }
+        if (!selectedGroups || selectedGroups.length === 0) {
+            await showCustomAlert('Please select at least one group', 'Error');
+            return;
+        }
+        const payload = {
+            title: document.getElementById('compName').value,
+            description: document.getElementById('compDescription').value,
+            group_ids: selectedGroups,
+            is_general: document.getElementById('compIsGeneral').checked,
+            start_time: startTime.toISOString(),
+            end_time: endTime.toISOString(),
+            questions: questions
+        };
+        if (seasonId) payload.season_id = seasonId;
+        const res = await fetch('/api/competitions', {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(payload)
+        });
+        const data = await res.json();
+        if (res.ok) {
+            await showCustomAlert('Competition created!', 'Success');
+            window.location.href = "{{ url_for('main.competitions_page') }}";
+        } else if (res.status === 401) {
+            localStorage.removeItem('token');
+            sessionStorage.setItem('redirectAfterLogin', window.location.href);
+            window.location.href = "{{ url_for('auth_page') }}";
+        } else {
+            await showCustomAlert(data.message || 'Failed to create competition', 'Error');
+        }
+    } catch (error) {
+        console.error('Error creating competition:', error);
+        await showCustomAlert('An error occurred while creating the competition', 'Error');
+    }
+});
+</script>
+{% endblock %}

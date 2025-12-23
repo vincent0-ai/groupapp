@@ -38,6 +38,13 @@ def competitions_page():
         return redirect(url_for('main.auth_page'))
     return render_template('competitions.html', user=user)
 
+@main_bp.route('/competitions/create')
+def create_competition_page():
+    user = get_current_user()
+    if not user:
+        return redirect(url_for('main.auth_page'))
+    return render_template('create_competition.html', user=user)
+
 @main_bp.route('/files')
 def files_page():
     user = get_current_user()

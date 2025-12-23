@@ -1002,6 +1002,31 @@
                 renderParticipants();
             }
         });
+
+        // Keep an authoritative list of online users for the room. Server emits this periodically/at joins.
+        socket.on('online_users', (data) => {
+            const users = (data && data.users) || [];
+            let changed = false;
+            users.forEach(u => {
+                const p = u.profile;
+                if (!p || !p.id) return;
+                if (!participants[p.id]) {
+                    participants[p.id] = {
+                        name: p.full_name || p.username || (`User ${String(p.id).slice(-4)}`),
+                        avatar_url: p.avatar_url || '',
+                        can_draw: false,
+                        can_speak: false,
+                        can_share_screen: false
+                    };
+                    changed = true;
+                } else {
+                    // merge profile updates without clobbering permission flags
+                    participants[p.id].name = p.full_name || p.username || participants[p.id].name;
+                    participants[p.id].avatar_url = p.avatar_url || participants[p.id].avatar_url;
+                }
+            });
+            if (changed) renderParticipants();
+        });
         socket.on('user_left', (data) => {
             delete participants[data.user_id];
             renderParticipants();
