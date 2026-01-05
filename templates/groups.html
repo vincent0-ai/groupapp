@@ -363,7 +363,7 @@
                                 <h5 class="card-title fw-semibold">${g.name}${unreadBadge}</h5>
                                 <p class="card-text small">${g.description || 'No description'}</p>
                                 <small class="text-muted">
-                                    👥 ${g.member_count || 0} members
+                                    ${g.member_count || 0} members
                                     ${g.channel && g.channel.name ? `<span class="badge bg-primary ms-2">${g.channel.name}</span>` : ''}
                                     <span id="group-streak-${groupId}" class="badge bg-warning text-dark ms-2" style="display:none;"></span>
                                 </small>
@@ -441,7 +441,7 @@
                                                         <h5 class="card-title fw-semibold">${g.name}</h5>
                                                         <p class="card-text small">${g.description || 'No description'}</p>
                                                         <small class="text-muted">
-                                                            👥 ${g.member_count || 0} members
+                                                            ${g.member_count || 0} members
                                                             ${g.is_private ? '<span class="ms-2" title="Private">🔒</span>' : '<span class="ms-2" title="Public">🌐</span>'}
                                                         </small>
                                                         <div class="mt-auto pt-3">

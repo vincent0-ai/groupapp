@@ -164,27 +164,21 @@
     <div class="offcanvas-body pb-4">
         <div class="list-group list-group-flush">
             <a href="{{ url_for('messages_page') }}" class="list-group-item list-group-item-action d-flex align-items-center gap-3 py-3" style="background: transparent; color: var(--text-body); border-color: var(--border-color);">
-                <span style="width: 24px;">💬</span>
                 <span>Group Messages</span>
             </a>
             <a href="{{ url_for('competitions_page') }}" class="list-group-item list-group-item-action d-flex align-items-center gap-3 py-3" style="background: transparent; color: var(--text-body); border-color: var(--border-color);">
-                <span style="width: 24px;">🏆</span>
                 <span>Competitions</span>
             </a>
             <a href="{{ url_for('files_page') }}" class="list-group-item list-group-item-action d-flex align-items-center gap-3 py-3" style="background: transparent; color: var(--text-body); border-color: var(--border-color);">
-                <span style="width: 24px;">📁</span>
                 <span>Files</span>
             </a>
             <a href="{{ url_for('leaderboard_page') }}" class="list-group-item list-group-item-action d-flex align-items-center gap-3 py-3" style="background: transparent; color: var(--text-body); border-color: var(--border-color);">
-                <span style="width: 24px;">🏅</span>
                 <span>Leaderboard</span>
             </a>
             <a href="#" class="list-group-item list-group-item-action d-flex align-items-center gap-3 py-3" data-bs-toggle="modal" data-bs-target="#aboutModal" data-bs-dismiss="offcanvas" style="background: transparent; color: var(--text-body); border-color: var(--border-color);">
-                <span style="width: 24px;">ℹ️</span>
                 <span>About</span>
             </a>
             <a href="#" class="list-group-item list-group-item-action d-flex align-items-center gap-3 py-3" id="mobileLogoutBtn" style="background: transparent; color: var(--danger-color); border-color: var(--border-color);">
-                <span style="width: 24px;">🚪</span>
                 <span>Logout</span>
             </a>
         </div>
@@ -206,9 +200,9 @@
                 <h4 class="mb-3 fw-bold">Discussio</h4>
                 <p class="text-muted mb-4">A modern collaborative learning platform for groups, discussions, and competitions.</p>
                 <div class="d-flex justify-content-center gap-3 mb-4">
-                    <span class="badge bg-primary">👥 Groups</span>
-                    <span class="badge bg-success">💬 Chat</span>
-                    <span class="badge bg-warning">🏆 Compete</span>
+                    <span class="badge bg-primary">Groups</span>
+                    <span class="badge bg-success">Chat</span>
+                    <span class="badge bg-warning">Compete</span>
                 </div>
                 <hr>
                 <p class="small text-muted mb-1">&copy; {{ now().year if now is defined else '2025' }} Discussio</p>
