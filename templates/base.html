@@ -32,8 +32,7 @@
 <nav class="navbar navbar-expand-lg navbar-dark sticky-top">
     <div class="container-fluid px-3 px-lg-4">
         <a class="navbar-brand d-flex align-items-center" href="{{ url_for('dashboard') }}">
-            <i class="fas fa-graduation-cap me-2"></i>
-            Discussio
+            🎓 Discussio
         </a>
         
         <!-- Notification Bell & User Actions (visible on mobile) -->
@@ -197,19 +196,19 @@
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content" style="background: var(--cream-bg); color: var(--text-body);">
             <div class="modal-header" style="border-color: var(--border-color);">
-                <h5 class="modal-title" id="aboutModalLabel" style="color: var(--text-heading);"><i class="fas fa-graduation-cap me-2"></i>About Discussio</h5>
+                <h5 class="modal-title" id="aboutModalLabel" style="color: var(--text-heading);">🎓 About Discussio</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <div class="modal-body text-center py-4">
-                <div class="mb-4">
-                    <i class="fas fa-graduation-cap fa-3x" style="color: #4F46E5;"></i>
+                <div class="mb-4" style="font-size: 3rem;">
+                    🎓
                 </div>
                 <h4 class="mb-3 fw-bold">Discussio</h4>
                 <p class="text-muted mb-4">A modern collaborative learning platform for groups, discussions, and competitions.</p>
                 <div class="d-flex justify-content-center gap-3 mb-4">
-                    <span class="badge bg-primary"><i class="fas fa-users me-1"></i> Groups</span>
-                    <span class="badge bg-success"><i class="fas fa-comments me-1"></i> Chat</span>
-                    <span class="badge bg-warning"><i class="fas fa-trophy me-1"></i> Compete</span>
+                    <span class="badge bg-primary">👥 Groups</span>
+                    <span class="badge bg-success">💬 Chat</span>
+                    <span class="badge bg-warning">🏆 Compete</span>
                 </div>
                 <hr>
                 <p class="small text-muted mb-1">&copy; {{ now().year if now is defined else '2025' }} Discussio</p>
@@ -509,7 +508,7 @@
                     if (navbarList && !document.getElementById('adminLink')) {
                         const li = document.createElement('li');
                         li.className = 'nav-item';
-                        li.innerHTML = `<a class="nav-link" id="adminLink" href="/admin"><i class="fas fa-shield-alt"></i> Admin</a>`;
+                        li.innerHTML = `<a class="nav-link" id="adminLink" href="/admin">🛡️ Admin</a>`;
                         // Insert before Logout (last item)
                         navbarList.insertBefore(li, navbarList.lastElementChild);
                     }
@@ -587,11 +586,11 @@
         const listDesktop = document.getElementById('notificationListDesktop');
 
         const html = notifications.length === 0 
-            ? '<div class="text-center text-muted py-4"><i class="fas fa-bell-slash fa-2x mb-2"></i><p class="mb-0">No notifications yet</p></div>'
+            ? '<div class="text-center text-muted py-4" style="font-size: 2rem;">🔕</div><div class="text-center text-muted"><p class="mb-0">No notifications yet</p></div>'
             : notifications.map(n => `
                 <div class="notification-item ${n.read ? '' : 'unread'}" data-id="${n._id}" onclick="handleNotificationClick('${n._id}', '${n.link || ''}')">
                     <div class="d-flex align-items-start gap-2">
-                        <i class="fas ${getNotificationIcon(n.type)} text-primary mt-1"></i>
+                        <span class="mt-1">${getNotificationIcon(n.type)}</span>
                         <div class="flex-grow-1">
                             <div class="notification-text">${escapeHtml(n.message)}</div>
                             <small class="text-muted">${formatTimeAgo(n.created_at)}</small>
@@ -618,15 +617,15 @@
 
     function getNotificationIcon(type) {
         const icons = {
-            'mention': 'fa-at',
-            'message': 'fa-comment',
-            'join_request': 'fa-user-plus',
-            'announcement': 'fa-bullhorn',
-            'reaction': 'fa-heart',
-            'group_invite': 'fa-users',
-            'dm': 'fa-envelope'
+            'mention': '📣',
+            'message': '💬',
+            'join_request': '👤',
+            'announcement': '📢',
+            'reaction': '❤️',
+            'group_invite': '👥',
+            'dm': '✉️'
         };
-        return icons[type] || 'fa-bell';
+        return icons[type] || '🔔';
     }
 
     function formatTimeAgo(dateStr) {

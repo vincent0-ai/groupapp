@@ -5,21 +5,62 @@
 {% block head %}
 <style>
     .form-section {
-        background: var(--primary-ultra-light);
+        background: rgba(26, 23, 48, 0.9);
         border-radius: 20px;
         padding: 2rem 2.5rem;
         margin-bottom: 2rem;
-        border: 1px solid rgba(79, 70, 229, 0.1);
+        border: 1px solid rgba(124, 58, 237, 0.3);
         max-width: 800px;
         margin-left: auto;
         margin-right: auto;
+        backdrop-filter: blur(10px);
+        color: #E5E7EB;
+    }
+    
+    .form-section h2 {
+        color: #E5E7EB;
+    }
+    
+    .form-section .form-label {
+        color: #E5E7EB;
+    }
+    
+    .form-section .form-control,
+    .form-section .form-select {
+        background: rgba(26, 23, 48, 0.9);
+        border: 1px solid rgba(124, 58, 237, 0.3);
+        color: #E5E7EB;
+    }
+    
+    .form-section .form-control:focus,
+    .form-section .form-select:focus {
+        border-color: #7C3AED;
+        box-shadow: 0 0 0 3px rgba(124, 58, 237, 0.2);
+    }
+    
+    .form-section .form-control::placeholder {
+        color: #6B7280;
+    }
+    
+    .form-section .form-text,
+    .form-section .form-check-label {
+        color: #9CA3AF;
+    }
+    
+    .form-section .card {
+        background: rgba(124, 58, 237, 0.15);
+        border: 1px solid rgba(124, 58, 237, 0.2);
+    }
+    
+    .form-section .card h6 {
+        color: #E5E7EB;
     }
 </style>
 {% endblock %}
 
 {% block content %}
 <div class="form-section mt-4">
-    <h2 class="mb-4"><i class="fas fa-trophy me-2"></i>Create Competition</h2>
+    <h2 class="mb-4">🏆 Create Competition</h2>
     <form id="createCompForm">
         <div class="row">
             <div class="col-md-6 mb-3">
@@ -28,7 +69,7 @@
             </div>
             <div class="col-md-6 mb-3">
                 <label for="compGroup" class="form-label">Group</label>
-                <div class="form-text small text-muted mb-1">If you want multiple groups to compete, check "General competition" and select groups below.</div>
+                <div class="form-text small mb-1">If you want multiple groups to compete, check "General competition" and select groups below.</div>
                 <select class="form-control" id="compGroup" required></select>
                 <div class="form-check form-switch mt-2">
                     <input class="form-check-input" type="checkbox" id="compIsGeneral">
@@ -42,19 +83,19 @@
         </div>
         <div class="row">
             <div class="col-md-6 mb-3">
-                <label for="compDuration" class="form-label">Duration (minutes)</label>
+                <label for="compDuration" class="form-label">⏱️ Duration (minutes)</label>
                 <input type="number" class="form-control" id="compDuration" value="60" required>
             </div>
             <div class="col-md-6 mb-3">
-                <label for="compSeason" class="form-label">Season (optional)</label>
+                <label for="compSeason" class="form-label">📅 Season (optional)</label>
                 <select class="form-control" id="compSeason"><option value="">None</option></select>
             </div>
         </div>
-        <hr>
+        <hr style="border-color: rgba(124, 58, 237, 0.3);">
         <div class="d-flex justify-content-between align-items-center mb-3">
-            <h6>Questions</h6>
+            <h6>❓ Questions</h6>
             <button type="button" class="btn btn-sm btn-outline-primary" onclick="addQuestionField()">
-                <i class="fas fa-plus"></i> Add Question
+                ➕ Add Question
             </button>
         </div>
         <div id="questionsContainer">
@@ -62,7 +103,7 @@
         </div>
         <div class="d-flex justify-content-end mt-4">
             <a href="{{ url_for('main.competitions_page') }}" class="btn btn-secondary me-2">Cancel</a>
-            <button type="submit" class="btn btn-primary">Create</button>
+            <button type="submit" class="btn btn-primary">✅ Create</button>
         </div>
     </form>
 </div>
@@ -79,13 +120,13 @@ function addQuestionField() {
     questionCount++;
     const container = document.getElementById('questionsContainer');
     const div = document.createElement('div');
-    div.className = 'card mb-3 bg-light';
+    div.className = 'card mb-3';
     div.innerHTML = `
         <div class="card-body">
             <div class="d-flex justify-content-between mb-2">
                 <h6>Question ${questionCount}</h6>
                 <button type="button" class="btn btn-sm btn-danger" onclick="this.closest('.card').remove()">
-                    <i class="fas fa-trash"></i>
+                    🗑️
                 </button>
             </div>
             <div class="mb-2">

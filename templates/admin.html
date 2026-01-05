@@ -2,40 +2,142 @@
 
 {% block title %}Admin Dashboard - Discussio{% endblock %}
 
+{% block head %}
+<style>
+    .admin-header {
+        background: linear-gradient(135deg, rgba(220, 53, 69, 0.3) 0%, rgba(124, 58, 237, 0.3) 100%);
+        border-radius: 20px;
+        padding: 2rem;
+        border: 1px solid rgba(124, 58, 237, 0.3);
+        backdrop-filter: blur(10px);
+    }
+    
+    .admin-header h1 {
+        color: #E5E7EB;
+    }
+    
+    .admin-header p {
+        color: #9CA3AF;
+    }
+    
+    .admin-tabs {
+        background: rgba(26, 23, 48, 0.9);
+        border-radius: 12px;
+        padding: 6px;
+        border: 1px solid rgba(124, 58, 237, 0.3);
+    }
+    
+    .admin-tabs .nav-link {
+        border: none;
+        border-radius: 8px;
+        padding: 10px 20px;
+        font-weight: 500;
+        color: #9CA3AF;
+        background: transparent;
+    }
+    
+    .admin-tabs .nav-link.active {
+        background: rgba(124, 58, 237, 0.3);
+        color: #E5E7EB;
+    }
+    
+    .admin-tabs .nav-link:hover:not(.active) {
+        color: #E5E7EB;
+    }
+    
+    .admin-card {
+        background: rgba(26, 23, 48, 0.9);
+        border: 1px solid rgba(124, 58, 237, 0.3);
+        border-radius: 16px;
+        backdrop-filter: blur(10px);
+        color: #E5E7EB;
+    }
+    
+    .admin-card h5 {
+        color: #E5E7EB;
+    }
+    
+    .admin-card .list-group-item {
+        background: rgba(124, 58, 237, 0.1);
+        border-color: rgba(124, 58, 237, 0.2);
+        color: #E5E7EB;
+    }
+    
+    .admin-card .list-group-item .text-muted {
+        color: #9CA3AF !important;
+    }
+    
+    .admin-card .form-control {
+        background: rgba(26, 23, 48, 0.9);
+        border: 1px solid rgba(124, 58, 237, 0.3);
+        color: #E5E7EB;
+    }
+    
+    .admin-card .form-control:focus {
+        border-color: #7C3AED;
+        box-shadow: 0 0 0 3px rgba(124, 58, 237, 0.2);
+    }
+    
+    .admin-card .form-control::placeholder {
+        color: #6B7280;
+    }
+    
+    .pagination .page-link {
+        background: rgba(26, 23, 48, 0.9);
+        border-color: rgba(124, 58, 237, 0.3);
+        color: #E5E7EB;
+    }
+    
+    .pagination .page-link:hover {
+        background: rgba(124, 58, 237, 0.3);
+    }
+    
+    .pagination .page-item.active .page-link {
+        background: #7C3AED;
+        border-color: #7C3AED;
+    }
+    
+    .pagination .page-item.disabled .page-link {
+        background: rgba(26, 23, 48, 0.5);
+        color: #6B7280;
+    }
+</style>
+{% endblock %}
+
 {% block content %}
 <!-- Page Header -->
-<div class="page-header mb-4" style="background: linear-gradient(135deg, #dc3545 0%, #6f42c1 100%); border-radius: 20px; padding: 2rem; color: white;">
+<div class="-header mb-4">
     <div class="d-flex justify-content-between align-items-center flex-wrap gap-3">
         <div class="d-flex align-items-center gap-3">
             <div>
-                <h1 class="mb-1" style="font-size: 1.75rem; font-weight: 700;">Admin Dashboard</h1>
-                <p class="mb-0 opacity-75">Manage users, groups, and channels</p>
+                <h1 class="mb-1" style="font-size: 1.75rem; font-weight: 700;">🛡️ Admin Dashboard</h1>
+                <p class="mb-0">Manage users, groups, and channels</p>
             </div>
         </div>
-        <div id="adminStats" class="d-flex gap-3 align-items-center">
+        <div id="adminStats" class="d-flex gap-3 align-items-center" style="color: #E5E7EB;">
             <!-- Stats will be loaded here -->
             <button id="adminCreateSeasonBtn" class="btn btn-sm btn-outline-light ms-3" title="Create Season" onclick="window.location.href='/seasons?showCreate=1'">
-                <i class="fas fa-calendar-plus me-1"></i> Create Season
+                📅 Create Season
             </button>
         </div>
     </div>
 </div>
 
-<div class="nav-tabs-container mb-4" style="background: #4F46E5; border-radius: 12px; padding: 6px;">
+<div class="admin-tabs mb-4">
     <ul class="nav nav-tabs border-0" id="adminTabs" role="tablist" style="gap: 4px;">
         <li class="nav-item" role="presentation">
-            <button class="nav-link active" id="users-tab" data-bs-toggle="tab" data-bs-target="#users" type="button" role="tab" style="border: none; border-radius: 8px; padding: 10px 20px; font-weight: 500; color: #0F172A;">
-                <i class="fas fa-users me-2"></i>Users
+            <button class="nav-link active" id="users-tab" data-bs-toggle="tab" data-bs-target="#users" type="button" role="tab">
+                👥 Users
             </button>
         </li>
         <li class="nav-item" role="presentation">
-            <button class="nav-link" id="groups-tab" data-bs-toggle="tab" data-bs-target="#groups" type="button" role="tab" style="border: none; border-radius: 8px; padding: 10px 20px; font-weight: 500; color: #0F172A;">
-                <i class="fas fa-layer-group me-2"></i>Groups
+            <button class="nav-link" id="groups-tab" data-bs-toggle="tab" data-bs-target="#groups" type="button" role="tab">
+                📂 Groups
             </button>
         </li>
         <li class="nav-item" role="presentation">
-            <button class="nav-link" id="channels-tab" data-bs-toggle="tab" data-bs-target="#channels" type="button" role="tab" style="border: none; border-radius: 8px; padding: 10px 20px; font-weight: 500; color: #0F172A;">
-                <i class="fas fa-hashtag me-2"></i>Channels
+            <button class="nav-link" id="channels-tab" data-bs-toggle="tab" data-bs-target="#channels" type="button" role="tab">
+                #️⃣ Channels
             </button>
         </li>
     </ul>
@@ -44,18 +146,17 @@
 <div class="tab-content" id="adminTabContent">
     <!-- Users Tab -->
     <div class="tab-pane fade show active" id="users" role="tabpanel">
-        <div class="card border-0 shadow-sm mb-4" style="border-radius: 16px; overflow: hidden;">
+        <div class="card admin-card border-0 shadow-sm mb-4">
             <div class="card-body">
                 <div class="d-flex justify-content-between align-items-center mb-3">
-                    <h5 class="mb-0 fw-semibold"><i class="fas fa-users text-primary me-2"></i>User Management</h5>
+                    <h5 class="mb-0 fw-semibold">👥 User Management</h5>
                     <div class="search-wrapper position-relative">
-                        <i class="fas fa-search position-absolute" style="left: 12px; top: 50%; transform: translateY(-50%); color: #6c757d;"></i>
-                        <input type="text" class="form-control" id="userSearch" placeholder="Search users..." style="padding-left: 38px; border-radius: 10px; min-width: 250px;">
+                        <input type="text" class="form-control" id="userSearch" placeholder="🔍 Search users..." style="border-radius: 10px; min-width: 250px;">
                     </div>
                 </div>
                 <!-- List view (replaces table for normal display) -->
                 <div id="usersList" class="list-group">
-                    <div class="list-group-item text-center py-4 text-muted">Loading users...</div>
+                    <div class="list-group-item text-center py-4">Loading users...</div>
                 </div>
             </div>
         </div>
@@ -66,18 +167,17 @@
 
     <!-- Groups Tab -->
     <div class="tab-pane fade" id="groups" role="tabpanel">
-        <div class="card border-0 shadow-sm mb-4" style="border-radius: 16px; overflow: hidden;">
+        <div class="card admin-card border-0 shadow-sm mb-4">
             <div class="card-body">
                 <div class="d-flex justify-content-between align-items-center mb-3">
-                    <h5 class="mb-0 fw-semibold"><i class="fas fa-layer-group text-primary me-2"></i>Group Management</h5>
+                    <h5 class="mb-0 fw-semibold">📂 Group Management</h5>
                     <div class="search-wrapper position-relative">
-                        <i class="fas fa-search position-absolute" style="left: 12px; top: 50%; transform: translateY(-50%); color: #6c757d;"></i>
-                        <input type="text" class="form-control" id="groupSearch" placeholder="Search groups..." style="padding-left: 38px; border-radius: 10px; min-width: 250px;">
+                        <input type="text" class="form-control" id="groupSearch" placeholder="🔍 Search groups..." style="border-radius: 10px; min-width: 250px;">
                     </div>
                 </div>
                 <!-- List view (replaces table for normal display) -->
                 <div id="groupsList" class="list-group">
-                    <div class="list-group-item text-center py-4 text-muted">Loading groups...</div>
+                    <div class="list-group-item text-center py-4">Loading groups...</div>
                 </div>
             </div>
         </div>
@@ -88,14 +188,14 @@
 
     <!-- Channels Tab -->
     <div class="tab-pane fade" id="channels" role="tabpanel">
-        <div class="card border-0 shadow-sm mb-4" style="border-radius: 16px; overflow: hidden;">
+        <div class="card admin-card border-0 shadow-sm mb-4">
             <div class="card-body">
                 <div class="d-flex justify-content-between align-items-center mb-3">
-                    <h5 class="mb-0 fw-semibold"><i class="fas fa-hashtag text-primary me-2"></i>Channel Management</h5>
+                    <h5 class="mb-0 fw-semibold">#️⃣ Channel Management</h5>
                 </div>
                 <!-- List view (replaces table for normal display) -->
                 <div id="channelsList" class="list-group">
-                    <div class="list-group-item text-center py-4 text-muted">Loading channels...</div>
+                    <div class="list-group-item text-center py-4">Loading channels...</div>
                 </div>
             </div>
         </div>
@@ -172,9 +272,12 @@ async function loadStats() {
     if (res.status === 'success') {
         const stats = res.data;
         document.getElementById('adminStats').innerHTML = `
-            <span><i class="fas fa-users"></i> ${stats.total_users} Users</span>
-            <span><i class="fas fa-layer-group"></i> ${stats.total_groups} Groups</span>
-            <span><i class="fas fa-hashtag"></i> ${stats.total_channels} Channels</span>
+            <span>👥 ${stats.total_users} Users</span>
+            <span>📂 ${stats.total_groups} Groups</span>
+            <span>#️⃣ ${stats.total_channels} Channels</span>
+            <button id="adminCreateSeasonBtn" class="btn btn-sm btn-outline-light ms-3" title="Create Season" onclick="window.location.href='/seasons?showCreate=1'">
+                📅 Create Season
+            </button>
         `;
     }
 }
