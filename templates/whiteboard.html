@@ -316,7 +316,7 @@
         <div class="card shadow-sm border-0 mb-3" style="overflow: hidden;">
             <div class="card-body">
                     <div class="d-flex justify-content-between align-items-center">
-                        <h6 class="card-title mb-0 fw-semibold">🎨 Tools</h6>
+                        <h6 class="card-title mb-0 fw-semibold">Tools</h6>
                         <button class="btn btn-sm btn-outline-primary" data-bs-toggle="collapse" data-bs-target="#drawingToolsCollapse" aria-expanded="false" aria-controls="drawingToolsCollapse" id="toggleDrawingTools" style="font-size: 0.75rem;">Show</button>
                     </div>
                     <div id="permissionStatus" class="mb-2 text-muted small mt-2"></div>
@@ -350,7 +350,7 @@
 
         <div class="card mt-3 shadow-sm border-0" style="overflow: hidden;">
             <div class="card-header">
-                <h6 class="mb-0 fw-semibold">👥 Participants</h6>
+                <h6 class="mb-0 fw-semibold">Participants</h6>
             </div>
             <div class="card-body">
                 <div id="participantsList" style="max-height: 30vh; overflow-y: auto;">
@@ -637,7 +637,7 @@
             screenShareBtn.className = 'btn btn-sm btn-outline-info';
             screenShareBtn.setAttribute('aria-label', 'Share Screen');
             screenShareBtn.disabled = true;
-            screenShareBtn.innerHTML = '💻<span class="btn-text"> Share Screen</span>';
+            screenShareBtn.innerHTML = '<span class="btn-text"> Share Screen</span>';
             if (!supportsDisplayMedia) {
                 screenShareBtn.disabled = true;
                 screenShareBtn.title = 'Screen sharing not supported on this device or browser';
@@ -739,7 +739,7 @@
         function updateScreenShareButton() {
             const screenShareBtn = document.getElementById('screenShareBtn');
             if(!screenShareBtn) return;
-            screenShareBtn.innerHTML = isScreenSharing ? '💻<span class="btn-text"> Stop Sharing</span>' : '💻<span class="btn-text"> Share Screen</span>';
+            screenShareBtn.innerHTML = isScreenSharing ? '<span class="btn-text"> Stop Sharing</span>' : '<span class="btn-text"> Share Screen</span>';
             screenShareBtn.className = isScreenSharing ? 'btn btn-sm btn-info text-white' : 'btn btn-sm btn-outline-info';
             screenShareBtn.disabled = !isInCall;
         }
