@@ -83,19 +83,19 @@
         </div>
         <div class="row">
             <div class="col-md-6 mb-3">
-                <label for="compDuration" class="form-label">⏱️ Duration (minutes)</label>
+                <label for="compDuration" class="form-label">Duration (minutes)</label>
                 <input type="number" class="form-control" id="compDuration" value="60" required>
             </div>
             <div class="col-md-6 mb-3">
-                <label for="compSeason" class="form-label">📅 Season (optional)</label>
+                <label for="compSeason" class="form-label">Season (optional)</label>
                 <select class="form-control" id="compSeason"><option value="">None</option></select>
             </div>
         </div>
         <hr style="border-color: rgba(124, 58, 237, 0.3);">
         <div class="d-flex justify-content-between align-items-center mb-3">
-            <h6>❓ Questions</h6>
+            <h6>Questions</h6>
             <button type="button" class="btn btn-sm btn-outline-primary" onclick="addQuestionField()">
-                ➕ Add Question
+                Add Question
             </button>
         </div>
         <div id="questionsContainer">
@@ -103,7 +103,7 @@
         </div>
         <div class="d-flex justify-content-end mt-4">
             <a href="{{ url_for('main.competitions_page') }}" class="btn btn-secondary me-2">Cancel</a>
-            <button type="submit" class="btn btn-primary">✅ Create</button>
+            <button type="submit" class="btn btn-primary">Create</button>
         </div>
     </form>
 </div>
@@ -139,10 +139,10 @@ function addQuestionField() {
                 </select>
             </div>
             <div class="mb-2 question-options-row">
-                <input type="text" class="form-control form-control-sm question-options" placeholder="Options (comma separated, e.g. A,B,C,D)" required>
+                <input type="text" class="form-control form-control-sm question-options" placeholder="Options (comma separated, e.g. A,B,C,D)">
             </div>
             <div class="question-answer-row">
-                <input type="text" class="form-control form-control-sm question-answer" placeholder="Correct Answer" required>
+                <input type="text" class="form-control form-control-sm question-answer" placeholder="Correct Answer">
             </div>
         </div>
     `;
@@ -206,7 +206,7 @@ async function loadGroupsForCreate() {
 }
 
 document.addEventListener('DOMContentLoaded', async () => {
-    if (!token) {
+    if (!getAuthToken()) {
         sessionStorage.setItem('redirectAfterLogin', window.location.href);
         window.location.href = "{{ url_for('auth_page') }}";
         return;

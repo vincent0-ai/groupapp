@@ -623,14 +623,14 @@
             liveBtn.id = 'liveBtn';
             liveBtn.className = 'btn btn-sm btn-outline-success';
             liveBtn.setAttribute('aria-label', 'Join Call');
-            liveBtn.innerHTML = '📞<span class="btn-text"> Join Call</span>';
+            liveBtn.innerHTML = '<span class="btn-text"> Join Call</span>';
 
             const muteBtn = document.createElement('button');
             muteBtn.id = 'muteBtn';
             muteBtn.className = 'btn btn-sm btn-outline-warning';
             muteBtn.setAttribute('aria-label', 'Mute');
             muteBtn.disabled = true;
-            muteBtn.innerHTML = '🎙️<span class="btn-text"> Mute</span>';
+            muteBtn.innerHTML = '<span class="btn-text"> Mute</span>';
 
             const screenShareBtn = document.createElement('button');
             screenShareBtn.id = 'screenShareBtn';
@@ -648,13 +648,13 @@
             watchScreenBtn.className = 'btn btn-sm btn-outline-primary';
             watchScreenBtn.setAttribute('aria-label', 'Watch Screen');
             watchScreenBtn.disabled = true;
-            watchScreenBtn.innerHTML = '👁️<span class="btn-text"> Watch Screen</span>';
+            watchScreenBtn.innerHTML = '<span class="btn-text"> Watch Screen</span>';
 
             const raiseBtn = document.createElement('button');
             raiseBtn.id = 'raiseBtn';
             raiseBtn.className = 'btn btn-sm btn-outline-secondary';
             raiseBtn.setAttribute('aria-label', 'Raise Hand');
-            raiseBtn.innerHTML = '✋<span class="btn-text"> Raise Hand</span>';
+            raiseBtn.innerHTML = '<span class="btn-text"> Raise Hand</span>';
 
             const leaveSessionBtn = document.createElement('button');
             leaveSessionBtn.id = 'leaveSessionBtn';
@@ -730,7 +730,7 @@
         function updateMuteButton() {
             const muteBtn = document.getElementById('muteBtn');
             if(!muteBtn) return;
-            muteBtn.innerHTML = isMuted ? '🔇<span class="btn-text"> Unmute</span>' : '🎙️<span class="btn-text"> Mute</span>';
+            muteBtn.innerHTML = isMuted ? '<span class="btn-text"> Unmute</span>' : '<span class="btn-text"> Mute</span>';
             muteBtn.className = isMuted ? 'btn btn-sm btn-warning' : 'btn btn-sm btn-outline-warning';
             muteBtn.disabled = !isInCall || (isMuted && !canSpeak);
             muteBtn.setAttribute('aria-pressed', String(!isMuted));
@@ -793,7 +793,7 @@
             const lkResp = await getLiveKitToken(sessionId);
             if (!lkResp || !lkResp.token) {
                 liveBtn.disabled = false;
-                liveBtn.innerHTML = '📞<span class="btn-text"> Join Call</span>';
+                liveBtn.innerHTML = '<span class="btn-text"> Join Call</span>';
                 return;
             }
 
@@ -831,7 +831,7 @@
                 showCustomAlert('Could not connect to the media session.', 'Connection Error');
                 isInCall = false;
                 liveBtn.disabled = false;
-                liveBtn.innerHTML = '📞<span class="btn-text"> Join Call</span>';
+                liveBtn.innerHTML = '<span class="btn-text"> Join Call</span>';
             }
         }
 
@@ -843,7 +843,7 @@
             const liveBtn = document.getElementById('liveBtn');
             if(liveBtn) {
                 liveBtn.className = 'btn btn-sm btn-outline-success';
-                liveBtn.innerHTML = '📞<span class="btn-text"> Join Call</span>';
+                liveBtn.innerHTML = '<span class="btn-text"> Join Call</span>';
             }
             const muteBtn = document.getElementById('muteBtn');
             const screenShareBtn = document.getElementById('screenShareBtn');
@@ -969,12 +969,12 @@
                 if (leaveBtn) {
                     if (isCreator) {
                         leaveBtn.setAttribute('aria-label', 'End Session');
-                        leaveBtn.innerHTML = '⏹️<span class="btn-text"> End Session</span>';
+                        leaveBtn.innerHTML = '<span class="btn-text"> End Session</span>';
                         leaveBtn.className = 'btn btn-sm btn-danger';
                         leaveBtn.onclick = async () => { if (confirm('End session for everyone?')) await endSession(sessionId); };
                     } else {
                         leaveBtn.setAttribute('aria-label', 'Leave');
-                        leaveBtn.innerHTML = '🚪<span class="btn-text"> Leave</span>';
+                        leaveBtn.innerHTML = '<span class="btn-text"> Leave</span>';
                         leaveBtn.className = 'btn btn-sm btn-outline-danger';
                         leaveBtn.onclick = async () => { try { await leaveCall(); } catch(e){}; window.location.href = '/whiteboard'; };
                     }
