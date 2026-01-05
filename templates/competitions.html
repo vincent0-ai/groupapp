@@ -5,21 +5,18 @@
 {% block head %}
 <style>
     .page-header {
-        background: var(--primary-ultra-light);
+        background: linear-gradient(135deg, rgba(124, 58, 237, 0.15), rgba(6, 182, 212, 0.08));
         border-radius: 20px;
         padding: 1.5rem 2rem;
         margin-bottom: 2rem;
-        border: 1px solid rgba(79, 70, 229, 0.1);
+        border: 1px solid rgba(124, 58, 237, 0.2);
+        backdrop-filter: blur(10px);
     }
     
     .page-header h1 {
         font-weight: 800;
         margin-bottom: 0;
-        color: #0F172A;
-    }
-    
-    .page-header h1 i {
-        background: linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%);
+        background: linear-gradient(135deg, #A78BFA, #06B6D4);
         -webkit-background-clip: text;
         -webkit-text-fill-color: transparent;
         background-clip: text;
@@ -27,11 +24,12 @@
     
     .nav-tabs {
         border: none;
-        background: var(--cream-bg);
+        background: rgba(12, 10, 29, 0.6);
         border-radius: 12px;
         padding: 6px;
         gap: 4px;
         display: inline-flex;
+        border: 1px solid rgba(124, 58, 237, 0.2);
     }
     
     .nav-tabs .nav-link {
@@ -39,30 +37,35 @@
         border-radius: 8px;
         padding: 10px 20px;
         font-weight: 600;
-        color: var(--text-muted);
+        color: #9CA3AF;
         transition: all 0.25s ease;
     }
     
     .nav-tabs .nav-link:hover {
-        background: rgba(79, 70, 229, 0.08);
-        color: var(--primary-color);
+        background: rgba(124, 58, 237, 0.15);
+        color: #A78BFA;
     }
     
     .nav-tabs .nav-link.active {
-        background: #4F46E5;
+        background: linear-gradient(135deg, #7C3AED, #6D28D9);
         color: white;
-        box-shadow: 0 4px 12px rgba(79, 70, 229, 0.35);
+        box-shadow: 0 4px 15px rgba(124, 58, 237, 0.35);
     }
     
     .competition-card {
-        border: 1px solid var(--border-color);
-        border-left: 3px solid var(--primary-color);
-        transition: box-shadow 0.15s ease;
+        background: rgba(26, 23, 48, 0.8);
+        border: 1px solid rgba(124, 58, 237, 0.15);
+        border-left: 3px solid #7C3AED;
+        transition: all 0.2s ease;
         height: 100%;
+        border-radius: 16px;
+        backdrop-filter: blur(10px);
     }
     
     .competition-card:hover {
-        box-shadow: var(--shadow-md);
+        border-color: rgba(124, 58, 237, 0.4);
+        box-shadow: 0 8px 25px rgba(124, 58, 237, 0.2);
+        transform: translateY(-2px);
     }
     
     .competition-card.active {
@@ -70,18 +73,22 @@
     }
     
     .competition-card.ended {
-        border-left-color: var(--text-muted);
+        border-left-color: #6B7280;
         opacity: 0.8;
     }
     
     .competition-card .card-header {
         background: transparent !important;
-        border-bottom: 1px solid var(--border-color);
-        color: var(--text-dark) !important;
+        border-bottom: 1px solid rgba(124, 58, 237, 0.15);
+        color: #E5E7EB !important;
     }
     
     .competition-card .card-header h5 {
-        color: var(--text-dark) !important;
+        color: #E5E7EB !important;
+    }
+    
+    .competition-card .card-body {
+        color: #D1D5DB;
     }
     
     .status-badge {
@@ -95,8 +102,8 @@
     }
     
     .status-badge.live {
-        background: var(--success-light);
-        color: var(--success-color);
+        background: rgba(34, 197, 94, 0.15);
+        color: #22C55E;
     }
     
     .status-badge.live::before {
@@ -104,18 +111,18 @@
         width: 8px;
         height: 8px;
         border-radius: 50%;
-        background: var(--success-color);
+        background: #22C55E;
         animation: pulse 1.5s infinite;
     }
     
     .status-badge.upcoming {
-        background: var(--warning-light);
-        color: #b45309;
+        background: rgba(251, 191, 36, 0.15);
+        color: #FBBF24;
     }
     
     .status-badge.ended {
-        background: var(--cream-bg);
-        color: var(--text-muted);
+        background: rgba(107, 114, 128, 0.15);
+        color: #9CA3AF;
     }
     
     @keyframes pulse {
@@ -126,12 +133,13 @@
     .empty-state {
         text-align: center;
         padding: 3rem 1.5rem;
+        color: #6B7280;
     }
     
-    .empty-state i {
+    .empty-state .emoji-icon {
         font-size: 4rem;
-        color: var(--text-light);
         margin-bottom: 1rem;
+        opacity: 0.5;
     }
 
     /* Make questions area scrollable so new questions remain reachable */
@@ -150,8 +158,9 @@
         position: sticky;
         bottom: 0;
         z-index: 10;
-        background: var(--body-bg, #fff);
-        box-shadow: 0 -8px 20px rgba(2,6,23,0.06);
+        background: rgba(26, 23, 48, 0.98);
+        box-shadow: 0 -8px 20px rgba(0, 0, 0, 0.3);
+        border-top: 1px solid rgba(124, 58, 237, 0.15);
     }
     .modal-body.padding-for-footer {
         padding-bottom: 3.5rem; /* room for sticky footer */
@@ -170,18 +179,44 @@
         margin-right:12px;
         flex-shrink:0;
     }
-    .rank-badge.gold { background: #f59e0b; }
-    .rank-badge.silver { background: #9ca3af; }
-    .rank-badge.bronze { background: #cd7f32; }
-    .rank-num { font-weight:700; margin-right:8px; }
+    .rank-badge.gold { background: linear-gradient(135deg, #f59e0b, #fbbf24); }
+    .rank-badge.silver { background: linear-gradient(135deg, #9ca3af, #d1d5db); }
+    .rank-badge.bronze { background: linear-gradient(135deg, #cd7f32, #daa06d); }
+    .rank-num { font-weight:700; margin-right:8px; color: #A78BFA; }
+    
+    /* Modal dark theme */
+    .modal-content {
+        background: rgba(26, 23, 48, 0.98);
+        border: 1px solid rgba(124, 58, 237, 0.2);
+        backdrop-filter: blur(20px);
+    }
+    
+    .modal-header {
+        border-bottom: 1px solid rgba(124, 58, 237, 0.15);
+    }
+    
+    .modal-footer {
+        border-top: 1px solid rgba(124, 58, 237, 0.15);
+    }
+    
+    .modal-title {
+        color: #E5E7EB;
+    }
+    
+    .list-group-item {
+        background: rgba(12, 10, 29, 0.4);
+        border-color: rgba(124, 58, 237, 0.15);
+        color: #E5E7EB;
+    }
 </style>
 {% endblock %}
 
 {% block content %}
         <div class="page-header d-flex flex-wrap justify-content-between align-items-center">
+            <h1>🏆 Competitions</h1>
             <div class="mt-2 mt-md-0">
                 <a href="{{ url_for('main.create_competition_page') }}" class="btn btn-primary">
-                    <i class="fas fa-plus me-2"></i>Create Competition
+                    ➕ Create Competition
                 </a>
             </div>
         </div>
@@ -245,11 +280,11 @@
             <div class="modal-content">
                 <div class="modal-header">
                     <h5 class="modal-title" id="playCompTitle">Play Competition</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
                 </div>
                 <div class="modal-body">
-                    <div class="alert alert-info">
-                        <i class="fas fa-info-circle"></i> Answer the questions below. You get 1 point for each correct answer.
+                    <div class="alert alert-info" style="background: rgba(6, 182, 212, 0.15); border: 1px solid rgba(6, 182, 212, 0.3); color: #06B6D4;">
+                        ℹ️ Answer the questions below. You get 1 point for each correct answer.
                     </div>
                     <div id="playCompQuestions">
                         <!-- Questions will be loaded here -->
@@ -399,13 +434,14 @@
             questionCount++;
             const container = document.getElementById('questionsContainer');
             const div = document.createElement('div');
-            div.className = 'card mb-3 bg-light';
+            div.className = 'card mb-3';
+            div.style.cssText = 'background: rgba(12, 10, 29, 0.4); border: 1px solid rgba(124, 58, 237, 0.15);';
             div.innerHTML = `
                 <div class="card-body">
                     <div class="d-flex justify-content-between mb-2">
-                        <h6>Question ${questionCount}</h6>
+                        <h6 style="color: #E5E7EB;">Question ${questionCount}</h6>
                         <button type="button" class="btn btn-sm btn-danger" onclick="this.closest('.card').remove()">
-                            <i class="fas fa-trash"></i>
+                            🗑️
                         </button>
                     </div>
                     <div class="mb-2">
@@ -542,16 +578,16 @@
                         // Show correct answer if competition ended
                         let correctAnswerHtml = '';
                         if (isEnded && !isAnswered) {
-                            correctAnswerHtml = `<div class="alert alert-info mt-2"><i class="fas fa-info-circle"></i> Correct answer: <strong>${q.correct_answer}</strong></div>`;
+                            correctAnswerHtml = `<div class="alert alert-info mt-2" style="background: rgba(6, 182, 212, 0.15); border: 1px solid rgba(6, 182, 212, 0.3); color: #06B6D4;">ℹ️ Correct answer: <strong>${q.correct_answer}</strong></div>`;
                         }
 
                         return `
-                            <div class="card mb-3">
-                                <div class="card-header d-flex justify-content-between align-items-center">
+                            <div class="card mb-3" style="background: rgba(12, 10, 29, 0.4); border: 1px solid rgba(124, 58, 237, 0.15);">
+                                <div class="card-header d-flex justify-content-between align-items-center" style="background: rgba(124, 58, 237, 0.1); border-bottom: 1px solid rgba(124, 58, 237, 0.15); color: #E5E7EB;">
                                     <strong>Question ${i+1}</strong>
                                     ${statusBadge}
                                 </div>
-                                <div class="card-body">
+                                <div class="card-body" style="color: #D1D5DB;">
                                     <p>${q.text}</p>
                                     <div class="mb-3">
                                         ${optionsHtml}
@@ -566,7 +602,7 @@
                                     ${!isAnswered && !isEnded && isJoined ? `
                                         <button class="btn btn-primary btn-sm" onclick="submitAnswer('${comp.id}', ${i})">Submit Answer</button>
                                     ` : isAnswered ? `
-                                        <div class="alert alert-light border">
+                                        <div class="alert" style="background: rgba(124, 58, 237, 0.1); border: 1px solid rgba(124, 58, 237, 0.2); color: #D1D5DB;">
                                             Your answer: <strong>${answerData.answer}</strong>
                                             ${answerData.discussion ? `<div class="mt-2"><strong>Discussion:</strong> ${answerData.discussion}</div>` : ''}
                                             ${isEnded ? ` | Correct: <strong>${q.correct_answer}</strong>` : ''}
@@ -586,13 +622,13 @@
                 const progressPercent = totalQuestions > 0 ? (answeredCount / totalQuestions) * 100 : 0;
                 
                 headerHtml += `
-                    <div class="card mb-3 bg-light">
+                    <div class="card mb-3" style="background: rgba(12, 10, 29, 0.4); border: 1px solid rgba(124, 58, 237, 0.15);">
                         <div class="card-body">
-                            <div class="d-flex justify-content-between align-items-center mb-2">
+                            <div class="d-flex justify-content-between align-items-center mb-2" style="color: #E5E7EB;">
                                 <span><strong>Progress:</strong> ${answeredCount} / ${totalQuestions} questions</span>
-                                <span class="badge bg-primary fs-6"><i class="fas fa-star"></i> Score: ${currentScore} / ${totalQuestions}</span>
+                                <span class="badge bg-primary fs-6">⭐ Score: ${currentScore} / ${totalQuestions}</span>
                             </div>
-                            <div class="progress" style="height: 20px;">
+                            <div class="progress" style="height: 20px; background: rgba(12, 10, 29, 0.6);">
                                 <div class="progress-bar bg-success" role="progressbar" style="width: ${scorePercent}%" title="Correct answers"></div>
                                 <div class="progress-bar bg-danger" role="progressbar" style="width: ${progressPercent - scorePercent}%" title="Incorrect answers"></div>
                             </div>
@@ -602,16 +638,16 @@
                 `;
                 
                 if (isEnded) {
-                    headerHtml += '<div class="alert alert-warning mb-3"><i class="fas fa-clock"></i> This competition has ended. You can view the questions and correct answers below.</div>';
+                    headerHtml += '<div class="alert alert-warning mb-3" style="background: rgba(251, 191, 36, 0.15); border: 1px solid rgba(251, 191, 36, 0.3); color: #FBBF24;">⏱️ This competition has ended. You can view the questions and correct answers below.</div>';
                 } else if (!isJoined) {
                     headerHtml += `
-                        <div class="alert alert-info mb-3 d-flex justify-content-between align-items-center">
-                            <div><i class="fas fa-info-circle"></i> You must join this competition before submitting answers.</div>
+                        <div class="alert alert-info mb-3 d-flex justify-content-between align-items-center" style="background: rgba(6, 182, 212, 0.15); border: 1px solid rgba(6, 182, 212, 0.3); color: #06B6D4;">
+                            <div>ℹ️ You must join this competition before submitting answers.</div>
                             <button class="btn btn-sm btn-success" onclick="joinCompetition('${comp.id}')">Join</button>
                         </div>
                     `;
                 } else if (answeredCount >= totalQuestions) {
-                    headerHtml += `<div class="alert alert-success mb-3"><i class="fas fa-check-circle"></i> You've completed all questions! Final score: <strong>${currentScore} / ${totalQuestions}</strong></div>`;
+                    headerHtml += `<div class="alert alert-success mb-3" style="background: rgba(34, 197, 94, 0.15); border: 1px solid rgba(34, 197, 94, 0.3); color: #22C55E;">✅ You've completed all questions! Final score: <strong>${currentScore} / ${totalQuestions}</strong></div>`;
                 }
                 
                 document.getElementById('playCompQuestions').innerHTML = headerHtml + (questionsHtml || '<p>No questions found.</p>');
@@ -1032,30 +1068,30 @@
                     // Creator actions (end/delete)
                     if (isCreator) {
                         if (!isCompletedCard) {
-                            creatorActions += `<button class="btn btn-sm btn-outline-warning" onclick="endCompetition('${comp.id}')" title="End competition now"><i class="fas fa-stop"></i></button> `;
+                            creatorActions += `<button class="btn btn-sm btn-outline-warning" onclick="endCompetition('${comp.id}')" title="End competition now">⏹️</button> `;
                         }
-                        creatorActions += `<button class="btn btn-sm btn-outline-danger" onclick="deleteCompetition('${comp.id}')" title="Delete competition"><i class="fas fa-trash"></i></button>`;
+                        creatorActions += `<button class="btn btn-sm btn-outline-danger" onclick="deleteCompetition('${comp.id}')" title="Delete competition">🗑️</button>`;
                     }
                     
                     if (isCompletedCard) {
                         // Completed - show results button
                         statusBadge = '<span class="badge bg-secondary">Ended</span>';
-                        actionBtn = `<button class="btn btn-sm btn-outline-secondary" onclick="viewCompetition('${comp.id}')"><i class="fas fa-chart-bar"></i> Results</button>`;
+                        actionBtn = `<button class="btn btn-sm btn-outline-secondary" onclick="viewCompetition('${comp.id}')">📊 Results</button>`;
                     } else {
                         // Active competition
                         if (timeRemaining < 3600000) { // Less than 1 hour
                             const mins = Math.floor(timeRemaining / 60000);
-                            statusBadge = `<span class="badge bg-danger"><i class="fas fa-clock"></i> ${mins}m left</span>`;
+                            statusBadge = `<span class="badge bg-danger">⏱️ ${mins}m left</span>`;
                         } else if (timeRemaining < 86400000) { // Less than 24 hours
                             const hours = Math.floor(timeRemaining / 3600000);
-                            statusBadge = `<span class="badge bg-warning text-dark"><i class="fas fa-clock"></i> ${hours}h left</span>`;
+                            statusBadge = `<span class="badge bg-warning text-dark">⏱️ ${hours}h left</span>`;
                         } else {
                             const days = Math.floor(timeRemaining / 86400000);
-                            statusBadge = `<span class="badge bg-info"><i class="fas fa-clock"></i> ${days}d left</span>`;
+                            statusBadge = `<span class="badge bg-info">⏱️ ${days}d left</span>`;
                         }
                         
                         if (isParticipant) {
-                            actionBtn = `<button class="btn btn-sm btn-warning" onclick="playCompetition('${comp.id}')"><i class="fas fa-play"></i> Play</button>`;
+                            actionBtn = `<button class="btn btn-sm btn-warning" onclick="playCompetition('${comp.id}')">▶️ Play</button>`;
                         } else {
                             actionBtn = `<button class="btn btn-sm btn-success" onclick="joinCompetition('${comp.id}')">Join</button>`;
                         }
@@ -1063,15 +1099,15 @@
 
                     return `
                     <div class="col-md-6 mb-3">
-                        <div class="card h-100 shadow-sm border-0">
+                        <div class="card competition-card h-100">
                             <div class="card-body d-flex flex-column">
                                 <div class="d-flex justify-content-between align-items-start mb-2">
-                                    <h5 class="card-title mb-0">${comp.title}</h5>
+                                    <h5 class="card-title mb-0" style="color: #E5E7EB;">${comp.title}</h5>
                                     ${statusBadge}
                                 </div>
-                                <p class="card-text">${comp.description || 'No description'}</p>
+                                <p class="card-text" style="color: #9CA3AF;">${comp.description || 'No description'}</p>
                                 <div class="mb-2">
-                                    <small class="text-muted"><i class="fas fa-users"></i> ${participantCount} participants</small>
+                                    <small class="text-muted">👥 ${participantCount} participants</small>
                                     ${isCreator ? '<span class="badge bg-primary ms-2">Creator</span>' : ''}
                                 </div>
                                 <div class="mt-auto pt-3 d-flex justify-content-between">
@@ -1087,10 +1123,10 @@
                 `;
                 };
 
-                const activeHtml = activeComps.length ? activeComps.map(c => compCard(c, false)).join('') : '<div class="col-12 text-center text-secondary"><p>No active competitions</p></div>';
+                const activeHtml = activeComps.length ? activeComps.map(c => compCard(c, false)).join('') : '<div class="col-12 text-center text-muted py-4"><div style="font-size:3rem;opacity:0.5;">🏆</div><p>No active competitions</p></div>';
                 document.getElementById('activeCompsList').innerHTML = activeHtml;
 
-                const completedHtml = completedComps.length ? completedComps.map(c => compCard(c, true)).join('') : '<div class="col-12 text-center text-secondary"><p>No completed competitions</p></div>';
+                const completedHtml = completedComps.length ? completedComps.map(c => compCard(c, true)).join('') : '<div class="col-12 text-center text-muted py-4"><div style="font-size:3rem;opacity:0.5;">🏅</div><p>No completed competitions</p></div>';
                 document.getElementById('completedCompsList').innerHTML = completedHtml;
 
                 // Populate group dropdown with groups where the user is owner or moderator

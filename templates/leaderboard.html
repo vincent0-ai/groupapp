@@ -5,17 +5,22 @@
 {% block head %}
 <style>
     .leaderboard-header {
-        background: var(--primary-ultra-light);
+        background: linear-gradient(135deg, rgba(124, 58, 237, 0.2), rgba(6, 182, 212, 0.1));
         border-radius: 14px;
         padding: 1.5rem;
         margin-bottom: 1.5rem;
-        border: 1px solid var(--border-color);
+        border: 1px solid rgba(124, 58, 237, 0.3);
         text-align: center;
+        backdrop-filter: blur(10px);
     }
     
     .leaderboard-header h1 {
         font-weight: 700;
-        color: #4F46E5;
+        color: #E5E7EB;
+    }
+    
+    .leaderboard-header p {
+        color: #9CA3AF;
     }
     
     .top-three-container {
@@ -30,19 +35,21 @@
         text-align: center;
         padding: 1.25rem;
         border-radius: 14px;
-        background: var(--card-bg);
-        border: 1px solid var(--border-color);
-        transition: box-shadow 0.15s ease;
+        background: rgba(26, 23, 48, 0.9);
+        border: 1px solid rgba(124, 58, 237, 0.3);
+        transition: all 0.2s ease;
+        backdrop-filter: blur(10px);
     }
     
     .top-user:hover {
-        box-shadow: var(--shadow-md);
+        border-color: rgba(124, 58, 237, 0.5);
+        box-shadow: 0 8px 25px rgba(0, 0, 0, 0.3);
     }
     
     .top-user.first {
         order: 2;
         border-color: #F59E0B;
-        background: linear-gradient(180deg, rgba(245, 158, 11, 0.08) 0%, var(--card-bg) 100%);
+        background: linear-gradient(180deg, rgba(245, 158, 11, 0.15) 0%, rgba(26, 23, 48, 0.9) 100%);
     }
     
     .top-user.second {
@@ -103,26 +110,6 @@
         color: white;
     }
     
-    .leaderboard-card {
-        border: none;
-        box-shadow: none;
-    }
-    
-    .leaderboard-card .card-header {
-        background: transparent !important;
-        border-bottom: 1px solid var(--border-color);
-        color: var(--text-dark) !important;
-    }
-    
-    .leaderboard-card .card-header h5 {
-        color: var(--text-dark) !important;
-        font-weight: 700;
-    }
-    
-    .leaderboard-card .card-header i {
-        color: var(--primary-color) !important;
-    }
-    
     .leaderboard-row {
         display: flex;
         align-items: center;
@@ -130,10 +117,13 @@
         border-radius: 12px;
         margin-bottom: 0.5rem;
         transition: all 0.2s ease;
+        background: rgba(26, 23, 48, 0.9);
+        border: 1px solid rgba(124, 58, 237, 0.2);
     }
     
     .leaderboard-row:hover {
-        background: var(--cream-bg);
+        background: rgba(26, 23, 48, 0.95);
+        border-color: rgba(124, 58, 237, 0.4);
     }
     
     .leaderboard-row .rank-num {
@@ -145,13 +135,21 @@
         justify-content: center;
         font-weight: 700;
         margin-right: 1rem;
-        background: var(--background-color);
-        color: var(--text-muted);
+        background: rgba(124, 58, 237, 0.2);
+        color: #E5E7EB;
+    }
+    
+    .leaderboard-row .fw-semibold {
+        color: #E5E7EB;
+    }
+    
+    .leaderboard-row .text-muted {
+        color: #9CA3AF !important;
     }
     
     .my-rank-card {
-        background: var(--primary-ultra-light);
-        border: 1px solid rgba(79, 70, 229, 0.15);
+        background: rgba(124, 58, 237, 0.15);
+        border: 1px solid rgba(124, 58, 237, 0.3);
     }
     
     .filter-container {
@@ -164,6 +162,52 @@
     .filter-container .form-control,
     .filter-container .form-select {
         max-width: 200px;
+        background: rgba(26, 23, 48, 0.9);
+        border: 1px solid rgba(124, 58, 237, 0.3);
+        color: #E5E7EB;
+    }
+    
+    .filter-container .form-control:focus,
+    .filter-container .form-select:focus {
+        border-color: #7C3AED;
+        box-shadow: 0 0 0 3px rgba(124, 58, 237, 0.2);
+    }
+    
+    .filter-container .form-select option {
+        background: #1a1730;
+        color: #E5E7EB;
+    }
+    
+    /* Modal dark theme */
+    .modal-content {
+        background: rgba(26, 23, 48, 0.98);
+        border: 1px solid rgba(124, 58, 237, 0.3);
+        color: #E5E7EB;
+    }
+    
+    .modal-header {
+        border-bottom: 1px solid rgba(124, 58, 237, 0.2);
+    }
+    
+    .modal-footer {
+        border-top: 1px solid rgba(124, 58, 237, 0.2);
+    }
+    
+    .modal-body .bg-light {
+        background: rgba(124, 58, 237, 0.15) !important;
+        color: #E5E7EB;
+    }
+    
+    .modal-body h4, .modal-body h5, .modal-body h6 {
+        color: #E5E7EB;
+    }
+    
+    .modal-body .text-muted {
+        color: #9CA3AF !important;
+    }
+    
+    .btn-close {
+        filter: invert(1);
     }
     
     @media (max-width: 768px) {
@@ -191,27 +235,19 @@
         .leaderboard-header h1 {
             font-size: 1.5rem;
         }
-        .table th, .table td {
-            padding: 0.5rem 0.25rem;
-            font-size: 0.9rem;
-        }
-        .table img {
-            width: 32px;
-            height: 32px;
-        }
     }
 </style>
 {% endblock %}
 
 {% block content %}
         <div class="leaderboard-header">
-            <h1>Global Leaderboard</h1>
-            <p class="text-muted mb-0">Compete and climb the ranks!</p>
+            <h1>🏆 Global Leaderboard</h1>
+            <p class="mb-0">Compete and climb the ranks!</p>
         </div>
 
         <div class="container py-3">
             <div class="filter-container mb-3">
-                <input type="text" id="groupSearch" class="form-control" placeholder="Search groups" />
+                <input type="text" id="groupSearch" class="form-control" placeholder="🔍 Search groups" />
                 <select id="filterPeriod" class="form-select">
                     <option value="7">7 days</option>
                     <option value="30">30 days</option>
@@ -229,7 +265,7 @@
         <div class="modal-dialog">
             <div class="modal-content">
                 <div class="modal-header">
-                    <h5 class="modal-title"><i class="fas fa-user"></i> User Profile</h5>
+                    <h5 class="modal-title">👤 User Profile</h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                 </div>
                 <div class="modal-body">
@@ -255,17 +291,17 @@
                     </div>
                     
                     <div class="mb-3" id="viewUserBio" style="display: none;">
-                        <h6><i class="fas fa-info-circle me-2"></i>About</h6>
+                        <h6>ℹ️ About</h6>
                         <p class="text-muted" id="viewUserBioText"></p>
                     </div>
                     
                     <div class="mb-3" id="viewUserBadgesSection" style="display: none;">
-                        <h6><i class="fas fa-award me-2"></i>Badges</h6>
+                        <h6>🏅 Badges</h6>
                         <div id="viewUserBadgesList" class="d-flex flex-wrap gap-2"></div>
                     </div>
                     
                     <div class="mb-3">
-                        <h6><i class="fas fa-calendar me-2"></i>Member Since</h6>
+                        <h6>📅 Member Since</h6>
                         <p class="text-muted mb-0" id="viewUserJoined">-</p>
                     </div>
                 </div>

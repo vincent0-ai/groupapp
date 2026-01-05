@@ -5,122 +5,206 @@
 {% block head %}
 <style>
     .page-header {
-        background: var(--primary-ultra-light);
-        border-radius: 14px;
-        padding: 1.25rem 1.5rem;
+        background: linear-gradient(135deg, rgba(124, 58, 237, 0.15), rgba(6, 182, 212, 0.08));
+        border-radius: 16px;
+        padding: 1.5rem 1.75rem;
         margin-bottom: 1.5rem;
-        border: 1px solid var(--border-color);
+        border: 1px solid rgba(124, 58, 237, 0.2);
+        backdrop-filter: blur(10px);
     }
     
     .page-header h1 {
         font-weight: 700;
         margin-bottom: 0;
-        color: #0F172A;
-    }
-    
-    .page-header h1 i {
-        color: #4F46E5;
+        background: linear-gradient(135deg, #A78BFA, #06B6D4);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
     }
     
     .nav-tabs {
         border: none;
-        background: var(--background-color);
-        border-radius: 10px;
-        padding: 4px;
-        gap: 4px;
+        background: rgba(12, 10, 29, 0.6);
+        border-radius: 12px;
+        padding: 6px;
+        gap: 6px;
         display: inline-flex;
+        border: 1px solid rgba(124, 58, 237, 0.2);
     }
     
     .nav-tabs .nav-link {
         border: none;
-        border-radius: 6px;
-        padding: 8px 16px;
+        border-radius: 8px;
+        padding: 10px 18px;
         font-weight: 600;
-        color: var(--text-muted);
-        transition: all 0.15s ease;
+        color: #9CA3AF;
+        transition: all 0.2s ease;
     }
     
     .nav-tabs .nav-link:hover {
-        background: rgba(79, 70, 229, 0.08);
-        color: var(--primary-color);
+        background: rgba(124, 58, 237, 0.15);
+        color: #A78BFA;
     }
     
     .nav-tabs .nav-link.active {
-        background: #4F46E5;
+        background: linear-gradient(135deg, #7C3AED, #6D28D9);
         color: white;
-        box-shadow: 0 2px 8px rgba(79, 70, 229, 0.2);
+        box-shadow: 0 4px 15px rgba(124, 58, 237, 0.3);
     }
     
     .group-card {
-        border: 1px solid var(--border-color);
-        transition: box-shadow 0.15s ease;
+        background: rgba(26, 23, 48, 0.8);
+        border: 1px solid rgba(124, 58, 237, 0.15);
+        border-radius: 16px;
+        transition: all 0.2s ease;
         height: 100%;
+        backdrop-filter: blur(10px);
     }
     
     .group-card:hover {
-        box-shadow: var(--shadow-md);
+        border-color: rgba(124, 58, 237, 0.4);
+        box-shadow: 0 8px 25px rgba(124, 58, 237, 0.2);
+        transform: translateY(-2px);
     }
     
-    .group-card .card-header {
-        background: transparent !important;
-        border-bottom: 1px solid var(--border-color);
-        color: var(--text-heading) !important;
+    .group-card .card-body {
+        padding: 1.5rem;
     }
     
-    .group-card .card-header h5 {
-        color: var(--text-heading) !important;
+    .group-card .card-title {
+        color: #E5E7EB !important;
+        font-weight: 600;
+    }
+    
+    .group-card .card-text {
+        color: #9CA3AF !important;
     }
     
     .group-icon {
-        width: 44px;
-        height: 44px;
-        border-radius: 10px;
+        width: 48px;
+        height: 48px;
+        border-radius: 12px;
         display: flex;
         align-items: center;
         justify-content: center;
-        font-size: 1.125rem;
-        margin-right: 0.875rem;
+        font-size: 1.25rem;
+        margin-right: 1rem;
     }
     
-    .group-icon.public { background: rgba(34, 197, 94, 0.1); color: #22C55E; }
-    .group-icon.private { background: rgba(79, 70, 229, 0.1); color: #4F46E5; }
+    .group-icon.public { background: rgba(34, 197, 94, 0.15); }
+    .group-icon.private { background: rgba(124, 58, 237, 0.15); }
     
     .member-count {
         display: inline-flex;
         align-items: center;
         gap: 6px;
-        padding: 4px 10px;
-        background: var(--background-color);
+        padding: 5px 12px;
+        background: rgba(124, 58, 237, 0.1);
         border-radius: 50px;
         font-size: 0.8rem;
-        color: var(--text-muted);
+        color: #A78BFA;
     }
     
     .channel-accordion .accordion-button {
         font-weight: 600;
-        padding: 0.875rem 1rem;
-        background: var(--card-bg);
+        padding: 1rem 1.25rem;
+        background: rgba(26, 23, 48, 0.9);
+        color: #E5E7EB;
+        border: none;
     }
     
     .channel-accordion .accordion-button:not(.collapsed) {
-        background: rgba(79, 70, 229, 0.06);
-        color: var(--primary-color);
+        background: rgba(124, 58, 237, 0.15);
+        color: #A78BFA;
+        box-shadow: none;
+    }
+    
+    .channel-accordion .accordion-button::after {
+        filter: invert(1) brightness(0.7);
     }
     
     .channel-accordion .accordion-item {
-        border: 1px solid var(--border-color);
-        background: var(--card-bg);
+        border: 1px solid rgba(124, 58, 237, 0.15);
+        background: rgba(26, 23, 48, 0.8);
+        border-radius: 16px !important;
+        overflow: hidden;
+        margin-bottom: 1rem;
+    }
+    
+    .accordion-body {
+        background: rgba(12, 10, 29, 0.4);
     }
     
     .empty-state {
         text-align: center;
-        padding: 2.5rem 1.25rem;
+        padding: 3rem 1.5rem;
+        color: #6B7280;
     }
     
-    .empty-state i {
+    .empty-state .emoji-icon {
         font-size: 4rem;
-        color: var(--text-light);
         margin-bottom: 1rem;
+        opacity: 0.5;
+    }
+    
+    .badge.bg-primary {
+        background: linear-gradient(135deg, #7C3AED, #6D28D9) !important;
+    }
+    
+    .badge.bg-success {
+        background: linear-gradient(135deg, #22C55E, #16A34A) !important;
+    }
+    
+    .btn-success {
+        background: linear-gradient(135deg, #22C55E, #16A34A);
+        border: none;
+    }
+    
+    .btn-success:hover {
+        background: linear-gradient(135deg, #16A34A, #15803D);
+    }
+    
+    .btn-outline-success {
+        color: #22C55E;
+        border-color: #22C55E;
+    }
+    
+    .btn-outline-danger {
+        color: #EF4444;
+        border-color: rgba(239, 68, 68, 0.5);
+    }
+    
+    .btn-outline-danger:hover {
+        background: rgba(239, 68, 68, 0.15);
+        color: #EF4444;
+        border-color: #EF4444;
+    }
+    
+    /* Modal dark theme */
+    .modal-content {
+        background: rgba(26, 23, 48, 0.95);
+        border: 1px solid rgba(124, 58, 237, 0.2);
+        backdrop-filter: blur(20px);
+    }
+    
+    .modal-header {
+        border-bottom: 1px solid rgba(124, 58, 237, 0.15);
+    }
+    
+    .modal-footer {
+        border-top: 1px solid rgba(124, 58, 237, 0.15);
+    }
+    
+    .modal-title {
+        color: #E5E7EB;
+    }
+    
+    .form-label {
+        color: #D1D5DB;
+    }
+    
+    .form-text {
+        color: #6B7280;
     }
 </style>
 {% endblock %}
@@ -128,11 +212,11 @@
 {% block content %}
         <div class="page-header d-flex flex-wrap justify-content-between align-items-center">
             <div>
-                <h1>Groups</h1>
+                <h1>👥 Groups</h1>
             </div>
             <div class="mt-2 mt-md-0">
                 <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#createGroupModal">
-                    <i class="fas fa-plus me-2"></i>Create Group
+                    ➕ Create Group
                 </button>
             </div>
         </div>
@@ -179,7 +263,7 @@
                 <div class="row g-4" id="pendingRequestsList">
                     <div class="col-12">
                         <div class="empty-state">
-                            <i class="fas fa-inbox"></i>
+                            <div class="emoji-icon">📥</div>
                             <p class="text-muted mb-0">No pending requests.</p>
                         </div>
                     </div>
@@ -274,23 +358,23 @@
                         : '';
                     return `
                     <div class="col-md-4 mb-3">
-                        <div class="card h-100 shadow-sm border-0">
+                        <div class="card group-card h-100">
                             <div class="card-body d-flex flex-column">
-                                <h5 class="card-title fw-semibold" style="color: var(--text-dark);">${g.name}${unreadBadge}</h5>
-                                <p class="card-text text-muted small">${g.description || 'No description'}</p>
+                                <h5 class="card-title fw-semibold">${g.name}${unreadBadge}</h5>
+                                <p class="card-text small">${g.description || 'No description'}</p>
                                 <small class="text-muted">
-                                    <i class="fas fa-users text-primary"></i> ${g.member_count || 0} members
-                                    ${g.channel && g.channel.name ? `<span class="badge bg-primary bg-opacity-10 text-primary ms-2">${g.channel.name}</span>` : ''}
+                                    👥 ${g.member_count || 0} members
+                                    ${g.channel && g.channel.name ? `<span class="badge bg-primary ms-2">${g.channel.name}</span>` : ''}
                                     <span id="group-streak-${groupId}" class="badge bg-warning text-dark ms-2" style="display:none;"></span>
                                 </small>
                                 <div class="mt-auto pt-3">
-                                    <button class="btn btn-sm btn-primary" onclick="viewGroup('${groupId}')"><i class="fas fa-eye me-1"></i>View</button>
-                                    <button class="btn btn-sm btn-outline-danger" onclick="leaveGroup('${groupId}')"><i class="fas fa-sign-out-alt me-1"></i>Leave</button>
+                                    <button class="btn btn-sm btn-primary" onclick="viewGroup('${groupId}')">👁️ View</button>
+                                    <button class="btn btn-sm btn-outline-danger" onclick="leaveGroup('${groupId}')">🚪 Leave</button>
                                 </div>
                             </div>
                         </div>
                     </div>
-                `}).join('') : '<div class="col-12 text-center text-muted py-4"><i class="fas fa-users fa-3x mb-3 opacity-25"></i><p>You haven\'t joined any groups yet</p></div>';
+                `}).join('') : '<div class="col-12 text-center text-muted py-4"><div class="emoji-icon" style="font-size:3rem;opacity:0.3;">👥</div><p>You haven\'t joined any groups yet</p></div>';
 
                 document.getElementById('myGroupsList').innerHTML = html;
 
@@ -341,32 +425,32 @@
                     const category = channel.name || 'General';
                     const categoryGroups = channel.groups || [];
                     html += `
-                        <div class="accordion-item mb-3" style="border-radius: 12px; overflow: hidden;">
+                        <div class="accordion-item">
                             <h2 class="accordion-header" id="heading${index}">
-                                <button class="accordion-button ${index === 0 ? '' : 'collapsed'}" type="button" data-bs-toggle="collapse" data-bs-target="#collapse${index}" style="background: var(--card-bg); color: var(--text-dark); font-weight: 600;">
-                                    <i class="fas fa-hashtag text-primary me-2"></i>${category} <span class="badge bg-primary bg-opacity-10 text-primary ms-2">${categoryGroups.length} groups</span>
+                                <button class="accordion-button ${index === 0 ? '' : 'collapsed'}" type="button" data-bs-toggle="collapse" data-bs-target="#collapse${index}">
+                                    📂 ${category} <span class="badge bg-primary ms-2">${categoryGroups.length} groups</span>
                                 </button>
                             </h2>
                             <div id="collapse${index}" class="accordion-collapse collapse ${index === 0 ? 'show' : ''}" data-bs-parent="#availableGroupsAccordion">
-                                <div class="accordion-body p-3" style="background: var(--card-bg);">
+                                <div class="accordion-body p-3">
                                     <div class="row g-4">
                                         ${categoryGroups.map(g => `
                                             <div class="col-md-4 mb-3">
-                                                <div class="card h-100 shadow-sm border-0">
+                                                <div class="card group-card h-100">
                                                     <div class="card-body d-flex flex-column">
-                                                        <h5 class="card-title fw-semibold" style="color: var(--text-dark);">${g.name}</h5>
-                                                        <p class="card-text text-muted small">${g.description || 'No description'}</p>
+                                                        <h5 class="card-title fw-semibold">${g.name}</h5>
+                                                        <p class="card-text small">${g.description || 'No description'}</p>
                                                         <small class="text-muted">
-                                                            <i class="fas fa-users text-primary"></i> ${g.member_count || 0} members
-                                                            ${g.is_private ? '<i class="fas fa-lock text-warning ms-2" title="Private"></i>' : '<i class="fas fa-globe text-success ms-2" title="Public"></i>'}
+                                                            👥 ${g.member_count || 0} members
+                                                            ${g.is_private ? '<span class="ms-2" title="Private">🔒</span>' : '<span class="ms-2" title="Public">🌐</span>'}
                                                         </small>
                                                         <div class="mt-auto pt-3">
                                                             ${g.is_member ? 
-                                                                `<button class="btn btn-sm btn-outline-success" disabled><i class="fas fa-check me-1"></i>Joined</button>` : 
+                                                                `<button class="btn btn-sm btn-outline-success" disabled>✓ Joined</button>` : 
                                                                 (g.is_pending ? 
-                                                                    `<button class="btn btn-sm btn-secondary" disabled><i class="fas fa-clock me-1"></i>Request Sent</button>` : 
+                                                                    `<button class="btn btn-sm btn-secondary" disabled>⏳ Request Sent</button>` : 
                                                                     `<button class="btn btn-sm btn-success" onclick="joinGroup('${g.id || g._id}', ${g.is_private})">
-                                                                        <i class="fas fa-${g.is_private ? 'key' : 'plus'} me-1"></i>${g.is_private ? 'Request to Join' : 'Join'}
+                                                                        ${g.is_private ? '🔑 Request to Join' : '➕ Join'}
                                                                     </button>`
                                                                 )
                                                             }

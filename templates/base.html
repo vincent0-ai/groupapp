@@ -29,71 +29,71 @@
 {% set ep = request.endpoint %}
 
 {% block navbar %}
-<nav class="navbar navbar-expand-lg navbar-light sticky-top">
+<nav class="navbar navbar-expand-lg navbar-dark sticky-top">
     <div class="container-fluid px-3 px-lg-4">
         <a class="navbar-brand d-flex align-items-center" href="{{ url_for('dashboard') }}">
-            <i class="fas fa-graduation-cap me-2" style="color: #4F46E5;"></i>
+            <i class="fas fa-graduation-cap me-2"></i>
             Discussio
         </a>
         
         <!-- Notification Bell & User Actions (visible on mobile) -->
         <div class="d-flex align-items-center gap-2 d-lg-none">
             <div class="dropdown">
-                <button class="btn btn-link text-dark position-relative p-2" id="notifBellMobile" data-bs-toggle="dropdown" data-bs-auto-close="outside">
-                    <i class="fas fa-bell fa-lg"></i>
+                <button class="btn btn-link position-relative p-2 notification-btn" id="notifBellMobile" data-bs-toggle="dropdown" data-bs-auto-close="outside" style="color: var(--text-body);">
+                    🔔
                     <span class="notification-badge" id="notifBadgeMobile" style="display: none;">0</span>
                 </button>
-                <div class="dropdown-menu dropdown-menu-end notification-dropdown" style="width: 320px; max-height: 400px; overflow-y: auto;">
-                    <div class="dropdown-header d-flex justify-content-between align-items-center">
+                <div class="dropdown-menu dropdown-menu-end notification-dropdown" style="width: 320px; max-height: 400px; overflow-y: auto; background: var(--cream-bg); border-color: var(--border-color);">
+                    <div class="dropdown-header d-flex justify-content-between align-items-center" style="color: var(--text-heading);">
                         <strong>Notifications</strong>
-                        <button class="btn btn-link btn-sm p-0" id="markAllReadMobile">Mark all read</button>
+                        <button class="btn btn-link btn-sm p-0" id="markAllReadMobile" style="color: var(--primary-light);">Mark all read</button>
                     </div>
                     <div id="notificationListMobile" class="notification-list">
-                        <div class="text-center py-3 text-muted">No notifications</div>
+                        <div class="text-center py-3" style="color: var(--text-muted);">No notifications</div>
                     </div>
                 </div>
             </div>
-            <button class="navbar-toggler border-0 shadow-none" type="button" id="navbarToggler" aria-label="Toggle navigation">
-                <span class="navbar-toggler-icon"></span>
+            <button class="navbar-toggler border-0 shadow-none" type="button" id="navbarToggler" aria-label="Toggle navigation" style="color: var(--text-body);">
+                ☰
             </button>
         </div>
         
         <div class="navbar-collapse" id="navbarNav">
             <button class="mobile-menu-close d-lg-none" id="menuClose" aria-label="Close menu">
-                <i class="fas fa-times"></i>
+                ✕
             </button>
             <ul class="navbar-nav ms-auto" id="navbarList">
                 <li class="nav-item">
-                    <a class="nav-link {% if ep == 'dashboard' %}active{% endif %}" href="{{ url_for('dashboard') }}"><i class="fas fa-home"></i> Dashboard</a>
+                    <a class="nav-link {% if ep == 'dashboard' %}active{% endif %}" href="{{ url_for('dashboard') }}">Dashboard</a>
                 </li>
                 <li class="nav-item">
-                    <a class="nav-link {% if ep == 'groups_page' %}active{% endif %}" href="{{ url_for('groups_page') }}"><i class="fas fa-users"></i> Channels</a>
+                    <a class="nav-link {% if ep == 'groups_page' %}active{% endif %}" href="{{ url_for('groups_page') }}">Channels</a>
                 </li>
                 <li class="nav-item">
-                    <a class="nav-link {% if ep == 'messages_page' %}active{% endif %}" href="{{ url_for('messages_page') }}"><i class="fas fa-comments"></i> Messages</a>
+                    <a class="nav-link {% if ep == 'messages_page' %}active{% endif %}" href="{{ url_for('messages_page') }}">Messages</a>
                 </li>
                 <li class="nav-item">
-                    <a class="nav-link {% if ep == 'dm_page' %}active{% endif %}" href="{{ url_for('dm_page') }}"><i class="fas fa-envelope"></i> DMs</a>
+                    <a class="nav-link {% if ep == 'dm_page' %}active{% endif %}" href="{{ url_for('dm_page') }}">DMs</a>
                 </li>
                 <li class="nav-item">
-                    <a class="nav-link {% if ep == 'competitions_page' %}active{% endif %}" href="{{ url_for('competitions_page') }}"><i class="fas fa-trophy"></i> Competitions</a>
+                    <a class="nav-link {% if ep == 'competitions_page' %}active{% endif %}" href="{{ url_for('competitions_page') }}">Competitions</a>
                 </li>
                 <li class="nav-item">
-                    <a class="nav-link {% if ep == 'files_page' %}active{% endif %}" href="{{ url_for('files_page') }}"><i class="fas fa-folder-open"></i> Files</a>
+                    <a class="nav-link {% if ep == 'files_page' %}active{% endif %}" href="{{ url_for('files_page') }}">Files</a>
                 </li>
                 <li class="nav-item">
-                    <a class="nav-link {% if ep == 'leaderboard_page' %}active{% endif %}" href="{{ url_for('leaderboard_page') }}"><i class="fas fa-medal"></i> Leaderboard</a>
+                    <a class="nav-link {% if ep == 'leaderboard_page' %}active{% endif %}" href="{{ url_for('leaderboard_page') }}">Leaderboard</a>
                 </li>
                 <li class="nav-item">
-                    <a class="nav-link {% if ep == 'profile_page' %}active{% endif %}" href="{{ url_for('profile_page') }}"><i class="fas fa-user-circle"></i> Profile</a>
+                    <a class="nav-link {% if ep == 'profile_page' %}active{% endif %}" href="{{ url_for('profile_page') }}">Profile</a>
                 </li>
                 <li class="nav-item">
-                    <a class="nav-link {% if ep == 'whiteboard_page' %}active{% endif %}" href="{{ url_for('whiteboard_page') }}"><i class="fas fa-chalkboard"></i> Whiteboard</a>
+                    <a class="nav-link {% if ep == 'whiteboard_page' %}active{% endif %}" href="{{ url_for('whiteboard_page') }}">Whiteboard</a>
                 </li>
                 <!-- Notification Bell (Desktop) -->
                 <li class="nav-item dropdown d-none d-lg-block">
-                    <button class="btn btn-link nav-link position-relative" id="notifBellDesktop" data-bs-toggle="dropdown" data-bs-auto-close="outside">
-                        <i class="fas fa-bell"></i>
+                    <button class="btn btn-link nav-link position-relative notification-btn" id="notifBellDesktop" data-bs-toggle="dropdown" data-bs-auto-close="outside">
+                        🔔
                         <span class="notification-badge" id="notifBadgeDesktop" style="display: none;">0</span>
                     </button>
                     <div class="dropdown-menu dropdown-menu-end notification-dropdown" style="width: 360px; max-height: 450px; overflow-y: auto;">
@@ -107,7 +107,7 @@
                     </div>
                 </li>
                 <li class="nav-item">
-                    <a class="nav-link text-danger" id="logoutBtn" href="#"><i class="fas fa-sign-out-alt"></i> Logout</a>
+                    <a class="nav-link logout-link" id="logoutBtn" href="#">Logout</a>
                 </li>
             </ul>
         </div>
@@ -119,7 +119,7 @@
 {% block body %}
 <main class="{% block main_class %}container py-4{% endblock %}">
     {% block main_inner %}
-    <div class="card shadow-lg border-0 rounded-4">
+    <div class="card glass-card shadow-lg border-0 rounded-4">
         <div class="card-body p-4">
             {% block content %}{% endblock %}
         </div>
@@ -129,27 +129,27 @@
 {% endblock %}
 
 {% block footer %}
-<footer class="fixed-bottom border-top py-2 d-md-none" id="mobileBottomNav" style="background: rgba(255, 255, 255, 0.95); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);">
+<footer class="fixed-bottom border-top py-2 d-md-none" id="mobileBottomNav" style="background: rgba(12, 10, 29, 0.95); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); border-color: var(--border-color) !important;">
     <div class="container-fluid">
         <div class="d-flex justify-content-around align-items-center">
             <a href="{{ url_for('dashboard') }}" class="footer-nav-link text-center text-decoration-none {% if ep == 'dashboard' %}active{% endif %}">
-                <i class="fas fa-home"></i>
+                <span class="nav-emoji">🏠</span>
                 <small class="d-block">Home</small>
             </a>
             <a href="{{ url_for('groups_page') }}" class="footer-nav-link text-center text-decoration-none {% if ep == 'groups_page' %}active{% endif %}">
-                <i class="fas fa-users"></i>
+                <span class="nav-emoji">👥</span>
                 <small class="d-block">Groups</small>
             </a>
             <a href="{{ url_for('dm_page') }}" class="footer-nav-link text-center text-decoration-none {% if ep == 'dm_page' %}active{% endif %}">
-                <i class="fas fa-envelope"></i>
+                <span class="nav-emoji">💬</span>
                 <small class="d-block">DMs</small>
             </a>
             <a href="{{ url_for('profile_page') }}" class="footer-nav-link text-center text-decoration-none {% if ep == 'profile_page' %}active{% endif %}">
-                <i class="fas fa-user-circle"></i>
+                <span class="nav-emoji">👤</span>
                 <small class="d-block">Profile</small>
             </a>
             <a href="#" class="footer-nav-link text-center text-decoration-none" data-bs-toggle="offcanvas" data-bs-target="#mobileMoreSheet">
-                <i class="fas fa-ellipsis-h"></i>
+                <span class="nav-emoji">•••</span>
                 <small class="d-block">More</small>
             </a>
         </div>
@@ -157,35 +157,35 @@
 </footer>
 
 <!-- Mobile More Bottom Sheet -->
-<div class="offcanvas offcanvas-bottom" tabindex="-1" id="mobileMoreSheet" style="height: auto; max-height: 70vh; border-radius: 20px 20px 0 0;">
-    <div class="offcanvas-header">
-        <h5 class="offcanvas-title">More Options</h5>
-        <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="Close"></button>
+<div class="offcanvas offcanvas-bottom" tabindex="-1" id="mobileMoreSheet" style="height: auto; max-height: 70vh; border-radius: 20px 20px 0 0; background: var(--cream-bg);">
+    <div class="offcanvas-header" style="border-bottom: 1px solid var(--border-color);">
+        <h5 class="offcanvas-title" style="color: var(--text-heading);">More Options</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="offcanvas" aria-label="Close"></button>
     </div>
     <div class="offcanvas-body pb-4">
         <div class="list-group list-group-flush">
-            <a href="{{ url_for('messages_page') }}" class="list-group-item list-group-item-action d-flex align-items-center gap-3 py-3">
-                <i class="fas fa-comments text-primary" style="width: 24px;"></i>
+            <a href="{{ url_for('messages_page') }}" class="list-group-item list-group-item-action d-flex align-items-center gap-3 py-3" style="background: transparent; color: var(--text-body); border-color: var(--border-color);">
+                <span style="width: 24px;">💬</span>
                 <span>Group Messages</span>
             </a>
-            <a href="{{ url_for('competitions_page') }}" class="list-group-item list-group-item-action d-flex align-items-center gap-3 py-3">
-                <i class="fas fa-trophy text-warning" style="width: 24px;"></i>
+            <a href="{{ url_for('competitions_page') }}" class="list-group-item list-group-item-action d-flex align-items-center gap-3 py-3" style="background: transparent; color: var(--text-body); border-color: var(--border-color);">
+                <span style="width: 24px;">🏆</span>
                 <span>Competitions</span>
             </a>
-            <a href="{{ url_for('files_page') }}" class="list-group-item list-group-item-action d-flex align-items-center gap-3 py-3">
-                <i class="fas fa-folder-open text-info" style="width: 24px;"></i>
+            <a href="{{ url_for('files_page') }}" class="list-group-item list-group-item-action d-flex align-items-center gap-3 py-3" style="background: transparent; color: var(--text-body); border-color: var(--border-color);">
+                <span style="width: 24px;">📁</span>
                 <span>Files</span>
             </a>
-            <a href="{{ url_for('leaderboard_page') }}" class="list-group-item list-group-item-action d-flex align-items-center gap-3 py-3">
-                <i class="fas fa-medal text-success" style="width: 24px;"></i>
+            <a href="{{ url_for('leaderboard_page') }}" class="list-group-item list-group-item-action d-flex align-items-center gap-3 py-3" style="background: transparent; color: var(--text-body); border-color: var(--border-color);">
+                <span style="width: 24px;">🏅</span>
                 <span>Leaderboard</span>
             </a>
-            <a href="#" class="list-group-item list-group-item-action d-flex align-items-center gap-3 py-3" data-bs-toggle="modal" data-bs-target="#aboutModal" data-bs-dismiss="offcanvas">
-                <i class="fas fa-info-circle text-secondary" style="width: 24px;"></i>
+            <a href="#" class="list-group-item list-group-item-action d-flex align-items-center gap-3 py-3" data-bs-toggle="modal" data-bs-target="#aboutModal" data-bs-dismiss="offcanvas" style="background: transparent; color: var(--text-body); border-color: var(--border-color);">
+                <span style="width: 24px;">ℹ️</span>
                 <span>About</span>
             </a>
-            <a href="#" class="list-group-item list-group-item-action d-flex align-items-center gap-3 py-3 text-danger" id="mobileLogoutBtn">
-                <i class="fas fa-sign-out-alt" style="width: 24px;"></i>
+            <a href="#" class="list-group-item list-group-item-action d-flex align-items-center gap-3 py-3" id="mobileLogoutBtn" style="background: transparent; color: var(--danger-color); border-color: var(--border-color);">
+                <span style="width: 24px;">🚪</span>
                 <span>Logout</span>
             </a>
         </div>
@@ -195,9 +195,9 @@
 <!-- About Modal -->
 <div class="modal fade" id="aboutModal" tabindex="-1" aria-labelledby="aboutModalLabel" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title" id="aboutModalLabel"><i class="fas fa-graduation-cap me-2"></i>About Discussio</h5>
+        <div class="modal-content" style="background: var(--cream-bg); color: var(--text-body);">
+            <div class="modal-header" style="border-color: var(--border-color);">
+                <h5 class="modal-title" id="aboutModalLabel" style="color: var(--text-heading);"><i class="fas fa-graduation-cap me-2"></i>About Discussio</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <div class="modal-body text-center py-4">
