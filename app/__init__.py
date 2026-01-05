@@ -10,6 +10,7 @@ from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
 import threading
 import time
+from dotenv import load_dotenv
 import asyncio
 from app.services.livekit_service import LiveKitService
 limiter = Limiter(
@@ -17,7 +18,7 @@ limiter = Limiter(
     default_limits=[],
     storage_uri=None
 )
-
+load_dotenv()
 def create_app(config_name='development'):
     app = Flask(__name__, template_folder='../templates', static_folder='../static')
     app.config.from_object(config[config_name])
