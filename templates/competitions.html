@@ -1192,21 +1192,89 @@
 
         async function joinCompetition(compId, groupId = null) {
             try {
+                // If no groupId provided, we need to determine the correct one
+                if (!groupId) {
+                    // Fetch competition to check if it's multi-group
+                    const compRes = await fetch(`/api/competitions/${compId}`, {
+                        headers: getAuthHeaders()
+                    });
+                    if (!compRes.ok) {
+                        await showCustomAlert('Could not fetch competition details', 'Error');
+                        return;
+                    }
+                    const compData = await compRes.json();
+                    const comp = compData.data;
+                    
+                    const compGroupIds = (comp.group_ids || []).map(g => String(g));
+                    
+                    // If single group and not general, we can proceed without group_id
+                    if (compGroupIds.length === 1 && !comp.is_general) {
+                        groupId = compGroupIds[0];
+                    } else {
+                        // Need to find eligible groups
+                        const userGroupsRes = await fetch('/api/users/groups', { headers: getAuthHeaders() });
+                        const userGroupsData = await userGroupsRes.json();
+                        const userGroups = userGroupsData.data?.groups || [];
+                        
+                        const eligible = userGroups.filter(g => compGroupIds.includes(g.id));
+                        
+                        if (eligible.length === 0) {
+                            await showCustomAlert('You must be a member of a participating group to join this competition.', 'Info');
+                            return;
+                        }
+                        
+                        if (eligible.length === 1) {
+                            groupId = eligible[0].id;
+                        } else {
+                            // Show chooser modal
+                            const chooseSelect = document.getElementById('chooseGroupSelect');
+                            chooseSelect.innerHTML = '';
+                            eligible.forEach(g => {
+                                const opt = document.createElement('option');
+                                opt.value = g.id;
+                                opt.textContent = g.name;
+                                chooseSelect.appendChild(opt);
+                            });
+                            
+                            return new Promise((resolve) => {
+                                const chooseModal = new bootstrap.Modal(document.getElementById('chooseGroupModal'));
+                                document.getElementById('confirmChooseGroupBtn').onclick = async () => {
+                                    const selected = chooseSelect.value;
+                                    if (!selected) { resolve(); return; }
+                                    chooseModal.hide();
+                                    await joinCompetition(compId, selected);
+                                    resolve();
+                                };
+                                chooseModal.show();
+                            });
+                        }
+                    }
+                }
+                
                 const body = groupId ? { group_id: groupId } : null;
                 const res = await fetch(`/api/competitions/${compId}/join`, {
                     method: 'POST',
-                    headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+                    headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
                     body: body ? JSON.stringify(body) : null
                 });
                 if (res.ok) {
                     await showCustomAlert('Joined competition!', 'Success');
                     loadCompetitions();
                 } else {
-                    const errData = await res.json();
-                    await showCustomAlert(errData.message || 'Failed to join competition', 'Error');
+                    // Safely parse error response
+                    let errMsg = 'Failed to join competition';
+                    try {
+                        const errData = await res.json();
+                        errMsg = errData.message || errMsg;
+                    } catch (parseErr) {
+                        // Response was not JSON
+                        errMsg = `Failed to join competition (${res.status})`;
+                    }
+                    await showCustomAlert(errMsg, 'Error');
                 }
             } catch (error) {
                 console.error('Error joining competition:', error);
+                await showCustomAlert('An error occurred while joining the competition', 'Error');
             }
         }
 

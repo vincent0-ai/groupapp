@@ -132,23 +132,18 @@
     <div class="container-fluid">
         <div class="d-flex justify-content-around align-items-center">
             <a href="{{ url_for('dashboard') }}" class="footer-nav-link text-center text-decoration-none {% if ep == 'dashboard' %}active{% endif %}">
-                <span class="nav-emoji">🏠</span>
                 <small class="d-block">Home</small>
             </a>
             <a href="{{ url_for('groups_page') }}" class="footer-nav-link text-center text-decoration-none {% if ep == 'groups_page' %}active{% endif %}">
-                <span class="nav-emoji">👥</span>
                 <small class="d-block">Groups</small>
             </a>
             <a href="{{ url_for('dm_page') }}" class="footer-nav-link text-center text-decoration-none {% if ep == 'dm_page' %}active{% endif %}">
-                <span class="nav-emoji">💬</span>
                 <small class="d-block">DMs</small>
             </a>
             <a href="{{ url_for('profile_page') }}" class="footer-nav-link text-center text-decoration-none {% if ep == 'profile_page' %}active{% endif %}">
-                <span class="nav-emoji">👤</span>
                 <small class="d-block">Profile</small>
             </a>
             <a href="#" class="footer-nav-link text-center text-decoration-none" data-bs-toggle="offcanvas" data-bs-target="#mobileMoreSheet">
-                <span class="nav-emoji">•••</span>
                 <small class="d-block">More</small>
             </a>
         </div>
