@@ -389,7 +389,7 @@
                         const el = document.getElementById(`group-streak-${gid}`);
                         if (el && streak && (streak.streak_count || 0) > 0) {
                             el.style.display = 'inline-block';
-                            el.textContent = `🔥 ${streak.streak_count}d`;
+                            el.textContent = `${streak.streak_count}d`;
                         }
                     } catch (e) {
                         // ignore

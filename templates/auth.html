@@ -255,8 +255,8 @@
                 <div class="card auth-card border-0 rounded-4 overflow-hidden">
                     <div class="card-body p-4 p-md-5">
                         <div class="text-center mb-4">
-                            <div class="auth-logo">
-                                <i class="fas fa-graduation-cap"></i>
+                            <div class="auth-logo" style="font-size: 3rem;">
+                                🎓
                             </div>
                             <h2 class="auth-title mb-2">Discussio</h2>
                             <p class="auth-subtitle mb-0">Your collaborative learning platform</p>
@@ -422,7 +422,7 @@
           .then(data => {
               if (data.status === 'success' && data.data) {
                   if (socialContainer) {
-                      socialContainer.innerHTML = '<div class="text-center w-100 py-2 text-success"><i class="fas fa-check-circle me-2"></i>Login successful! Redirecting...</div>';
+                      socialContainer.innerHTML = '<div class="text-center w-100 py-2 text-success">✅ Login successful! Redirecting...</div>';
                   }
                   
                   // Save token and user info
@@ -449,7 +449,7 @@
               if (socialContainer) {
                   socialContainer.innerHTML = `
                       <div class="text-center w-100">
-                          <div class="text-danger mb-2"><i class="fas fa-exclamation-circle me-1"></i>${errorMessage}</div>
+                          <div class="text-danger mb-2">⚠️ ${errorMessage}</div>
                           <button class="btn btn-sm btn-outline-primary" onclick="window.location.reload()">Try Again</button>
                       </div>`;
               }
@@ -466,7 +466,7 @@
           if (!isGoogleConfigured) {
               console.warn('Google Client ID not configured');
               if (container) {
-                  container.innerHTML = '<div class="text-center text-muted small py-2"><i class="fas fa-info-circle me-1"></i>Google Sign-In not available</div>';
+                  container.innerHTML = '<div class="text-center text-muted small py-2">ℹ️ Google Sign-In not available</div>';
               }
               return;
           }
@@ -475,7 +475,7 @@
           if (typeof google === 'undefined' || !google.accounts) {
               console.warn('Google Sign-In library not loaded');
               if (container) {
-                  container.innerHTML = '<div class="text-center text-warning small py-2"><i class="fas fa-exclamation-triangle me-1"></i>Google Sign-In unavailable. Please try again later.</div>';
+                  container.innerHTML = '<div class="text-center text-warning small py-2">⚠️ Google Sign-In unavailable. Please try again later.</div>';
               }
               return;
           }
@@ -504,7 +504,7 @@
           } catch (err) {
               console.error('Failed to initialize Google Sign-In:', err);
               if (container) {
-                  container.innerHTML = '<div class="text-center text-danger small py-2"><i class="fas fa-times-circle me-1"></i>Failed to load Google Sign-In</div>';
+                  container.innerHTML = '<div class="text-center text-danger small py-2">❌ Failed to load Google Sign-In</div>';
               }
           }
       }
@@ -664,8 +664,8 @@
                       // Show success message in the signup panel
                       let successHtml = `
                           <div class="text-center py-4">
-                              <div class="mb-3 text-success">
-                                  <i class="fas fa-envelope-open-text fa-4x"></i>
+                              <div class="mb-3 text-success" style="font-size: 4rem;">
+                                  📧
                               </div>
                               <h4 class="mb-3">Check your email</h4>
                               <p class="text-muted">We've sent a verification link to <strong>${email}</strong>.</p>
@@ -676,8 +676,7 @@
                       if (data.data && data.data.email_sent === false) {
                           successHtml += `
                               <div class="alert alert-warning mt-3">
-                                  <i class="fas fa-exclamation-triangle me-2"></i>
-                                  We couldn't send the verification email. Please contact support if you don't receive it.
+                                  ⚠️ We couldn't send the verification email. Please contact support if you don't receive it.
                               </div>
                           `;
                           
@@ -693,7 +692,7 @@
                       
                       successHtml += `
                               <button class="btn btn-outline-primary mt-3" onclick="window.location.reload()">
-                                  <i class="fas fa-arrow-left me-2"></i>Back to Login
+                                  ← Back to Login
                               </button>
                           </div>
                       `;

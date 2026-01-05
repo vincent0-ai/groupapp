@@ -218,7 +218,6 @@
             <div class="col-lg-6 mb-4">
                 <div class="card activity-card h-100">
                     <div class="card-header d-flex align-items-center">
-                        <span class="me-2">📚</span>
                         <h5 class="mb-0">Recent Groups</h5>
                     </div>
                     <div class="card-body" id="recentGroups">
@@ -232,7 +231,6 @@
             <div class="col-lg-6 mb-4">
                 <div class="card activity-card h-100">
                     <div class="card-header d-flex align-items-center">
-                        <span class="me-2">🏅</span>
                         <h5 class="mb-0">Top Performers</h5>
                     </div>
                     <div class="card-body" id="topPerformers">
@@ -426,7 +424,7 @@
                             <a href="#" onclick="viewGroup('${g.id || g._id}')" class="text-decoration-none fw-semibold" style="color: var(--text-dark);">${g.name}</a>
                             <div class="small text-muted">${g.member_count || 0} members</div>
                         </div>
-                        <i class="fas fa-chevron-right text-muted"></i>
+                        <span class="text-muted">›</span>
                     </div>
                 `).join('') || '<p class="text-muted text-center py-3">No groups yet</p>';
                 document.getElementById('recentGroups').innerHTML = groupsHtml || '<p class="text-muted text-center py-3">No groups yet</p>';
@@ -440,7 +438,7 @@
                             <div class="fw-semibold" style="color: var(--text-dark);">${g.name}</div>
                             <div class="small text-muted">${g.member_count || 0} members • ${g.activity || 0} msgs</div>
                         </div>
-                        <div class="ms-2 align-self-center"><span class="badge bg-warning text-dark">🔥 ${g.streak_count || 0}d</span></div>
+                        <div class="ms-2 align-self-center"><span class="badge bg-warning text-dark"> ${g.streak_count || 0}d</span></div>
                     </div>
                 `).join('') || '<p class="text-muted text-center py-3">No data available</p>';
                 document.getElementById('topPerformers').innerHTML = performersHtml || '<p class="text-muted text-center py-3">No data available</p>';

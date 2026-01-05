@@ -1,10 +1,46 @@
 {% extends "base.html" %}
 {% block title %}Terms and Conditions - Discussio{% endblock %}
+{% block head %}
+<style>
+    .terms-card {
+        background: rgba(26, 23, 48, 0.9);
+        border: 1px solid rgba(124, 58, 237, 0.3);
+        border-radius: 16px;
+        backdrop-filter: blur(10px);
+        color: #E5E7EB;
+    }
+    
+    .terms-card h2, .terms-card h5 {
+        color: #E5E7EB;
+    }
+    
+    .terms-card h5 {
+        margin-top: 1.5rem;
+        color: #A78BFA;
+    }
+    
+    .terms-card p, .terms-card li {
+        color: #9CA3AF;
+    }
+    
+    .terms-card a {
+        color: #06B6D4;
+    }
+    
+    .terms-card hr {
+        border-color: rgba(124, 58, 237, 0.3);
+    }
+    
+    .terms-card .text-muted {
+        color: #6B7280 !important;
+    }
+</style>
+{% endblock %}
 {% block content %}
 <div class="container py-5">
-  <div class="card mx-auto" style="max-width: 700px;">
-    <div class="card-body">
-      <h2 class="mb-4">Terms and Conditions</h2>
+  <div class="card terms-card mx-auto" style="max-width: 700px;">
+    <div class="card-body p-4">
+      <h2 class="mb-4">📜 Terms and Conditions</h2>
       <p>Welcome to Discussio. By accessing or using our platform, you agree to the following terms and conditions. Please read them carefully.</p>
       <h5>1. Acceptance of Terms</h5>
       <p>By creating an account or using Discussio, you agree to be bound by these terms and all applicable laws and regulations.</p>

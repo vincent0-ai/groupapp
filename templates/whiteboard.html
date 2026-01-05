@@ -5,9 +5,21 @@
 {% block head %}
 <script src="https://cdn.jsdelivr.net/npm/livekit-client@2.2.0/dist/livekit-client.umd.min.js"></script>
 <style>
+    /* Dark theme colors */
+    :root {
+        --dark-bg: #0c0a1d;
+        --dark-card: rgba(26, 23, 48, 0.9);
+        --dark-surface: #1a1730;
+        --dark-canvas: #1e1b38;
+        --dark-border: rgba(124, 58, 237, 0.3);
+        --dark-text: #E5E7EB;
+        --dark-text-muted: #9CA3AF;
+        --dark-gradient: linear-gradient(135deg, rgba(124, 58, 237, 0.3), rgba(6, 182, 212, 0.2));
+    }
+
     canvas {
-        border: 2px solid var(--border-color);
-        background: #fff;
+        border: 2px solid var(--dark-border);
+        background: var(--dark-canvas);
         cursor: crosshair;
         border-radius: 8px;
         touch-action: none;
@@ -15,6 +27,53 @@
 
     .controls {
         margin-bottom: 15px;
+    }
+
+    /* Dark theme card styling */
+    .card {
+        background: var(--dark-card) !important;
+        border: 1px solid var(--dark-border) !important;
+        backdrop-filter: blur(10px);
+    }
+
+    .card-header {
+        background: var(--dark-gradient) !important;
+        border-bottom: 1px solid var(--dark-border) !important;
+        color: var(--dark-text) !important;
+    }
+
+    .card-body {
+        background: transparent !important;
+        color: var(--dark-text) !important;
+    }
+
+    .card-title, .fw-semibold {
+        color: var(--dark-text) !important;
+    }
+
+    .text-muted, .text-body-secondary {
+        color: var(--dark-text-muted) !important;
+    }
+
+    .form-label {
+        color: var(--dark-text) !important;
+    }
+
+    .form-control, .form-select {
+        background: var(--dark-surface) !important;
+        border: 1px solid var(--dark-border) !important;
+        color: var(--dark-text) !important;
+    }
+
+    .form-control:focus, .form-select:focus {
+        border-color: rgba(124, 58, 237, 0.6) !important;
+        box-shadow: 0 0 0 0.25rem rgba(124, 58, 237, 0.25) !important;
+    }
+
+    .list-group-item {
+        background: var(--dark-surface) !important;
+        border-color: var(--dark-border) !important;
+        color: var(--dark-text) !important;
     }
 
     /* Fullscreen mode styles */
@@ -25,7 +84,7 @@
         width: 100vw !important;
         height: 100vh !important;
         z-index: 9999 !important;
-        background: #fff !important;
+        background: var(--dark-bg) !important;
         border-radius: 0 !important;
         border: none !important;
     }
@@ -48,10 +107,11 @@
         z-index: 10000;
         display: flex;
         gap: 10px;
-        background: rgba(255,255,255,0.95);
+        background: rgba(26, 23, 48, 0.95);
+        border: 1px solid var(--dark-border);
         padding: 10px 15px;
         border-radius: 30px;
-        box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+        box-shadow: 0 2px 10px rgba(0,0,0,0.4);
     }
 
     .fullscreen-controls button {
@@ -61,6 +121,9 @@
         display: flex;
         align-items: center;
         justify-content: center;
+        background: var(--dark-surface);
+        border: 1px solid var(--dark-border);
+        color: var(--dark-text);
     }
 
     .fullscreen-exit-btn {
@@ -71,6 +134,9 @@
         border-radius: 50%;
         width: 45px;
         height: 45px;
+        background: var(--dark-surface) !important;
+        border: 1px solid var(--dark-border) !important;
+        color: var(--dark-text) !important;
     }
 
     /* Participant list improvements */
@@ -84,6 +150,7 @@
         overflow: hidden;
         text-overflow: ellipsis;
         white-space: nowrap;
+        color: var(--dark-text);
     }
 
     #participantsList .mod-btn {
@@ -97,6 +164,35 @@
         display: inline-flex !important;
     }
 
+    /* Modal dark theme */
+    .modal-content {
+        background: rgba(26, 23, 48, 0.98) !important;
+        border: 1px solid rgba(124, 58, 237, 0.3) !important;
+        color: #E5E7EB !important;
+    }
+
+    .modal-header {
+        background: linear-gradient(135deg, rgba(124, 58, 237, 0.3), rgba(6, 182, 212, 0.2)) !important;
+        border-bottom: 1px solid var(--dark-border) !important;
+        color: var(--dark-text) !important;
+    }
+
+    .modal-title {
+        color: var(--dark-text) !important;
+    }
+
+    .modal-body {
+        color: var(--dark-text) !important;
+    }
+
+    .modal-footer {
+        border-top: 1px solid var(--dark-border) !important;
+    }
+
+    .btn-close {
+        filter: invert(1);
+    }
+
     /* Mobile Controls Bar */
     @media (max-width: 991px) {
         #sessionControls {
@@ -105,17 +201,17 @@
             left: 0;
             width: 100%;
             z-index: 1020;
-            background: white;
+            background: var(--dark-surface);
             padding: 10px 15px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-            border-bottom: 1px solid var(--border-color);
+            box-shadow: 0 2px 10px rgba(0,0,0,0.3);
+            border-bottom: 1px solid var(--dark-border);
             /* keep controls on a single horizontal line and allow scrolling */
             flex-wrap: nowrap !important;
             overflow-x: auto;
             justify-content: flex-start;
             border-radius: 0 !important;
             border: none !important;
-            border-bottom: 1px solid var(--border-color) !important;
+            border-bottom: 1px solid var(--dark-border) !important;
         }
         
         #sessionControls::-webkit-scrollbar {
@@ -161,7 +257,6 @@
                 font-size: 0; /* hide stray text nodes if any */
             }
             #sessionControls .btn .btn-text { display: none !important; }
-            #sessionControls .btn i { font-size: 1.05rem !important; }
         }
     }
 </style>
@@ -169,11 +264,11 @@
 
 {% block content %}
 <!-- Page Header -->
-<div class="page-header mb-4" style="background: var(--gradient-primary); border-radius: 20px; padding: 2rem; color: white;">
+<div class="page-header mb-4" style="background: linear-gradient(135deg, rgba(124, 58, 237, 0.3), rgba(6, 182, 212, 0.2)); border: 1px solid rgba(124, 58, 237, 0.3); border-radius: 20px; padding: 2rem; color: #E5E7EB;">
     <div class="d-flex align-items-center gap-3">
         <div>
-            <h1 class="mb-1" style="font-size: 1.75rem; font-weight: 700;">Collaborate</h1>
-            <p class="mb-0 opacity-75">Draw and collaborate in real-time with your group</p>
+            <h1 class="mb-1" style="font-size: 1.75rem; font-weight: 700; color: #E5E7EB;">🎨 Collaborate</h1>
+            <p class="mb-0" style="color: #9CA3AF;">Draw and collaborate in real-time with your group</p>
         </div>
     </div>
 </div>
@@ -183,22 +278,22 @@
     <div class="row mt-4">
         <div class="col-md-8 offset-md-2">
             <div class="card shadow-sm border-0 mb-4" style="overflow: hidden;">
-                <div class="card-body text-center p-5" style="background: var(--primary-ultra-light);">
+                <div class="card-body text-center p-5">
                     <p class="text-muted mb-4">Create a new whiteboard session or join an existing one</p>
                     <div class="d-flex justify-content-center gap-3 flex-wrap">
                         <button id="createSessionBtnLanding" class="btn btn-primary btn-lg px-4">
-                            <i class="fas fa-plus-circle me-2"></i> Create Session
+                            ➕ Create Session
                         </button>
                         <button id="joinSessionBtnLanding" class="btn btn-outline-primary btn-lg px-4">
-                            <i class="fas fa-sign-in-alt me-2"></i> Join Session
+                            🚪 Join Session
                         </button>
                     </div>
                 </div>
             </div>
             
             <div class="card shadow-sm border-0" id="mySessionsCardLanding" style="display:none;">
-                <div class="card-header" style="background: transparent; border-bottom: 1px solid var(--border-color);">
-                    <h5 class="mb-0"><i class="fas fa-list text-primary me-2"></i> My Active Sessions</h5>
+                <div class="card-header">
+                    <h5 class="mb-0">📋 My Active Sessions</h5>
                 </div>
                 <div class="card-body p-0">
                     <div class="list-group list-group-flush" id="mySessionsListLanding">
@@ -214,14 +309,14 @@
 <div id="sessionView" class="row mt-4" style="display:none;">
     <!-- Top Controls Bar -->
     <div class="col-12 mb-3">
-        <div id="sessionControls" class="d-flex flex-wrap gap-2 align-items-center p-3 bg-white rounded shadow-sm border"></div>
+        <div id="sessionControls" class="d-flex flex-wrap gap-2 align-items-center p-3 rounded shadow-sm" style="background: rgba(26, 23, 48, 0.9); border: 1px solid rgba(124, 58, 237, 0.3);"></div>
     </div>
 
     <div class="col-lg-2">
         <div class="card shadow-sm border-0 mb-3" style="overflow: hidden;">
             <div class="card-body">
                     <div class="d-flex justify-content-between align-items-center">
-                        <h6 class="card-title mb-0 fw-semibold"><i class="fas fa-paint-brush text-primary me-2"></i>Tools</h6>
+                        <h6 class="card-title mb-0 fw-semibold">🎨 Tools</h6>
                         <button class="btn btn-sm btn-outline-primary" data-bs-toggle="collapse" data-bs-target="#drawingToolsCollapse" aria-expanded="false" aria-controls="drawingToolsCollapse" id="toggleDrawingTools" style="font-size: 0.75rem;">Show</button>
                     </div>
                     <div id="permissionStatus" class="mb-2 text-muted small mt-2"></div>
@@ -240,13 +335,13 @@
                         </div>
                         <div class="btn-group-vertical w-100 gap-2">
                             <button id="clearBtn" class="btn btn-warning">
-                                <i class="fas fa-trash me-1"></i> Clear
+                                🗑️ Clear
                             </button>
                             <button id="undoBtn" class="btn btn-outline-secondary">
-                                <i class="fas fa-undo me-1"></i> Undo
+                                ↩️ Undo
                             </button>
                             <button id="downloadBtn" class="btn btn-info text-white">
-                                <i class="fas fa-download me-1"></i> Save
+                                ⬇️ Save
                             </button>
                         </div>
                     </div>
@@ -254,8 +349,8 @@
         </div>
 
         <div class="card mt-3 shadow-sm border-0" style="overflow: hidden;">
-            <div class="card-header" style="background: rgba(79, 70, 229, 0.08); border-bottom: none;">
-                <h6 class="mb-0 fw-semibold"><i class="fas fa-users text-primary me-2"></i> Participants</h6>
+            <div class="card-header">
+                <h6 class="mb-0 fw-semibold">👥 Participants</h6>
             </div>
             <div class="card-body">
                 <div id="participantsList" style="max-height: 30vh; overflow-y: auto;">
@@ -269,19 +364,19 @@
 
     <div class="col-lg-10">
         <div class="card shadow-sm border-0" style="overflow: hidden;">
-            <div class="card-header d-flex justify-content-between align-items-center" style="background: rgba(79, 70, 229, 0.08); border-bottom: none;">
-                <span class="fw-semibold"><i class="fas fa-chalkboard text-primary me-2"></i>Whiteboard</span>
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <span class="fw-semibold">🖌️ Whiteboard</span>
                 <button id="fullscreenToggleBtn" class="btn btn-sm btn-primary fullscreen-toggle-btn">
-                    <i class="fas fa-expand me-1"></i> Fullscreen
+                    ⛶ Fullscreen
                 </button>
             </div>
-            <div class="card-body overflow-auto text-center" id="canvasContainer" style="background: linear-gradient(180deg, #f8f9fa 0%, #e9ecef 100%); padding: 1rem;">
-                <div style="position:relative; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 20px rgba(0,0,0,0.1);">
-                    <canvas id="whiteboard" style="width:100%;display:block; background: white;" width="1200" height="600"></canvas>
+            <div class="card-body overflow-auto text-center" id="canvasContainer" style="background: linear-gradient(180deg, #1a1730 0%, #0c0a1d 100%); padding: 1rem;">
+                <div style="position:relative; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 20px rgba(0,0,0,0.3);">
+                    <canvas id="whiteboard" style="width:100%;height:50vh;display:block;" width="1200" height="600"></canvas>
                     
                     <!-- FIX: Replaced blur with a non-intrusive View Only badge -->
                     <div id="canvasOverlay" style="position:absolute; top: 12px; right: 12px; display:none; pointer-events: none; z-index: 10;">
-                        <span class="badge bg-secondary shadow-sm"><i class="fas fa-eye me-1"></i> View Only</span>
+                        <span class="badge bg-secondary shadow-sm">👁️ View Only</span>
                     </div>
                 </div>
             </div>
@@ -292,8 +387,8 @@
 <!-- Remote Video Container (Screen Share) -->
 <div id="remoteVideoContainer" style="display:none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.9); z-index: 10000; align-items: center; justify-content: center; flex-direction: column;">
     <div class="d-flex w-100 justify-content-end p-3" style="position: absolute; top: 0; right: 0;">
-        <button id="fullscreenBtn" class="btn btn-outline-light rounded-circle me-2" title="Toggle Fullscreen"><i class="fas fa-expand"></i></button>
-        <button class="btn btn-outline-light rounded-circle" onclick="document.getElementById('remoteVideoContainer').style.display='none'" title="Close Video"><i class="fas fa-times"></i></button>
+        <button id="fullscreenBtn" class="btn btn-outline-light rounded-circle me-2" title="Toggle Fullscreen">⛶</button>
+        <button class="btn btn-outline-light rounded-circle" onclick="document.getElementById('remoteVideoContainer').style.display='none'" title="Close Video">✖️</button>
     </div>
     <video id="remoteVideo" autoplay playsinline controls style="max-width: 95%; max-height: 90%; border-radius: 8px; box-shadow: 0 0 20px rgba(0,0,0,0.5);"></video>
     <div id="remoteVideoLabel" class="text-white mt-2 fw-bold fs-5"></div>
@@ -306,9 +401,9 @@
 <div class="modal fade" id="createSessionModal" tabindex="-1">
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content border-0" style="border-radius: 20px; overflow: hidden;">
-            <div class="modal-header" style="background: var(--gradient-primary); border-bottom: none;">
-                <h5 class="modal-title text-white fw-semibold"><i class="fas fa-plus-circle me-2"></i>Create Session</h5>
-                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            <div class="modal-header" style="border-bottom: none;">
+                <h5 class="modal-title fw-semibold">➕ Create Session</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body p-4">
                 <p class="text-muted mb-3">Select which group this session is for:</p>
@@ -333,20 +428,20 @@
 <div class="modal fade" id="sessionCreatedModal" tabindex="-1">
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content border-0" style="border-radius: 20px; overflow: hidden;">
-            <div class="modal-header" style="background: var(--gradient-success); border-bottom: none;">
-                <h5 class="modal-title text-white fw-semibold"><i class="fas fa-check-circle me-2"></i>Session Created</h5>
-                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            <div class="modal-header" style="border-bottom: none;">
+                <h5 class="modal-title fw-semibold">✅ Session Created</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body p-4">
                 <p class="mb-3">Share this link with your group members:</p>
                 <div class="input-group">
                     <input type="text" class="form-control" id="createdSessionLink" readonly style="border-radius: 10px 0 0 10px;">
-                    <button class="btn btn-primary" type="button" onclick="navigator.clipboard.writeText(document.getElementById('createdSessionLink').value); this.innerHTML='<i class=\'fas fa-check\'></i>'; setTimeout(()=>this.innerHTML='<i class=\'fas fa-copy\'></i>', 2000);" style="border-radius: 0 10px 10px 0;"><i class="fas fa-copy"></i></button>
+                    <button class="btn btn-primary" type="button" onclick="navigator.clipboard.writeText(document.getElementById('createdSessionLink').value); this.innerHTML='✓'; setTimeout(()=>this.innerHTML='📋', 2000);" style="border-radius: 0 10px 10px 0;">📋</button>
                 </div>
             </div>
             <div class="modal-footer border-0 pt-0">
                 <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Close</button>
-                <button id="goToSessionBtn" type="button" class="btn btn-primary"><i class="fas fa-arrow-right me-1"></i>Go to Session</button>
+                <button id="goToSessionBtn" type="button" class="btn btn-primary">→ Go to Session</button>
             </div>
         </div>
     </div>
@@ -356,9 +451,9 @@
 <div class="modal fade" id="joinSessionModal" tabindex="-1">
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content border-0" style="border-radius: 20px; overflow: hidden;">
-            <div class="modal-header" style="background: var(--gradient-primary); border-bottom: none;">
-                <h5 class="modal-title text-white fw-semibold"><i class="fas fa-sign-in-alt me-2"></i>Join Session</h5>
-                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            <div class="modal-header" style="border-bottom: none;">
+                <h5 class="modal-title fw-semibold">🚪 Join Session</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body p-4">
                 <div class="mb-3">
@@ -368,7 +463,7 @@
             </div>
             <div class="modal-footer border-0 pt-0">
                 <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
-                <button id="joinSessionSubmit" type="button" class="btn btn-primary"><i class="fas fa-sign-in-alt me-1"></i>Join</button>
+                <button id="joinSessionSubmit" type="button" class="btn btn-primary">🚪 Join</button>
             </div>
         </div>
     </div>
@@ -528,21 +623,21 @@
             liveBtn.id = 'liveBtn';
             liveBtn.className = 'btn btn-sm btn-outline-success';
             liveBtn.setAttribute('aria-label', 'Join Call');
-            liveBtn.innerHTML = '<i class="fas fa-phone"></i><span class="btn-text"> Join Call</span>';
+            liveBtn.innerHTML = '📞<span class="btn-text"> Join Call</span>';
 
             const muteBtn = document.createElement('button');
             muteBtn.id = 'muteBtn';
             muteBtn.className = 'btn btn-sm btn-outline-warning';
             muteBtn.setAttribute('aria-label', 'Mute');
             muteBtn.disabled = true;
-            muteBtn.innerHTML = '<i class="fas fa-microphone"></i><span class="btn-text"> Mute</span>';
+            muteBtn.innerHTML = '🎙️<span class="btn-text"> Mute</span>';
 
             const screenShareBtn = document.createElement('button');
             screenShareBtn.id = 'screenShareBtn';
             screenShareBtn.className = 'btn btn-sm btn-outline-info';
             screenShareBtn.setAttribute('aria-label', 'Share Screen');
             screenShareBtn.disabled = true;
-            screenShareBtn.innerHTML = '<i class="fas fa-desktop"></i><span class="btn-text"> Share Screen</span>';
+            screenShareBtn.innerHTML = '💻<span class="btn-text"> Share Screen</span>';
             if (!supportsDisplayMedia) {
                 screenShareBtn.disabled = true;
                 screenShareBtn.title = 'Screen sharing not supported on this device or browser';
@@ -553,19 +648,19 @@
             watchScreenBtn.className = 'btn btn-sm btn-outline-primary';
             watchScreenBtn.setAttribute('aria-label', 'Watch Screen');
             watchScreenBtn.disabled = true;
-            watchScreenBtn.innerHTML = '<i class="fas fa-eye"></i><span class="btn-text"> Watch Screen</span>';
+            watchScreenBtn.innerHTML = '👁️<span class="btn-text"> Watch Screen</span>';
 
             const raiseBtn = document.createElement('button');
             raiseBtn.id = 'raiseBtn';
             raiseBtn.className = 'btn btn-sm btn-outline-secondary';
             raiseBtn.setAttribute('aria-label', 'Raise Hand');
-            raiseBtn.innerHTML = '<i class="fas fa-hand-paper"></i><span class="btn-text"> Raise Hand</span>';
+            raiseBtn.innerHTML = '✋<span class="btn-text"> Raise Hand</span>';
 
             const leaveSessionBtn = document.createElement('button');
             leaveSessionBtn.id = 'leaveSessionBtn';
             leaveSessionBtn.className = 'btn btn-sm btn-outline-danger';
             leaveSessionBtn.setAttribute('aria-label', 'Leave Session');
-            leaveSessionBtn.innerHTML = '<i class="fas fa-sign-out-alt me-1"></i><span class="btn-text"> Leave</span>';
+            leaveSessionBtn.innerHTML = '🚪<span class="btn-text"> Leave</span>';
 
 
             controlsContainer.appendChild(liveBtn);
@@ -635,7 +730,7 @@
         function updateMuteButton() {
             const muteBtn = document.getElementById('muteBtn');
             if(!muteBtn) return;
-            muteBtn.innerHTML = isMuted ? '<i class="fas fa-microphone-slash"></i><span class="btn-text"> Unmute</span>' : '<i class="fas fa-microphone"></i><span class="btn-text"> Mute</span>';
+            muteBtn.innerHTML = isMuted ? '🔇<span class="btn-text"> Unmute</span>' : '🎙️<span class="btn-text"> Mute</span>';
             muteBtn.className = isMuted ? 'btn btn-sm btn-warning' : 'btn btn-sm btn-outline-warning';
             muteBtn.disabled = !isInCall || (isMuted && !canSpeak);
             muteBtn.setAttribute('aria-pressed', String(!isMuted));
@@ -644,7 +739,7 @@
         function updateScreenShareButton() {
             const screenShareBtn = document.getElementById('screenShareBtn');
             if(!screenShareBtn) return;
-            screenShareBtn.innerHTML = isScreenSharing ? '<i class="fas fa-desktop"></i><span class="btn-text"> Stop Sharing</span>' : '<i class="fas fa-desktop"></i><span class="btn-text"> Share Screen</span>';
+            screenShareBtn.innerHTML = isScreenSharing ? '💻<span class="btn-text"> Stop Sharing</span>' : '💻<span class="btn-text"> Share Screen</span>';
             screenShareBtn.className = isScreenSharing ? 'btn btn-sm btn-info text-white' : 'btn btn-sm btn-outline-info';
             screenShareBtn.disabled = !isInCall;
         }
@@ -694,11 +789,11 @@
             if (!liveBtn) return;
             
             liveBtn.disabled = true;
-            liveBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i><span class="btn-text"> Joining...</span>';
+            liveBtn.innerHTML = '⏳<span class="btn-text"> Joining...</span>';
             const lkResp = await getLiveKitToken(sessionId);
             if (!lkResp || !lkResp.token) {
                 liveBtn.disabled = false;
-                liveBtn.innerHTML = '<i class="fas fa-phone"></i><span class="btn-text"> Join Call</span>';
+                liveBtn.innerHTML = '📞<span class="btn-text"> Join Call</span>';
                 return;
             }
 
@@ -720,7 +815,7 @@
 
                 liveBtn.disabled = false;
                 liveBtn.className = 'btn btn-sm btn-danger';
-                liveBtn.innerHTML = '<i class="fas fa-phone-slash"></i><span class="btn-text"> Leave</span>';
+                liveBtn.innerHTML = '📵<span class="btn-text"> Leave</span>';
 
                 if (canSpeak) {
                     isMuted = false;
@@ -736,7 +831,7 @@
                 showCustomAlert('Could not connect to the media session.', 'Connection Error');
                 isInCall = false;
                 liveBtn.disabled = false;
-                liveBtn.innerHTML = '<i class="fas fa-phone"></i><span class="btn-text"> Join Call</span>';
+                liveBtn.innerHTML = '📞<span class="btn-text"> Join Call</span>';
             }
         }
 
@@ -748,7 +843,7 @@
             const liveBtn = document.getElementById('liveBtn');
             if(liveBtn) {
                 liveBtn.className = 'btn btn-sm btn-outline-success';
-                liveBtn.innerHTML = '<i class="fas fa-phone"></i><span class="btn-text"> Join Call</span>';
+                liveBtn.innerHTML = '📞<span class="btn-text"> Join Call</span>';
             }
             const muteBtn = document.getElementById('muteBtn');
             const screenShareBtn = document.getElementById('screenShareBtn');
@@ -874,12 +969,12 @@
                 if (leaveBtn) {
                     if (isCreator) {
                         leaveBtn.setAttribute('aria-label', 'End Session');
-                        leaveBtn.innerHTML = '<i class="fas fa-stop-circle me-1"></i><span class="btn-text"> End Session</span>';
+                        leaveBtn.innerHTML = '⏹️<span class="btn-text"> End Session</span>';
                         leaveBtn.className = 'btn btn-sm btn-danger';
                         leaveBtn.onclick = async () => { if (confirm('End session for everyone?')) await endSession(sessionId); };
                     } else {
                         leaveBtn.setAttribute('aria-label', 'Leave');
-                        leaveBtn.innerHTML = '<i class="fas fa-sign-out-alt me-1"></i><span class="btn-text"> Leave</span>';
+                        leaveBtn.innerHTML = '🚪<span class="btn-text"> Leave</span>';
                         leaveBtn.className = 'btn btn-sm btn-outline-danger';
                         leaveBtn.onclick = async () => { try { await leaveCall(); } catch(e){}; window.location.href = '/whiteboard'; };
                     }
@@ -913,10 +1008,10 @@
                 let moderatorControls = '';
                 if(isCreator && uid !== userId) {
                    moderatorControls = `
-                    <button class="btn btn-xs mod-btn ${meta.can_draw ? 'btn-primary' : 'btn-outline-primary'}" data-action="${meta.can_draw ? 'revoke_draw' : 'grant_draw'}" data-uid="${uid}" title="${meta.can_draw ? 'Revoke' : 'Grant'} Draw"><i class="fas fa-pencil-alt"></i></button>
-                    <button class="btn btn-xs mod-btn ${meta.can_speak ? 'btn-success' : 'btn-outline-secondary'}" data-action="${meta.can_speak ? 'revoke_speak' : 'grant_speak'}" data-uid="${uid}" title="${meta.can_speak ? 'Revoke' : 'Grant'} Speak"><i class="fas fa-microphone"></i></button>
-                    <button class="btn btn-xs mod-btn ${meta.can_share_screen ? 'btn-info' : 'btn-outline-info'}" data-action="${meta.can_share_screen ? 'revoke_screen_share' : 'grant_screen_share'}" data-uid="${uid}" title="${meta.can_share_screen ? 'Revoke' : 'Grant'} Screen Share"><i class="fas fa-desktop"></i></button>
-                    ${meta.raised ? `<button class="btn btn-xs mod-btn btn-outline-danger" data-action="clear_hand" data-uid="${uid}" title="Clear Hand"><i class="fas fa-hand-paper"></i></button>` : ''}
+                    <button class="btn btn-xs mod-btn ${meta.can_draw ? 'btn-primary' : 'btn-outline-primary'}" data-action="${meta.can_draw ? 'revoke_draw' : 'grant_draw'}" data-uid="${uid}" title="${meta.can_draw ? 'Revoke' : 'Grant'} Draw">✏️</button>
+                    <button class="btn btn-xs mod-btn ${meta.can_speak ? 'btn-success' : 'btn-outline-secondary'}" data-action="${meta.can_speak ? 'revoke_speak' : 'grant_speak'}" data-uid="${uid}" title="${meta.can_speak ? 'Revoke' : 'Grant'} Speak">🎙️</button>
+                    <button class="btn btn-xs mod-btn ${meta.can_share_screen ? 'btn-info' : 'btn-outline-info'}" data-action="${meta.can_share_screen ? 'revoke_screen_share' : 'grant_screen_share'}" data-uid="${uid}" title="${meta.can_share_screen ? 'Revoke' : 'Grant'} Screen Share">💻</button>
+                    ${meta.raised ? `<button class="btn btn-xs mod-btn btn-outline-danger" data-action="clear_hand" data-uid="${uid}" title="Clear Hand">✋</button>` : ''}
                 `;
                 } else {
                     moderatorControls = `<small class="text-muted">${meta.can_draw ? '✏️' : ''} ${meta.raised ? '✋' : ''}</small>`;
@@ -952,7 +1047,7 @@
 
                     btn.disabled = true;
                     const prevHtml = btn.innerHTML;
-                    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+                    btn.innerHTML = '⏳';
 
                     if (action === 'clear_hand') {
                         socket.emit(action, { room: `whiteboard:${sessionId}`, user_id: targetId });
@@ -1186,7 +1281,7 @@
              if (sidebarBrushToggle) {
                  sidebarBrushToggle.addEventListener('click', () => {
                      isErasing = !isErasing;
-                     sidebarBrushToggle.innerHTML = isErasing ? '<i class="fas fa-eraser"></i> Erase' : '<i class="fas fa-paint-brush"></i> Brush';
+                     sidebarBrushToggle.innerHTML = isErasing ? '🧹 Erase' : '🎨 Brush';
                  });
              }
         };
@@ -1343,7 +1438,7 @@
             const title = sessionNameInput?.value || '';
             if (!gid) return alert('Please select a group to create this session for.');
             createSessionSubmit.disabled = true;
-            createSessionSubmit.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Creating...';
+            createSessionSubmit.innerHTML = '⏳ Creating...';
             try {
                 const res = await fetch(`/api/groups/${gid}/whiteboards`, {
                     method: 'POST',
@@ -1486,7 +1581,7 @@
                     exit = document.createElement('button');
                     exit.id = 'wb-fs-exit';
                     exit.className = 'btn btn-light fullscreen-exit-btn';
-                    exit.innerHTML = '<i class="fas fa-times"></i>';
+                    exit.innerHTML = '✖️';
                     exit.addEventListener('click', exitWhiteboardFullscreen);
                     // Append inside the whiteboard container so it is visible in native fullscreen
                     canvasContainerEl.appendChild(exit);
@@ -1503,19 +1598,19 @@
                     clearBtnFs.id = 'wb-clear-btn';
                     clearBtnFs.className = 'btn btn-light';
                     clearBtnFs.title = 'Clear Whiteboard';
-                    clearBtnFs.innerHTML = '<i class="fas fa-trash"></i>';
+                    clearBtnFs.innerHTML = '🗑️';
 
                     const undoBtnFs = document.createElement('button');
                     undoBtnFs.id = 'wb-undo-btn';
                     undoBtnFs.className = 'btn btn-light';
                     undoBtnFs.title = 'Undo';
-                    undoBtnFs.innerHTML = '<i class="fas fa-undo"></i>';
+                    undoBtnFs.innerHTML = '↩️';
 
                     const brushToggleFs = document.createElement('button');
                     brushToggleFs.id = 'wb-brush-toggle-btn';
                     brushToggleFs.className = 'btn btn-light';
                     brushToggleFs.title = 'Toggle Brush / Eraser';
-                    brushToggleFs.innerHTML = '<i class="fas fa-paint-brush"></i>';
+                    brushToggleFs.innerHTML = '🎨';
 
                     fsControls.appendChild(clearBtnFs);
                     fsControls.appendChild(undoBtnFs);
@@ -1529,7 +1624,7 @@
                     undoBtnFs.addEventListener('click', () => undoLastStroke());
                     brushToggleFs.addEventListener('click', () => {
                         isErasing = !isErasing;
-                        brushToggleFs.innerHTML = isErasing ? '<i class="fas fa-eraser"></i>' : '<i class="fas fa-paint-brush"></i>';
+                        brushToggleFs.innerHTML = isErasing ? '🧹' : '🎨';
                         // small visual indication
                         brushToggleFs.classList.toggle('btn-danger', isErasing);
                     });
