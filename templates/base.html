@@ -411,7 +411,8 @@
             document.getElementById('globalAlertTitle').textContent = title;
             document.getElementById('globalAlertMessage').textContent = message;
             const modalEl = document.getElementById('globalAlertModal');
-            const modal = new bootstrap.Modal(modalEl);
+            // Use getOrCreateInstance to prevent multiple modal instances and backdrop stacking
+            const modal = bootstrap.Modal.getOrCreateInstance(modalEl);
             
             const onHidden = () => {
                 modalEl.removeEventListener('hidden.bs.modal', onHidden);
@@ -451,7 +452,8 @@
             document.getElementById('globalConfirmTitle').textContent = title;
             document.getElementById('globalConfirmMessage').textContent = message;
             const modalEl = document.getElementById('globalConfirmModal');
-            const modal = new bootstrap.Modal(modalEl);
+            // Use getOrCreateInstance to prevent multiple modal instances and backdrop stacking
+            const modal = bootstrap.Modal.getOrCreateInstance(modalEl);
             const okBtn = document.getElementById('globalConfirmOK');
             
             let result = false;
