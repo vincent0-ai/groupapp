@@ -664,20 +664,21 @@
                 return;
             }
 
-            // Prefer chosen option, but allow custom text answers
+            // Prefer chosen option, but allow custom text answers or discussion answers
             const selectedOption = document.querySelector(`input[name="q${questionIndex}"]:checked`);
             const customInput = document.getElementById(`custom_q${questionIndex}`);
             const discussionInput = document.getElementById(`discussion_q${questionIndex}`);
 
             const customAnswer = customInput ? customInput.value.trim() : '';
-            const discussion = discussionInput ? discussionInput.value.trim() : '';
+            const discussionAnswer = discussionInput ? discussionInput.value.trim() : '';
 
             let answer = '';
             if (selectedOption) answer = selectedOption.value;
             else if (customAnswer) answer = customAnswer;
+            else if (discussionAnswer) answer = discussionAnswer;  // Use discussion input as the answer for discussion questions
 
             if (!answer) {
-                alert('Please select an option or write your own answer');
+                alert('Please select an option or write your answer');
                 return;
             }
 
@@ -690,8 +691,7 @@
                     },
                     body: JSON.stringify({
                         question_id: questionIndex,
-                        answer: answer,
-                        discussion: discussion
+                        answer: answer
                     })
                 });
 
