@@ -1,5 +1,6 @@
 from flask import Blueprint, render_template, redirect, url_for
 from app.utils.auth import get_current_user
+import os
 
 main_bp = Blueprint('main', __name__)
 
@@ -15,7 +16,7 @@ def auth_page():
     user = get_current_user()
     if user:
         return redirect(url_for('main.index'))
-    return render_template('auth.html', user=user)
+    return render_template('auth.html', user=user, google_client_id=os.environ.get('GOOGLE_CLIENT_ID'))
 
 @main_bp.route('/groups')
 def groups_page():

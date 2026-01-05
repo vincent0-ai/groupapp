@@ -361,6 +361,9 @@
             return t ? Object.assign({'Authorization': `Bearer ${t}`}, extra) : extra;
         }
 
+        // Get the auth token for use throughout the page
+        const token = getAuthToken();
+
         // Some sessions may have a token but no cached userId.
         // Derive it from the JWT payload to keep UI state (answer marking, creator actions) consistent.
         let userId = localStorage.getItem('userId');
