@@ -1130,38 +1130,43 @@
                 document.getElementById('completedCompsList').innerHTML = completedHtml;
 
                 // Populate group dropdown with groups where the user is owner or moderator
-                const groupRes = await fetch('/api/users/groups', {
-                    headers: getAuthHeaders()
-                });
-                const groupData = await groupRes.json();
+                // (Only if we're on a page with these elements - e.g., create competition modal)
                 const groupSelect = document.getElementById('compGroup');
-                const allGroups = groupData.data?.groups || [];
-                // Filter to groups where the user is owner or a moderator
-                const myModeratedGroups = allGroups.filter(g => g.owner_id === userId || (Array.isArray(g.moderators) && g.moderators.includes(userId)));
-
-                groupSelect.innerHTML = '<option value="">Select a group</option>';
-                if (myModeratedGroups.length === 0) {
-                    groupSelect.innerHTML = '<option value="">No groups (you must be a group owner or moderator)</option>';
-                } else {
-                    myModeratedGroups.forEach(g => {
-                        const option = document.createElement('option');
-                        option.value = g.id;
-                        option.textContent = g.name;
-                        groupSelect.appendChild(option);
+                if (groupSelect) {
+                    const groupRes = await fetch('/api/users/groups', {
+                        headers: getAuthHeaders()
                     });
-                }
+                    const groupData = await groupRes.json();
+                    const allGroups = groupData.data?.groups || [];
+                    // Filter to groups where the user is owner or a moderator
+                    const myModeratedGroups = allGroups.filter(g => g.owner_id === userId || (Array.isArray(g.moderators) && g.moderators.includes(userId)));
 
-                // Toggle multi-select when 'general competition' is checked
-                const isGeneralCheckbox = document.getElementById('compIsGeneral');
-                isGeneralCheckbox.addEventListener('change', (e) => {
-                    if (e.target.checked) {
-                        groupSelect.multiple = true;
-                        groupSelect.size = Math.min(6, myModeratedGroups.length || 4);
+                    groupSelect.innerHTML = '<option value="">Select a group</option>';
+                    if (myModeratedGroups.length === 0) {
+                        groupSelect.innerHTML = '<option value="">No groups (you must be a group owner or moderator)</option>';
                     } else {
-                        groupSelect.multiple = false;
-                        groupSelect.size = 0;
+                        myModeratedGroups.forEach(g => {
+                            const option = document.createElement('option');
+                            option.value = g.id;
+                            option.textContent = g.name;
+                            groupSelect.appendChild(option);
+                        });
                     }
-                });
+
+                    // Toggle multi-select when 'general competition' is checked
+                    const isGeneralCheckbox = document.getElementById('compIsGeneral');
+                    if (isGeneralCheckbox) {
+                        isGeneralCheckbox.addEventListener('change', (e) => {
+                            if (e.target.checked) {
+                                groupSelect.multiple = true;
+                                groupSelect.size = Math.min(6, myModeratedGroups.length || 4);
+                            } else {
+                                groupSelect.multiple = false;
+                                groupSelect.size = 0;
+                            }
+                        });
+                    }
+                }
                 
                 // Load "My Competitions" - those created by the user
                 const myComps = competitions.filter(c => c.created_by === userId);
