@@ -10,7 +10,7 @@
 
 {% block content %}
     <style>
-        /* Modern Message Styling */
+        /* Modern Message Styling - Dark Theme */
         .messages-container {
             display: flex;
             flex-direction: column;
@@ -18,14 +18,15 @@
         }
         
         .chat-header {
-            background: var(--primary-ultra-light);
+            background: linear-gradient(135deg, rgba(124, 58, 237, 0.12), rgba(6, 182, 212, 0.06));
             border-radius: 12px;
             padding: 0.875rem 1rem;
             margin-bottom: 0.875rem;
-            border: 1px solid var(--border-color);
+            border: 1px solid rgba(124, 58, 237, 0.2);
             display: flex;
             align-items: center;
             justify-content: space-between;
+            backdrop-filter: blur(10px);
         }
 
         /* Ensure the messages area participates in flex layout so the footer/input
@@ -35,30 +36,34 @@
             flex: 1 1 auto;
             min-height: 0;
             overflow: auto;
+            background: rgba(12, 10, 29, 0.4) !important;
         }
 
         #messageInputArea {
             position: relative;
             z-index: 5;
-            background: var(--card-bg);
+            background: rgba(26, 23, 48, 0.95);
+            border-top: 1px solid rgba(124, 58, 237, 0.2);
         }
         
         .chat-header h5 {
             margin: 0;
             font-weight: 700;
+            color: #E5E7EB;
         }
         
         /* Message enhancements */
         .message-content a {
-            color: inherit;
+            color: #A78BFA;
             text-decoration: underline;
         }
         .message-content a:hover {
             opacity: 0.8;
+            color: #C4B5FD;
         }
         .mention {
-            background: rgba(79, 70, 229, 0.15);
-            color: #4F46E5;
+            background: rgba(124, 58, 237, 0.25);
+            color: #A78BFA;
             padding: 2px 6px;
             border-radius: 4px;
             font-weight: 600;
@@ -66,14 +71,14 @@
             transition: background 0.15s ease;
         }
         .mention:hover {
-            background: rgba(79, 70, 229, 0.25);
+            background: rgba(124, 58, 237, 0.35);
         }
         .bg-primary .mention {
             background: rgba(255, 255, 255, 0.25);
             color: white;
         }
         .hashtag {
-            color: #22C55E;
+            color: #06B6D4;
             font-weight: 600;
             cursor: pointer;
         }
@@ -93,27 +98,22 @@
             opacity: 1;
         }
         .message-bubble.sent {
-            background: #4F46E5;
+            background: linear-gradient(135deg, #7C3AED, #6D28D9);
             color: white;
             border-bottom-right-radius: 4px;
-            box-shadow: 0 2px 8px rgba(79, 70, 229, 0.2);
+            box-shadow: 0 4px 15px rgba(124, 58, 237, 0.25);
         }
         .message-bubble.received {
-            background: var(--card-bg);
-            border: 1px solid var(--border-color);
+            background: rgba(26, 23, 48, 0.9);
+            border: 1px solid rgba(124, 58, 237, 0.15);
             border-bottom-left-radius: 4px;
-        }
-        
-        @media (prefers-color-scheme: dark) {
-            .message-bubble.received {
-                background: var(--background-color);
-            }
+            color: #E5E7EB;
         }
         
         @keyframes pulse-highlight {
-            0% { box-shadow: 0 0 0 0 rgba(79, 70, 229, 0.4); }
-            70% { box-shadow: 0 0 0 10px rgba(79, 70, 229, 0); }
-            100% { box-shadow: 0 0 0 0 rgba(79, 70, 229, 0); }
+            0% { box-shadow: 0 0 0 0 rgba(124, 58, 237, 0.4); }
+            70% { box-shadow: 0 0 0 10px rgba(124, 58, 237, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(124, 58, 237, 0); }
         }
         .message-bubble.highlight {
             animation: pulse-highlight 0.5s ease-out;
@@ -135,9 +135,14 @@
             padding: 4px 8px;
             font-size: 0.7rem;
             border-radius: 6px;
-            background: var(--card-bg);
-            border: 1px solid var(--border-color);
-            box-shadow: var(--shadow-sm);
+            background: rgba(26, 23, 48, 0.95);
+            border: 1px solid rgba(124, 58, 237, 0.2);
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+            color: #D1D5DB;
+        }
+        .message-actions button:hover {
+            background: rgba(124, 58, 237, 0.2);
+            color: #A78BFA;
         }
         
         /* Reactions styling */
@@ -153,18 +158,19 @@
             padding: 2px 8px;
             border-radius: 12px;
             font-size: 0.75rem;
-            background: rgba(0,0,0,0.05);
-            border: 1px solid rgba(0,0,0,0.1);
+            background: rgba(124, 58, 237, 0.1);
+            border: 1px solid rgba(124, 58, 237, 0.2);
             cursor: pointer;
             transition: all 0.15s;
+            color: #D1D5DB;
         }
         .reaction-badge:hover {
-            background: rgba(79, 70, 229, 0.08);
-            border-color: rgba(79, 70, 229, 0.25);
+            background: rgba(124, 58, 237, 0.2);
+            border-color: rgba(124, 58, 237, 0.35);
         }
         .reaction-badge.reacted {
-            background: rgba(79, 70, 229, 0.12);
-            border-color: var(--primary-color);
+            background: rgba(124, 58, 237, 0.25);
+            border-color: #7C3AED;
         }
         .sent .reaction-badge {
             background: rgba(255,255,255,0.2);
@@ -185,10 +191,10 @@
             display: flex;
             gap: 4px;
             padding: 8px;
-            background: var(--card-bg);
-            border: 1px solid var(--border-color);
+            background: rgba(26, 23, 48, 0.98);
+            border: 1px solid rgba(124, 58, 237, 0.2);
             border-radius: 24px;
-            box-shadow: var(--shadow-lg);
+            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.4);
             z-index: 100;
             margin-bottom: 8px;
         }
@@ -202,18 +208,19 @@
             transition: all 0.15s;
         }
         .reaction-option:hover {
-            background: var(--primary-ultra-light);
+            background: rgba(124, 58, 237, 0.2);
             transform: scale(1.2);
         }
         
         .reply-preview {
             font-size: 0.75rem;
             padding: 6px 10px;
-            border-left: 3px solid rgba(79, 70, 229, 0.4);
+            border-left: 3px solid rgba(124, 58, 237, 0.5);
             margin-bottom: 8px;
-            background: rgba(0,0,0,0.05);
+            background: rgba(124, 58, 237, 0.1);
             border-radius: 6px;
             cursor: pointer;
+            color: #9CA3AF;
         }
         .bg-primary .reply-preview {
             background: rgba(255,255,255,0.15);
@@ -222,11 +229,12 @@
         .reply-bar {
             display: none;
             padding: 10px 16px;
-            background: var(--background-color);
+            background: rgba(12, 10, 29, 0.6);
             border-radius: 12px 12px 0 0;
             margin-bottom: -1px;
             align-items: center;
             gap: 8px;
+            border-bottom: 1px solid rgba(124, 58, 237, 0.15);
         }
         .reply-bar.active {
             display: flex;
@@ -237,14 +245,14 @@
             bottom: 100%;
             left: 0;
             right: 0;
-            background: var(--card-bg);
-            border: 1px solid var(--border-color);
+            background: rgba(26, 23, 48, 0.98);
+            border: 1px solid rgba(124, 58, 237, 0.2);
             border-radius: 12px;
             max-height: 200px;
             overflow-y: auto;
             display: none;
             z-index: 1000;
-            box-shadow: var(--shadow-lg);
+            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.4);
         }
         .mention-dropdown.show {
             display: block;
@@ -256,15 +264,16 @@
             align-items: center;
             gap: 10px;
             transition: background 0.15s ease;
+            color: #E5E7EB;
         }
         .mention-item:hover, .mention-item.active {
-            background: var(--primary-ultra-light);
+            background: rgba(124, 58, 237, 0.15);
         }
         .mention-item img {
             width: 32px;
             height: 32px;
             border-radius: 50%;
-            border: 2px solid var(--border-color);
+            border: 2px solid rgba(124, 58, 237, 0.3);
         }
         
         /* Message content text handling */
@@ -285,20 +294,25 @@
         
         /* Chat input area */
         .chat-input-area {
-            background: var(--card-bg);
-            border: 1px solid var(--border-color);
+            background: rgba(26, 23, 48, 0.9);
+            border: 1px solid rgba(124, 58, 237, 0.2);
             border-radius: 16px;
             padding: 12px;
         }
         
         .chat-input-area .form-control {
             border: none;
-            background: var(--cream-bg);
+            background: rgba(12, 10, 29, 0.6);
+            color: #E5E7EB;
         }
         
         .chat-input-area .form-control:focus {
             box-shadow: none;
-            background: var(--cream-bg);
+            background: rgba(12, 10, 29, 0.8);
+        }
+        
+        .chat-input-area .form-control::placeholder {
+            color: #6B7280;
         }
         
         /* Mobile-optimized message styles */
@@ -390,61 +404,60 @@
     </style>
     <div class="row g-3" style="height: calc(100vh - 160px);">
         <div class="col-12 h-100">
-            <div class="card h-100 d-flex flex-column shadow-sm border-0">
-                <div class="card-header d-flex align-items-center bg-white border-bottom">
+            <div class="card h-100 d-flex flex-column shadow-sm" style="background: rgba(26, 23, 48, 0.9); border: 1px solid rgba(124, 58, 237, 0.15);">
+                <div class="card-header d-flex align-items-center" style="background: rgba(26, 23, 48, 0.95); border-bottom: 1px solid rgba(124, 58, 237, 0.15);">
                     <a href="{{ url_for('groups_page') }}" class="btn btn-sm btn-outline-secondary me-3">
-                        <i class="fas fa-arrow-left me-1"></i> Groups
+                        ← Groups
                     </a>
-                    <h5 id="groupNameTitle" class="mb-0">Loading...</h5>
+                    <h5 id="groupNameTitle" class="mb-0" style="color: #E5E7EB;">Loading...</h5>
                     
                     <!-- Online Users Indicator -->
                     <div class="ms-3 d-flex align-items-center" id="onlineUsersIndicator" style="display: none;">
                         <div class="online-indicator me-1"></div>
                         <span class="text-muted small" id="onlineCount">0 online</span>
                         <button class="btn btn-sm btn-link p-0 ms-2" type="button" data-bs-toggle="offcanvas" data-bs-target="#onlineUsersPanel" title="View online users">
-                            <i class="fas fa-users text-muted"></i>
+                            👥
                         </button>
                     </div>
                     
                     <div class="ms-auto" id="groupAdminControls" style="display: none;">
                         <div class="dropdown">
                             <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown">
-                                <i class="fas fa-cog"></i> Settings
+                                ⚙️ Settings
                             </button>
-                            <ul class="dropdown-menu dropdown-menu-end">
-                                <li><a class="dropdown-item text-danger" href="#" id="clearChatBtn"><i class="fas fa-trash-alt me-2"></i>Clear Chat</a></li>
-                                <li><a class="dropdown-item" href="#" id="manageMembersBtn"><i class="fas fa-users-cog me-2"></i>Manage Members</a></li>
-                                <li><a class="dropdown-item" href="#" id="viewRequestsBtn"><i class="fas fa-user-plus me-2"></i>Join Requests</a></li>
+                            <ul class="dropdown-menu dropdown-menu-end" style="background: rgba(26, 23, 48, 0.98); border: 1px solid rgba(124, 58, 237, 0.2);">
+                                <li><a class="dropdown-item text-danger" href="#" id="clearChatBtn">🗑️ Clear Chat</a></li>
+                                <li><a class="dropdown-item" href="#" id="manageMembersBtn" style="color: #D1D5DB;">👥 Manage Members</a></li>
+                                <li><a class="dropdown-item" href="#" id="viewRequestsBtn" style="color: #D1D5DB;">📥 Join Requests</a></li>
                             </ul>
                         </div>
                     </div>
                 </div>
-                <div class="card-body overflow-auto bg-light" id="messagesArea" style="background: var(--card-bg);">
+                <div class="card-body overflow-auto" id="messagesArea" style="background: rgba(12, 10, 29, 0.4);">
                     <div class="h-100 d-flex align-items-center justify-content-center">
                         <p class="text-secondary">Loading messages...</p>
                     </div>
                 </div>
-                <div class="card-footer bg-white border-top p-0" id="messageInputArea">
+                <div class="card-footer p-0" id="messageInputArea" style="background: rgba(26, 23, 48, 0.95); border-top: 1px solid rgba(124, 58, 237, 0.15);">
                     <div class="reply-bar align-items-center justify-content-between" id="replyBar">
-                        <div class="d-flex align-items-center">
-                            <i class="fas fa-reply text-muted me-2"></i>
-                            <span id="replyPreviewText" class="text-truncate" style="max-width: 300px;"></span>
+                        <div class="d-flex align-items-center" style="color: #9CA3AF;">
+                            ↩️ <span id="replyPreviewText" class="text-truncate ms-2" style="max-width: 300px;"></span>
                         </div>
-                        <button class="btn btn-sm btn-link text-muted" id="cancelReplyBtn"><i class="fas fa-times"></i></button>
+                        <button class="btn btn-sm btn-link text-muted" id="cancelReplyBtn">✕</button>
                     </div>
                     <div class="p-2 position-relative">
                         <div class="mention-dropdown" id="mentionDropdown"></div>
                         <div class="input-group">
                             <button class="btn btn-outline-warning" id="announcementToggle" type="button" title="Send as Announcement" style="display: none;">
-                                <i class="fas fa-bullhorn"></i>
+                                📢
                             </button>
-                            <input type="text" class="form-control border-end-0" id="messageInput" placeholder="Type a message... (@ to mention)">
+                            <input type="text" class="form-control" id="messageInput" placeholder="Type a message... (@ to mention)" style="background: rgba(12, 10, 29, 0.6); border: 1px solid rgba(124, 58, 237, 0.2); color: #E5E7EB;">
                             <button class="btn btn-primary" id="sendBtn" type="button">
-                                <i class="fas fa-paper-plane"></i>
+                                ➤
                             </button>
                         </div>
                         <small id="announcementMode" class="text-warning mt-1" style="display: none;">
-                            <i class="fas fa-bullhorn me-1"></i> Sending as announcement (visible to all members)
+                            📢 Sending as announcement (visible to all members)
                         </small>
                     </div>
                 </div>
@@ -455,12 +468,12 @@
 
 {% block modals %}
     <!-- Online Users Panel (Offcanvas) -->
-    <div class="offcanvas offcanvas-end" tabindex="-1" id="onlineUsersPanel" aria-labelledby="onlineUsersPanelLabel">
-        <div class="offcanvas-header">
-            <h5 class="offcanvas-title" id="onlineUsersPanelLabel">
-                <i class="fas fa-users text-primary me-2"></i>Online Users
+    <div class="offcanvas offcanvas-end" tabindex="-1" id="onlineUsersPanel" aria-labelledby="onlineUsersPanelLabel" style="background: rgba(26, 23, 48, 0.98); border-left: 1px solid rgba(124, 58, 237, 0.2);">
+        <div class="offcanvas-header" style="border-bottom: 1px solid rgba(124, 58, 237, 0.15);">
+            <h5 class="offcanvas-title" id="onlineUsersPanelLabel" style="color: #E5E7EB;">
+                👥 Online Users
             </h5>
-            <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="Close"></button>
+            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="offcanvas" aria-label="Close"></button>
         </div>
         <div class="offcanvas-body">
             <div id="onlineUsersList" class="list-group list-group-flush">
@@ -472,10 +485,10 @@
     <!-- Manage Members Modal -->
     <div class="modal fade" id="manageMembersModal" tabindex="-1">
         <div class="modal-dialog">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title">Manage Members</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            <div class="modal-content" style="background: rgba(26, 23, 48, 0.98); border: 1px solid rgba(124, 58, 237, 0.2);">
+                <div class="modal-header" style="border-bottom: 1px solid rgba(124, 58, 237, 0.15);">
+                    <h5 class="modal-title" style="color: #E5E7EB;">Manage Members</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
                 </div>
                 <div class="modal-body">
                     <div id="membersList" class="list-group">
@@ -489,10 +502,10 @@
     <!-- Join Requests Modal -->
     <div class="modal fade" id="joinRequestsModal" tabindex="-1">
         <div class="modal-dialog">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title">Join Requests</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            <div class="modal-content" style="background: rgba(26, 23, 48, 0.98); border: 1px solid rgba(124, 58, 237, 0.2);">
+                <div class="modal-header" style="border-bottom: 1px solid rgba(124, 58, 237, 0.15);">
+                    <h5 class="modal-title" style="color: #E5E7EB;">Join Requests</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
                 </div>
                 <div class="modal-body">
                     <div id="requestsList" class="list-group">
@@ -572,13 +585,13 @@
             document.getElementById('groupNameTitle').textContent = 'No Group Selected';
             document.getElementById('messagesArea').innerHTML = `
                 <div class="h-100 d-flex flex-column align-items-center justify-content-center text-center p-4">
-                    <div class="mb-3">
-                        <i class="fas fa-users fa-3x text-muted"></i>
+                    <div class="mb-3" style="font-size: 3rem; opacity: 0.5;">
+                        👥
                     </div>
-                    <h4>No Group Selected</h4>
+                    <h4 style="color: #E5E7EB;">No Group Selected</h4>
                     <p class="text-muted">Please select a group to start chatting, or join a new group.</p>
                     <a href="{{ url_for('groups_page') }}" class="btn btn-primary mt-2">
-                        <i class="fas fa-search me-2"></i>Explore Groups
+                        🔍 Explore Groups
                     </a>
                 </div>
             `;
@@ -779,13 +792,14 @@
                     data.data.forEach(u => {
                         const item = document.createElement('div');
                         item.className = 'list-group-item d-flex justify-content-between align-items-center';
+                        item.style.cssText = 'background: rgba(12, 10, 29, 0.4); border-color: rgba(124, 58, 237, 0.15); color: #E5E7EB;';
                         item.innerHTML = `
                             <div>
                                 <strong>${u.full_name || u.username}</strong>
                             </div>
                             <div>
-                                <button class="btn btn-sm btn-success me-1 approve-btn" data-id="${u.id}"><i class="fas fa-check"></i></button>
-                                <button class="btn btn-sm btn-danger reject-btn" data-id="${u.id}"><i class="fas fa-times"></i></button>
+                                <button class="btn btn-sm btn-success me-1 approve-btn" data-id="${u.id}">✓</button>
+                                <button class="btn btn-sm btn-danger reject-btn" data-id="${u.id}">✕</button>
                             </div>
                         `;
                         list.appendChild(item);
@@ -885,12 +899,12 @@
                                 <div class="d-flex flex-column announcement-container">
                                     <div class="message-bubble p-3 rounded shadow-sm announcement-bubble">
                                         <div class="announcement-badge">
-                                            <i class="fas fa-bullhorn"></i> Announcement
+                                            📢 Announcement
                                         </div>
                                         <div class="message-actions">
                                             ${canDelete ? `
                                                 <button class="btn btn-sm btn-light text-danger" onclick="deleteMessage('${m._id}')" title="Delete">
-                                                    <i class="fas fa-trash"></i>
+                                                    🗑️
                                                 </button>
                                             ` : ''}
                                         </div>
@@ -908,18 +922,18 @@
                     return `
                         <div class="mb-2 d-flex ${isMine ? 'justify-content-end' : 'justify-content-start'}" id="msg-${m._id}">
                             <div class="d-flex flex-column ${isMine ? 'align-items-end' : 'align-items-start'}" style="max-width: 85%;">
-                                <div class="message-bubble p-2 rounded shadow-sm ${isMine ? 'bg-primary text-white sent' : 'bg-white text-dark border received'}">
+                                <div class="message-bubble p-2 rounded shadow-sm ${isMine ? 'sent' : 'received'}">
                                     ${replyHtml}
                                     <div class="message-actions ${isMine ? '' : 'message-actions-left'}">
                                         <button class="btn btn-sm btn-light" onclick="showReactionPicker('${m._id}')" title="React">
-                                            <i class="fas fa-smile"></i>
+                                            😊
                                         </button>
                                         <button class="btn btn-sm btn-light" onclick="replyToMessage('${m._id}', '${m.user_first_name || 'User'}', \`${m.content.replace(/`/g, "'").replace(/\\/g, "\\\\")}\`)" title="Reply">
-                                            <i class="fas fa-reply"></i>
+                                            ↩️
                                         </button>
                                         ${canDelete ? `
                                             <button class="btn btn-sm btn-light text-danger" onclick="deleteMessage('${m._id}')" title="Delete">
-                                                <i class="fas fa-trash"></i>
+                                                🗑️
                                             </button>
                                         ` : ''}
                                     </div>

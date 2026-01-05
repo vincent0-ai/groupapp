@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="theme-color" content="#4F46E5">
+    <meta name="theme-color" content="#7C3AED">
     
     <title>Login - Discussio</title>
     
@@ -26,55 +26,50 @@
     <style>
         .auth-page {
             min-height: 100vh;
-            background: #F8FAFC;
-        }
-        
-        @media (prefers-color-scheme: dark) {
-            .auth-page {
-                background: #0f172a;
-            }
+            background: radial-gradient(ellipse at top, #2d1f54 0%, #1a1730 35%, #0c0a1d 70%);
+            background-attachment: fixed;
         }
         
         .auth-card {
-            background: rgba(255, 255, 255, 0.98);
-            backdrop-filter: blur(12px);
-            -webkit-backdrop-filter: blur(12px);
-            border: 1px solid var(--border-color);
-            box-shadow: var(--shadow-lg);
-        }
-        
-        @media (prefers-color-scheme: dark) {
-            .auth-card {
-                background: rgba(30, 41, 59, 0.95);
-                border: 1px solid rgba(255, 255, 255, 0.1);
-            }
+            background: rgba(26, 23, 48, 0.8);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border: 1px solid rgba(124, 58, 237, 0.2);
+            box-shadow: 0 0 40px rgba(124, 58, 237, 0.15);
         }
         
         .auth-logo {
-            width: 72px;
-            height: 72px;
-            background: #4F46E5;
-            border-radius: 16px;
+            width: 80px;
+            height: 80px;
+            background: linear-gradient(135deg, #7C3AED 0%, #A78BFA 50%, #C4B5FD 100%);
+            border-radius: 20px;
             display: flex;
             align-items: center;
             justify-content: center;
-            margin: 0 auto 1.25rem;
-            box-shadow: 0 8px 20px rgba(79, 70, 229, 0.25);
+            margin: 0 auto 1.5rem;
+            box-shadow: 0 0 30px rgba(124, 58, 237, 0.4);
         }
         
         .auth-logo i {
-            font-size: 1.75rem;
+            font-size: 2rem;
             color: white;
         }
         
         .auth-title {
             font-weight: 700;
-            color: #4F46E5;
+            background: linear-gradient(135deg, #7C3AED 0%, #A78BFA 50%, #C4B5FD 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        
+        .auth-subtitle {
+            color: #9CA3AF;
         }
         
         .nav-tabs {
             border: none;
-            background: var(--background-color);
+            background: rgba(12, 10, 29, 0.5);
             border-radius: 12px;
             padding: 6px;
             gap: 4px;
@@ -82,77 +77,79 @@
         
         .nav-tabs .nav-link {
             border: none;
-            border-radius: 8px;
-            padding: 10px 24px;
+            border-radius: 10px;
+            padding: 12px 24px;
             font-weight: 600;
-            color: var(--text-muted);
-            transition: all 0.15s ease;
+            color: #9CA3AF;
+            transition: all 0.2s ease;
         }
         
         .nav-tabs .nav-link:hover {
-            background: rgba(79, 70, 229, 0.08);
-            color: var(--primary-color);
+            background: rgba(124, 58, 237, 0.15);
+            color: #A78BFA;
         }
         
         .nav-tabs .nav-link.active {
-            background: #4F46E5;
+            background: linear-gradient(135deg, #7C3AED 0%, #A78BFA 100%);
             color: white;
-            box-shadow: 0 2px 8px rgba(79, 70, 229, 0.25);
+            box-shadow: 0 0 20px rgba(124, 58, 237, 0.4);
         }
         
-        .social-btn {
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 8px;
-            padding: 10px 20px;
-            border-radius: 10px;
-            font-weight: 500;
-            transition: all 0.15s ease;
-            border: 1px solid var(--border-color);
-            background: var(--card-bg);
+        .form-control {
+            background-color: rgba(12, 10, 29, 0.6);
+            border: 1px solid rgba(124, 58, 237, 0.2);
+            color: #F3F4F6;
+            border-radius: 12px;
+            padding: 0.875rem 1rem;
         }
         
-        .social-btn:hover {
-            box-shadow: var(--shadow-sm);
+        .form-control:focus {
+            background-color: rgba(12, 10, 29, 0.8);
+            border-color: #7C3AED;
+            box-shadow: 0 0 20px rgba(124, 58, 237, 0.3);
+            color: #F3F4F6;
         }
         
-        .social-btn.google {
-            background: #fff;
-            color: #222;
-            border: 2px solid #4285F4;
-            font-weight: 700;
-            box-shadow: 0 2px 8px rgba(66,133,244,0.08);
-            transition: box-shadow 0.15s, border 0.15s;
-            position: relative;
-            z-index: 2;
+        .form-control::placeholder {
+            color: #6B7280;
         }
         
-        .social-btn.google:hover, .social-btn.google:focus {
-            background: #4285F4;
-            color: #fff;
-            border-color: #4285F4;
-            box-shadow: 0 4px 16px rgba(66,133,244,0.18);
+        .form-label {
+            color: #D1D5DB;
+            font-weight: 600;
         }
         
-        .social-btn.google i {
-            color: #EA4335;
-            font-size: 1.2em;
-            margin-right: 8px;
-            vertical-align: middle;
+        .input-group-text {
+            background-color: rgba(12, 10, 29, 0.6);
+            border: 1px solid rgba(124, 58, 237, 0.2);
+            border-right: none;
+            color: #9CA3AF;
         }
         
-        .social-btn.github:hover {
-            border-color: #333;
-            background: #333;
-            color: white;
+        .input-group .form-control {
+            border-left: none;
+        }
+        
+        .btn-primary {
+            background: linear-gradient(135deg, #7C3AED 0%, #A78BFA 100%);
+            border: none;
+            padding: 0.875rem 1.5rem;
+            font-weight: 600;
+            border-radius: 12px;
+            box-shadow: 0 0 20px rgba(124, 58, 237, 0.3);
+            transition: all 0.2s ease;
+        }
+        
+        .btn-primary:hover {
+            box-shadow: 0 0 30px rgba(124, 58, 237, 0.5);
+            transform: translateY(-2px);
         }
         
         .divider {
             display: flex;
             align-items: center;
             gap: 1rem;
-            color: var(--text-muted);
+            color: #6B7280;
             font-size: 0.875rem;
         }
         
@@ -161,7 +158,7 @@
             content: '';
             flex: 1;
             height: 1px;
-            background: var(--border-color);
+            background: rgba(124, 58, 237, 0.2);
         }
         
         .floating-shapes {
@@ -178,40 +175,70 @@
         .floating-shapes .shape {
             position: absolute;
             border-radius: 50%;
-            opacity: 0.5;
+            opacity: 0.6;
             animation: float 20s infinite ease-in-out;
         }
         
         .floating-shapes .shape:nth-child(1) {
-            width: 300px;
-            height: 300px;
-            background: linear-gradient(135deg, rgba(79, 70, 229, 0.08), transparent);
-            top: -100px;
-            right: -100px;
+            width: 400px;
+            height: 400px;
+            background: radial-gradient(circle, rgba(124, 58, 237, 0.15), transparent 70%);
+            top: -150px;
+            right: -150px;
             animation-delay: 0s;
         }
         
         .floating-shapes .shape:nth-child(2) {
-            width: 200px;
-            height: 200px;
-            background: linear-gradient(135deg, rgba(139, 92, 246, 0.1), transparent);
-            bottom: -50px;
-            left: -50px;
+            width: 300px;
+            height: 300px;
+            background: radial-gradient(circle, rgba(6, 182, 212, 0.1), transparent 70%);
+            bottom: -100px;
+            left: -100px;
             animation-delay: -5s;
         }
         
         .floating-shapes .shape:nth-child(3) {
-            width: 150px;
-            height: 150px;
-            background: linear-gradient(135deg, rgba(236, 72, 153, 0.1), transparent);
-            top: 50%;
-            left: 10%;
+            width: 200px;
+            height: 200px;
+            background: radial-gradient(circle, rgba(139, 92, 246, 0.1), transparent 70%);
+            top: 40%;
+            left: 5%;
             animation-delay: -10s;
         }
         
+        .form-check-input {
+            background-color: rgba(12, 10, 29, 0.6);
+            border-color: rgba(124, 58, 237, 0.3);
+        }
+        
+        .form-check-input:checked {
+            background-color: #7C3AED;
+            border-color: #7C3AED;
+        }
+        
+        .form-check-label {
+            color: #9CA3AF;
+        }
+        
+        a {
+            color: #A78BFA;
+        }
+        
+        a:hover {
+            color: #C4B5FD;
+        }
+        
+        .text-muted {
+            color: #6B7280 !important;
+        }
+        
+        .footer-text {
+            color: #6B7280;
+        }
+        
         @keyframes float {
-            0%, 100% { transform: translateY(0) rotate(0deg); }
-            50% { transform: translateY(-30px) rotate(180deg); }
+            0%, 100% { transform: translateY(0) scale(1); }
+            50% { transform: translateY(-30px) scale(1.05); }
         }
     </style>
 </head>
@@ -232,7 +259,7 @@
                                 <i class="fas fa-graduation-cap"></i>
                             </div>
                             <h2 class="auth-title mb-2">Discussio</h2>
-                            <p class="text-muted mb-0">Your collaborative learning platform</p>
+                            <p class="auth-subtitle mb-0">Your collaborative learning platform</p>
                         </div>
 
                         <ul class="nav nav-tabs nav-justified mb-4" role="tablist">
@@ -250,17 +277,11 @@
                                 <form id="loginForm">
                                     <div class="mb-3">
                                         <label for="loginEmail" class="form-label">Email Address</label>
-                                        <div class="input-group">
-                                            <span class="input-group-text bg-transparent border-end-0"><i class="fas fa-envelope text-muted"></i></span>
-                                            <input type="email" class="form-control border-start-0 ps-0" id="loginEmail" placeholder="Enter your email" required>
-                                        </div>
+                                        <input type="email" class="form-control" id="loginEmail" placeholder="Enter your email" required>
                                     </div>
                                     <div class="mb-4">
                                         <label for="loginPassword" class="form-label">Password</label>
-                                        <div class="input-group">
-                                            <span class="input-group-text bg-transparent border-end-0"><i class="fas fa-lock text-muted"></i></span>
-                                            <input type="password" class="form-control border-start-0 ps-0" id="loginPassword" placeholder="Enter your password" required>
-                                        </div>
+                                        <input type="password" class="form-control" id="loginPassword" placeholder="Enter your password" required>
                                     </div>
                                     <div class="d-flex justify-content-between align-items-center mb-3">
                                         <div class="form-check">
@@ -270,7 +291,7 @@
                                         <a href="{{ url_for('reset_password_page') }}" class="text-decoration-none small">Forgot password?</a>
                                     </div>
                                     <button type="submit" class="btn btn-primary w-100 py-2 mb-3" id="loginBtn">
-                                        <i class="fas fa-sign-in-alt me-2"></i>Login
+                                        Login
                                     </button>
                                 </form>
                             </div>
@@ -280,41 +301,26 @@
                                 <form id="signupForm">
                                     <div class="mb-3">
                                         <label for="signupEmail" class="form-label">Email Address</label>
-                                        <div class="input-group">
-                                            <span class="input-group-text bg-transparent border-end-0"><i class="fas fa-envelope text-muted"></i></span>
-                                            <input type="email" class="form-control border-start-0 ps-0" id="signupEmail" placeholder="Enter your email" required>
-                                        </div>
+                                        <input type="email" class="form-control" id="signupEmail" placeholder="Enter your email" required>
                                     </div>
                                     <div class="mb-3">
                                         <label for="signupUsername" class="form-label">Username</label>
-                                        <div class="input-group">
-                                            <span class="input-group-text bg-transparent border-end-0"><i class="fas fa-at text-muted"></i></span>
-                                            <input type="text" class="form-control border-start-0 ps-0" id="signupUsername" placeholder="Choose a username" required>
-                                        </div>
+                                        <input type="text" class="form-control" id="signupUsername" placeholder="Choose a username" required>
                                     </div>
                                     <div class="mb-3">
                                         <label for="signupFullName" class="form-label">Full Name</label>
-                                        <div class="input-group">
-                                            <span class="input-group-text bg-transparent border-end-0"><i class="fas fa-user text-muted"></i></span>
-                                            <input type="text" class="form-control border-start-0 ps-0" id="signupFullName" placeholder="Enter your full name">
-                                        </div>
+                                        <input type="text" class="form-control" id="signupFullName" placeholder="Enter your full name">
                                     </div>
                                     <div class="mb-3">
                                         <label for="signupPassword" class="form-label">Password</label>
-                                        <div class="input-group">
-                                            <span class="input-group-text bg-transparent border-end-0"><i class="fas fa-lock text-muted"></i></span>
-                                            <input type="password" class="form-control border-start-0 ps-0" id="signupPassword" placeholder="Create a password" required>
-                                        </div>
+                                        <input type="password" class="form-control" id="signupPassword" placeholder="Create a password" required>
                                     </div>
                                     <div class="mb-4">
                                         <label for="signupConfirmPassword" class="form-label">Confirm Password</label>
-                                        <div class="input-group">
-                                            <span class="input-group-text bg-transparent border-end-0"><i class="fas fa-check-circle text-muted"></i></span>
-                                            <input type="password" class="form-control border-start-0 ps-0" id="signupConfirmPassword" placeholder="Confirm your password" required>
-                                        </div>
+                                        <input type="password" class="form-control" id="signupConfirmPassword" placeholder="Confirm your password" required>
                                     </div>
                                     <button type="submit" class="btn btn-primary w-100 py-2" id="signupBtn">
-                                        <i class="fas fa-user-plus me-2"></i>Create Account
+                                        Create Account
                                     </button>
                                 </form>
                             </div>
