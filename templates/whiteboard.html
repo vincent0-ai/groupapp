@@ -853,7 +853,10 @@
             remoteVideoContainer.style.display = 'none';
             try { document.getElementById('watchScreenBtn')?.setAttribute('disabled', 'true'); } catch(e){}
             if(remoteVideoEl) remoteVideoEl.srcObject = null;
-            participantsAudioContainer.innerHTML = '';
+            
+            // FIX: Find and remove all managed audio elements from the body
+            const audioElements = document.querySelectorAll('audio[id^="audio-"]');
+            audioElements.forEach(el => el.remove());
         }
 
         mediaService.onTrackSubscribed = (track, participant) => {
