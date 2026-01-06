@@ -535,6 +535,9 @@ def mark_answer(comp_id, user_id, question_index):
         return error_response('Invalid points value', 400)
     comment = data.get('comment', '').strip()
 
+    # Track if this is the first review (for notification)
+    was_already_reviewed = answer_obj.get('is_reviewed', False)
+
     # compute delta points to update participant score and group scores accordingly
     prev_points = int(answer_obj.get('points', 0) or 0)
     delta = points - prev_points
@@ -582,13 +585,14 @@ def mark_answer(comp_id, user_id, question_index):
     except Exception as e:
         return error_response('Failed to save mark', 500)
 
-    # Notify participant that their answer was reviewed
-    try:
-        participant_user_id = participant.get('user_id')
-        msg = f"Your answer to question {question_index+1} in competition '{competition.get('title')}' has been reviewed and awarded {points} points."
-        create_notification(participant_user_id, 'competition_review', msg, link=f"/competitions/{comp_id}")
-    except Exception:
-        pass
+    # Notify participant that their answer was reviewed (only on first review, not re-marks)
+    if not was_already_reviewed:
+        try:
+            participant_user_id = participant.get('user_id')
+            msg = f"Your answer to question {question_index+1} in competition '{competition.get('title')}' has been reviewed and awarded {points} points."
+            create_notification(participant_user_id, 'competition_review', msg, link=f"/competitions/{comp_id}")
+        except Exception:
+            pass
 
     # Serialize answer_obj for JSON response (convert ObjectIds to strings)
     serialized_answer = {
@@ -756,7 +760,15 @@ def reply_to_comment(comp_id, user_id, question_index):
     except Exception:
         return error_response('Failed to save reply', 500)
 
-    return success_response({'reply': reply}, 'Reply added', 201)
+    # Serialize reply for JSON response
+    serialized_reply = {
+        'user_id': str(reply.get('user_id')) if reply.get('user_id') else None,
+        'username': reply.get('username', ''),
+        'text': reply.get('text', ''),
+        'created_at': reply.get('created_at').isoformat() if reply.get('created_at') else None
+    }
+
+    return success_response({'reply': serialized_reply}, 'Reply added', 201)
 
 
 @competitions_bp.route('/<comp_id>', methods=['DELETE'])
