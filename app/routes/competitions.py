@@ -590,7 +590,27 @@ def mark_answer(comp_id, user_id, question_index):
     except Exception:
         pass
 
-    return success_response({'answer': answer_obj, 'participant_score': participant['score']}, 'Answer marked', 200)
+    # Serialize answer_obj for JSON response (convert ObjectIds to strings)
+    serialized_answer = {
+        'question_id': str(answer_obj.get('question_id', '')),
+        'answer': answer_obj.get('answer'),
+        'points': answer_obj.get('points', 0),
+        'is_reviewed': answer_obj.get('is_reviewed', False),
+        'marked_by': str(answer_obj.get('marked_by')) if answer_obj.get('marked_by') else None,
+        'marked_at': answer_obj.get('marked_at').isoformat() if answer_obj.get('marked_at') else None,
+        'comments': [
+            {
+                'user_id': str(c.get('user_id')) if c.get('user_id') else None,
+                'username': c.get('username', ''),
+                'text': c.get('text', ''),
+                'created_at': c.get('created_at').isoformat() if c.get('created_at') else None,
+                'replies': c.get('replies', [])
+            }
+            for c in answer_obj.get('comments', [])
+        ]
+    }
+
+    return success_response({'answer': serialized_answer, 'participant_score': participant['score']}, 'Answer marked', 200)
 
 
 @competitions_bp.route('/<comp_id>/answers/<user_id>/<int:question_index>/comment', methods=['POST'])
