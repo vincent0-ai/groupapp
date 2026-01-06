@@ -213,7 +213,7 @@
 
 {% block content %}
         <div class="page-header d-flex flex-wrap justify-content-between align-items-center">
-            <h1>🏆 Competitions</h1>
+            <h1>Competitions</h1>
             <div class="mt-2 mt-md-0">
                 <a href="{{ url_for('main.create_competition_page') }}" class="btn btn-primary">
                     ➕ Create Competition
@@ -673,10 +673,18 @@
 
                     // Show completion message if all questions answered
                     if (result.is_complete) {
-                        await showCustomAlert(
-                            `🎉 Competition Complete!\n\nYour final score: ${result.current_score} / ${result.total_questions} points\n\n${result.current_score === result.total_questions ? '🏆 Perfect score!' : result.current_score >= result.total_questions / 2 ? '👍 Well done!' : 'Better luck next time!'}`,
-                            'Results'
-                        );
+                        let completionMsg = '';
+                        if (result.pending_discussion_count > 0) {
+                            // Has pending discussion questions - show appropriate message
+                            completionMsg = `All Questions Submitted!\n\nCurrent score: ${result.current_score} / ${result.total_questions} points\n\n📝 You have ${result.pending_discussion_count} discussion answer${result.pending_discussion_count > 1 ? 's' : ''} pending review. Your final score will update once reviewed.`;
+                        } else if (result.current_score === result.total_questions) {
+                            completionMsg = `Competition Complete!\n\nYour final score: ${result.current_score} / ${result.total_questions} points\n\n🏆 Perfect score!`;
+                        } else if (result.current_score >= result.total_questions / 2) {
+                            completionMsg = `Competition Complete!\n\nYour final score: ${result.current_score} / ${result.total_questions} points\n\n👍 Well done!`;
+                        } else {
+                            completionMsg = `Competition Complete!\n\nYour final score: ${result.current_score} / ${result.total_questions} points\n\nBetter luck next time!`;
+                        }
+                        await showCustomAlert(completionMsg, 'Results');
                     }
 
                     // Reload the modal to show result
