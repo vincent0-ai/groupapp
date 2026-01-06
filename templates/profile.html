@@ -304,19 +304,22 @@
                 </div>
             </div>
         </div>
+{% endblock %}
+
+{% block modals %}
     <!-- Edit Profile Modal -->
-    <div class="modal fade" id="editProfileModal" tabindex="-1">
+    <div class="modal fade" id="editProfileModal" tabindex="-1" aria-labelledby="editProfileModalLabel" aria-hidden="true">
         <div class="modal-dialog">
             <div class="modal-content">
                 <div class="modal-header">
-                    <h5 class="modal-title">Edit Profile</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                    <h5 class="modal-title" id="editProfileModalLabel">Edit Profile</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
                 <form id="editProfileForm">
                     <div class="modal-body">
                         <div class="mb-3">
                             <label for="editFullName" class="form-label">Full Name</label>
-                            <input type="text" class="form-control" id="editFullName">
+                            <input type="text" class="form-control" id="editFullName" autocomplete="name">
                         </div>
                         <div class="mb-3">
                             <label for="editBio" class="form-label">Bio</label>
@@ -324,7 +327,7 @@
                         </div>
                         <div class="mb-3">
                             <label for="editAvatar" class="form-label">Avatar URL</label>
-                            <input type="url" class="form-control" id="editAvatar">
+                            <input type="url" class="form-control" id="editAvatar" autocomplete="url">
                         </div>
                     </div>
                     <div class="modal-footer">
@@ -335,7 +338,6 @@
             </div>
         </div>
     </div>
-
 {% endblock %}
 
 {% block scripts %}
