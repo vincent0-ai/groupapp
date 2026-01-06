@@ -680,7 +680,16 @@ def comment_on_answer(comp_id, user_id, question_index):
     except Exception:
         return error_response('Failed to save comment', 500)
 
-    return success_response({'comment': comment}, 'Comment added', 201)
+    # Serialize comment for JSON response
+    serialized_comment = {
+        'user_id': str(comment.get('user_id')) if comment.get('user_id') else None,
+        'username': comment.get('username', ''),
+        'text': comment.get('text', ''),
+        'created_at': comment.get('created_at').isoformat() if comment.get('created_at') else None,
+        'replies': []
+    }
+
+    return success_response({'comment': serialized_comment}, 'Comment added', 201)
 
 
 @competitions_bp.route('/<comp_id>/answers/<user_id>/<int:question_index>/reply', methods=['POST'])
