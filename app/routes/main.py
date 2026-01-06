@@ -92,3 +92,10 @@ def leaderboard_page():
 def terms_page():
     user = get_current_user()
     return render_template('terms.html', user=user)
+
+@main_bp.route('/discussion-review')
+def discussion_review_page():
+    user = get_current_user()
+    if not user:
+        return redirect(url_for('main.auth_page'))
+    return render_template('discussion_review.html', user=user)
