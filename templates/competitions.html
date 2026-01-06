@@ -284,7 +284,7 @@
                 </div>
                 <div class="modal-body">
                     <div class="alert alert-info" style="background: rgba(6, 182, 212, 0.15); border: 1px solid rgba(6, 182, 212, 0.3); color: #06B6D4;">
-                        ℹ️ Answer the questions below. You get 1 point for each correct answer.
+                        Answer the questions below. You get 1 point for each correct answer.
                     </div>
                     <div id="playCompQuestions">
                         <!-- Questions will be loaded here -->
@@ -598,7 +598,7 @@
                         <div class="card-body">
                             <div class="d-flex justify-content-between align-items-center mb-2" style="color: #E5E7EB;">
                                 <span><strong>Progress:</strong> ${answeredCount} / ${totalQuestions} questions</span>
-                                <span class="badge bg-primary fs-6">⭐ Score: ${currentScore} / ${totalQuestions}</span>
+                                <span class="badge bg-primary fs-6">Score: ${currentScore} / ${totalQuestions}</span>
                             </div>
                             <div class="progress" style="height: 20px; background: rgba(12, 10, 29, 0.6);">
                                 <div class="progress-bar bg-success" role="progressbar" style="width: ${scorePercent}%" title="Correct answers"></div>
@@ -614,7 +614,7 @@
                 } else if (!isJoined) {
                     headerHtml += `
                         <div class="alert alert-info mb-3 d-flex justify-content-between align-items-center" style="background: rgba(6, 182, 212, 0.15); border: 1px solid rgba(6, 182, 212, 0.3); color: #06B6D4;">
-                            <div>ℹ️ You must join this competition before submitting answers.</div>
+                            <div>You must join this competition before submitting answers.</div>
                             <button class="btn btn-sm btn-success" onclick="joinCompetition('${comp.id}')">Join</button>
                         </div>
                     `;
@@ -1009,30 +1009,33 @@
                     // Creator actions (end/delete)
                     if (isCreator) {
                         if (!isCompletedCard) {
-                            creatorActions += `<button class="btn btn-sm btn-outline-warning" onclick="endCompetition('${comp.id}')" title="End competition now">⏹️</button> `;
+                            creatorActions += `<button class="btn btn-sm btn-outline-warning" onclick="endCompetition('${comp.id}')" title="End competition now">End</button> `;
                         }
-                        creatorActions += `<button class="btn btn-sm btn-outline-danger" onclick="deleteCompetition('${comp.id}')" title="Delete competition">🗑️</button>`;
+                        creatorActions += `<button class="btn btn-sm btn-outline-danger" onclick="deleteCompetition('${comp.id}')" title="Delete competition">Delete</button>`;
                     }
                     
                     if (isCompletedCard) {
                         // Completed - show results button
                         statusBadge = '<span class="badge bg-secondary">Ended</span>';
-                        actionBtn = `<button class="btn btn-sm btn-outline-secondary" onclick="viewCompetition('${comp.id}')">📊 Results</button>`;
+                        actionBtn = `<button class="btn btn-sm btn-outline-secondary" onclick="viewCompetition('${comp.id}')">Results</button>`;
                     } else {
                         // Active competition
                         if (timeRemaining < 3600000) { // Less than 1 hour
                             const mins = Math.floor(timeRemaining / 60000);
-                            statusBadge = `<span class="badge bg-danger">⏱️ ${mins}m left</span>`;
+                            statusBadge = `<span class="badge bg-danger">${mins}m left</span>`;
                         } else if (timeRemaining < 86400000) { // Less than 24 hours
                             const hours = Math.floor(timeRemaining / 3600000);
-                            statusBadge = `<span class="badge bg-warning text-dark">⏱️ ${hours}h left</span>`;
+                            statusBadge = `<span class="badge bg-warning text-dark">${hours}h left</span>`;
                         } else {
                             const days = Math.floor(timeRemaining / 86400000);
-                            statusBadge = `<span class="badge bg-info">⏱️ ${days}d left</span>`;
+                            statusBadge = `<span class="badge bg-info">${days}d left</span>`;
                         }
                         
-                        if (isParticipant) {
-                            actionBtn = `<button class="btn btn-sm btn-warning" onclick="playCompetition('${comp.id}')">▶️ Play</button>`;
+                        if (isCreator) {
+                            // Creator sees Review button to review discussion answers
+                            actionBtn = `<a href="/discussion-review?competition=${comp.id}" class="btn btn-sm btn-primary">Review</a>`;
+                        } else if (isParticipant) {
+                            actionBtn = `<button class="btn btn-sm btn-warning" onclick="playCompetition('${comp.id}')">Play</button>`;
                         } else {
                             actionBtn = `<button class="btn btn-sm btn-success" onclick="joinCompetition('${comp.id}')">Join</button>`;
                         }

@@ -229,13 +229,13 @@
 {% block content %}
 <div class="container py-4">
     <a href="{{ url_for('competitions_page') }}" class="back-link">
-        <i class="fas fa-arrow-left"></i> Back to Competitions
+        Back to Competitions
     </a>
 
     <div class="page-header">
         <div class="d-flex justify-content-between align-items-center flex-wrap gap-3">
             <div>
-                <h1>💬 Discussion Review</h1>
+                <h1>Discussion Review</h1>
                 <p class="text-muted mb-0 mt-2">Review and discuss submitted answers for discussion questions</p>
             </div>
         </div>
@@ -260,7 +260,7 @@
             </div>
             <div class="col-md-2">
                 <button class="btn btn-primary w-100" onclick="loadDiscussionAnswers()">
-                    <i class="fas fa-search me-2"></i>Load
+                    Load
                 </button>
             </div>
         </div>
@@ -287,7 +287,6 @@
     <!-- Answers Container -->
     <div id="answersContainer">
         <div class="empty-state">
-            <div class="emoji-icon">📋</div>
             <h4>Select a Competition</h4>
             <p>Choose a competition above to view and discuss submitted answers</p>
         </div>
@@ -314,9 +313,7 @@
             </div>
             <div class="modal-footer" style="border-top: 1px solid rgba(124, 58, 237, 0.15);">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                <button type="button" class="btn btn-primary" onclick="submitReply()">
-                    <i class="fas fa-reply me-2"></i>Reply
-                </button>
+                <button type="button" class="btn btn-primary" onclick="submitReply()">Reply</button>
             </div>
         </div>
     </div>
@@ -337,7 +334,7 @@
                 <div class="mb-3">
                     <label class="form-label text-muted">Points to Award</label>
                     <input type="number" id="markPoints" class="form-control" min="0" value="1">
-                    <small class="text-muted">Enter the points to award for this answer</small>
+                    <small class="text-muted">Enter the points to award for this answer (1 for correct, 0 for incorrect)</small>
                 </div>
                 <div class="mb-3">
                     <label class="form-label text-muted">Feedback Comment (optional)</label>
@@ -346,9 +343,7 @@
             </div>
             <div class="modal-footer" style="border-top: 1px solid rgba(124, 58, 237, 0.15);">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                <button type="button" class="btn btn-success" onclick="submitMark()">
-                    <i class="fas fa-check me-2"></i>Mark & Notify
-                </button>
+                <button type="button" class="btn btn-success" onclick="submitMark()">Save</button>
             </div>
         </div>
     </div>
@@ -502,7 +497,6 @@
             } else {
                 container.innerHTML = `
                     <div class="empty-state">
-                        <div class="emoji-icon">🤔</div>
                         <h4>No Discussion Questions</h4>
                         <p>This competition doesn't have any discussion questions</p>
                     </div>
@@ -568,7 +562,6 @@
         if (filteredAnswers.length === 0) {
             container.innerHTML = `
                 <div class="empty-state">
-                    <div class="emoji-icon">📭</div>
                     <h4>No Submissions Found</h4>
                     <p>${statusFilter !== 'all' ? 'Try changing the status filter' : 'No one has answered this question yet'}</p>
                 </div>
@@ -600,7 +593,7 @@
                                 </div>
                             </div>
                             <span class="status-badge ${isReviewed ? 'reviewed' : 'pending'}">
-                                ${isReviewed ? `✓ Reviewed (${points} pts)` : '⏳ Pending Review'}
+                                ${isReviewed ? `Reviewed (${points} pts)` : 'Pending Review'}
                             </span>
                         </div>
                         <div class="card-body">
@@ -613,21 +606,30 @@
                                     <div class="d-flex justify-content-between align-items-center">
                                         <div>
                                             ${isReviewed ? 
-                                                `<span class="text-success"><i class="fas fa-check-circle me-2"></i>Marked with ${points} points</span>` :
-                                                `<span class="text-warning"><i class="fas fa-clock me-2"></i>Awaiting review</span>`
+                                                `<span class="${points > 0 ? 'text-success' : 'text-danger'}">Marked: ${points > 0 ? 'Correct' : 'Incorrect'} (${points} pts)</span>` :
+                                                `<span class="text-warning">Awaiting review</span>`
                                             }
                                         </div>
-                                        <button class="btn btn-sm ${isReviewed ? 'btn-outline-success' : 'btn-success'}" 
-                                                onclick="openMarkModal('${currentCompetition.id}', '${participant.user_id}', ${currentQuestionIndex}, ${points})">
-                                            <i class="fas fa-${isReviewed ? 'edit' : 'star'} me-1"></i>
-                                            ${isReviewed ? 'Update Mark' : 'Mark Answer'}
-                                        </button>
+                                        <div class="btn-group">
+                                            <button class="btn btn-sm btn-success" 
+                                                    onclick="markAnswer('${currentCompetition.id}', '${participant.user_id}', ${currentQuestionIndex}, 1)">
+                                                Correct
+                                            </button>
+                                            <button class="btn btn-sm btn-danger" 
+                                                    onclick="markAnswer('${currentCompetition.id}', '${participant.user_id}', ${currentQuestionIndex}, 0)">
+                                                Incorrect
+                                            </button>
+                                            <button class="btn btn-sm btn-outline-secondary" 
+                                                    onclick="openMarkModal('${currentCompetition.id}', '${participant.user_id}', ${currentQuestionIndex}, ${points})">
+                                                Custom
+                                            </button>
+                                        </div>
                                     </div>
                                 </div>
-                            ` : ''}
+                            ` : ''}}
 
                             <div class="thread-container">
-                                <h6 style="color: #A78BFA;"><i class="fas fa-comments me-2"></i>Discussion Thread (${comments.length})</h6>
+                                <h6 style="color: #A78BFA;">Discussion Thread (${comments.length})</h6>
                                 
                                 <div class="comments-list" id="comments_${participant.user_id}_${currentQuestionIndex}">
                                     ${renderComments(comments, participant.user_id)}
@@ -641,7 +643,7 @@
                                                placeholder="Add a comment...">
                                         <button class="btn btn-primary" 
                                                 onclick="submitComment('${currentCompetition.id}', '${participant.user_id}', ${currentQuestionIndex})">
-                                            <i class="fas fa-paper-plane"></i>
+                                            Send
                                         </button>
                                     </div>
                                 </div>
@@ -674,7 +676,7 @@
                         ${!isReply ? `
                             <button class="btn btn-link btn-sm p-0" style="color: #A78BFA;" 
                                     onclick="openReplyModal('${currentCompetition.id}', '${participantId}', ${currentQuestionIndex}, '${index}')">
-                                <i class="fas fa-reply"></i> Reply
+                                Reply
                             </button>
                         ` : ''}
                     </div>
@@ -768,13 +770,37 @@
     }
 
     // Open mark modal
-    function openMarkModal(compId, userId, questionIndex, currentPoints) {
+    function openMarkModal(compId, oduserId, questionIndex, currentPoints) {
         document.getElementById('markCompId').value = compId;
-        document.getElementById('markUserId').value = userId;
+        document.getElementById('markUserId').value = oduserId;
         document.getElementById('markQuestionIndex').value = questionIndex;
         document.getElementById('markPoints').value = currentPoints || 1;
         document.getElementById('markComment').value = '';
         new bootstrap.Modal(document.getElementById('markAnswerModal')).show();
+    }
+
+    // Quick mark as Correct (1 point) or Incorrect (0 points)
+    async function markAnswer(compId, oduserId, questionIndex, points) {
+        try {
+            const res = await fetch(`/api/competitions/${compId}/answers/${oduserId}/${questionIndex}/mark`, {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ points: points, comment: '' })
+            });
+
+            if (res.ok) {
+                await loadDiscussionAnswers();
+            } else {
+                const data = await res.json();
+                alert(data.message || 'Failed to mark answer');
+            }
+        } catch (e) {
+            console.error('Error marking answer:', e);
+            alert('Failed to mark answer');
+        }
     }
 
     // Submit mark
