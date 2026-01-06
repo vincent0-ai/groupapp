@@ -397,13 +397,24 @@ def submit_answer(comp_id):
     current_score = updated_participant.get('score', 0) if updated_participant else 0
     is_complete = answered_count >= total_questions
     
+    # Count pending discussion questions (submitted but not reviewed)
+    pending_discussion_count = 0
+    if updated_participant:
+        for ans in updated_participant.get('answers', []):
+            q_idx = int(ans.get('question_id', -1))
+            if 0 <= q_idx < len(questions):
+                q = questions[q_idx]
+                if q.get('type') == 'discussion' and not ans.get('is_reviewed', False):
+                    pending_discussion_count += 1
+    
     return success_response({
         'is_correct': is_correct, 
         'points': points_awarded,
         'current_score': current_score,
         'answered_count': answered_count,
         'total_questions': total_questions,
-        'is_complete': is_complete
+        'is_complete': is_complete,
+        'pending_discussion_count': pending_discussion_count
     }, 'Answer submitted successfully', 200)
 
 @competitions_bp.route('/<comp_id>/individual-leaderboard', methods=['GET'])

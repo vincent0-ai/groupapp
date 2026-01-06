@@ -117,7 +117,7 @@
         <div id="adminStats" class="d-flex gap-3 align-items-center" style="color: #E5E7EB;">
             <!-- Stats will be loaded here -->
             <button id="adminCreateSeasonBtn" class="btn btn-sm btn-outline-light ms-3" title="Create Season" onclick="window.location.href='/seasons?showCreate=1'">
-                📅 Create Season
+                Create Season
             </button>
         </div>
     </div>
@@ -127,17 +127,17 @@
     <ul class="nav nav-tabs border-0" id="adminTabs" role="tablist" style="gap: 4px;">
         <li class="nav-item" role="presentation">
             <button class="nav-link active" id="users-tab" data-bs-toggle="tab" data-bs-target="#users" type="button" role="tab">
-                👥 Users
+                Users
             </button>
         </li>
         <li class="nav-item" role="presentation">
             <button class="nav-link" id="groups-tab" data-bs-toggle="tab" data-bs-target="#groups" type="button" role="tab">
-                📂 Groups
+                Groups
             </button>
         </li>
         <li class="nav-item" role="presentation">
             <button class="nav-link" id="channels-tab" data-bs-toggle="tab" data-bs-target="#channels" type="button" role="tab">
-                #️⃣ Channels
+                Channels
             </button>
         </li>
     </ul>
@@ -149,7 +149,7 @@
         <div class="card admin-card border-0 shadow-sm mb-4">
             <div class="card-body">
                 <div class="d-flex justify-content-between align-items-center mb-3">
-                    <h5 class="mb-0 fw-semibold">👥 User Management</h5>
+                    <h5 class="mb-0 fw-semibold">User Management</h5>
                     <div class="search-wrapper position-relative">
                         <input type="text" class="form-control" id="userSearch" placeholder="🔍 Search users..." style="border-radius: 10px; min-width: 250px;">
                     </div>
@@ -170,9 +170,9 @@
         <div class="card admin-card border-0 shadow-sm mb-4">
             <div class="card-body">
                 <div class="d-flex justify-content-between align-items-center mb-3">
-                    <h5 class="mb-0 fw-semibold">📂 Group Management</h5>
+                    <h5 class="mb-0 fw-semibold">Group Management</h5>
                     <div class="search-wrapper position-relative">
-                        <input type="text" class="form-control" id="groupSearch" placeholder="🔍 Search groups..." style="border-radius: 10px; min-width: 250px;">
+                        <input type="text" class="form-control" id="groupSearch" placeholder="Search groups..." style="border-radius: 10px; min-width: 250px;">
                     </div>
                 </div>
                 <!-- List view (replaces table for normal display) -->
@@ -191,7 +191,7 @@
         <div class="card admin-card border-0 shadow-sm mb-4">
             <div class="card-body">
                 <div class="d-flex justify-content-between align-items-center mb-3">
-                    <h5 class="mb-0 fw-semibold">#️⃣ Channel Management</h5>
+                    <h5 class="mb-0 fw-semibold">Channel Management</h5>
                 </div>
                 <!-- List view (replaces table for normal display) -->
                 <div id="channelsList" class="list-group">
@@ -272,11 +272,11 @@ async function loadStats() {
     if (res.status === 'success') {
         const stats = res.data;
         document.getElementById('adminStats').innerHTML = `
-            <span>👥 ${stats.total_users} Users</span>
-            <span>📂 ${stats.total_groups} Groups</span>
-            <span>#️⃣ ${stats.total_channels} Channels</span>
+            <span>${stats.total_users} Users</span>
+            <span>${stats.total_groups} Groups</span>
+            <span>${stats.total_channels} Channels</span>
             <button id="adminCreateSeasonBtn" class="btn btn-sm btn-outline-light ms-3" title="Create Season" onclick="window.location.href='/seasons?showCreate=1'">
-                📅 Create Season
+                Create Season
             </button>
         `;
     }
