@@ -628,7 +628,15 @@ def comment_on_answer(comp_id, user_id, question_index):
     if not (is_participant or str(competition.get('created_by')) == g.user_id or is_admin):
         return error_response('Only participants or competition creator/admins can comment on answers', 403)
 
-    comment = {'user_id': requester_id, 'text': text, 'created_at': __import__('datetime').datetime.utcnow()}
+    # Add username to comment for display
+    username = requester.get('username') or requester.get('full_name') or str(requester_id)
+    comment = {
+        'user_id': requester_id, 
+        'username': username,
+        'text': text, 
+        'created_at': __import__('datetime').datetime.utcnow(),
+        'replies': []
+    }
     answer_obj.setdefault('comments', []).append(comment)
 
     # Persist
@@ -638,6 +646,86 @@ def comment_on_answer(comp_id, user_id, question_index):
         return error_response('Failed to save comment', 500)
 
     return success_response({'comment': comment}, 'Comment added', 201)
+
+
+@competitions_bp.route('/<comp_id>/answers/<user_id>/<int:question_index>/reply', methods=['POST'])
+@require_auth
+def reply_to_comment(comp_id, user_id, question_index):
+    """Add a reply to a comment on an answer"""
+    try:
+        comp_id_obj = ObjectId(comp_id)
+        participant_id_obj = ObjectId(user_id)
+    except Exception:
+        return error_response('Invalid id format', 400)
+
+    data = request.get_json() or {}
+    text = (data.get('text') or '').strip()
+    parent_comment_id = data.get('parent_comment_id')
+    
+    if not text:
+        return error_response('Reply text required', 400)
+    
+    if parent_comment_id is None:
+        return error_response('Parent comment ID required', 400)
+
+    db = Database()
+    competition = db.find_one('competitions', {'_id': comp_id_obj})
+    if not competition:
+        return error_response('Competition not found', 404)
+
+    # Find participant and answer
+    participants = competition.get('participants', [])
+    participant = None
+    for p in participants:
+        if p.get('user_id') == participant_id_obj:
+            participant = p
+            break
+    if not participant:
+        return error_response('Participant not found', 404)
+
+    answer_obj = None
+    for a in participant.get('answers', []):
+        if str(a.get('question_id')) == str(question_index):
+            answer_obj = a
+            break
+    if not answer_obj:
+        return error_response('Answer not found', 404)
+
+    # Find the parent comment
+    comments = answer_obj.get('comments', [])
+    try:
+        comment_idx = int(parent_comment_id)
+        if comment_idx < 0 or comment_idx >= len(comments):
+            return error_response('Parent comment not found', 404)
+        parent_comment = comments[comment_idx]
+    except (ValueError, IndexError):
+        return error_response('Invalid parent comment ID', 400)
+
+    # Permission check - same as commenting
+    requester_id = ObjectId(g.user_id)
+    is_participant = any(p.get('user_id') == requester_id for p in participants)
+    requester = db.find_one('users', {'_id': requester_id})
+    is_admin = requester.get('is_admin', False) if requester else False
+    if not (is_participant or str(competition.get('created_by')) == g.user_id or is_admin):
+        return error_response('Only participants or competition creator/admins can reply to comments', 403)
+
+    # Create reply
+    username = requester.get('username') or requester.get('full_name') or str(requester_id)
+    reply = {
+        'user_id': requester_id,
+        'username': username,
+        'text': text,
+        'created_at': __import__('datetime').datetime.utcnow()
+    }
+    parent_comment.setdefault('replies', []).append(reply)
+
+    # Persist
+    try:
+        db.update_one('competitions', {'_id': comp_id_obj}, {'participants': participants, 'updated_at': __import__('datetime').datetime.utcnow()})
+    except Exception:
+        return error_response('Failed to save reply', 500)
+
+    return success_response({'reply': reply}, 'Reply added', 201)
 
 
 @competitions_bp.route('/<comp_id>', methods=['DELETE'])

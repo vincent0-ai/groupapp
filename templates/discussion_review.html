@@ -1,0 +1,825 @@
+{% extends "base.html" %}
+
+{% block title %}Discussion Review - Discussio{% endblock %}
+
+{% block head %}
+<style>
+    .page-header {
+        background: linear-gradient(135deg, rgba(124, 58, 237, 0.15), rgba(6, 182, 212, 0.08));
+        border-radius: 20px;
+        padding: 1.5rem 2rem;
+        margin-bottom: 2rem;
+        border: 1px solid rgba(124, 58, 237, 0.2);
+        backdrop-filter: blur(10px);
+    }
+    
+    .page-header h1 {
+        font-weight: 800;
+        margin-bottom: 0;
+        background: linear-gradient(135deg, #A78BFA, #06B6D4);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+    }
+
+    .competition-selector {
+        background: rgba(26, 23, 48, 0.8);
+        border: 1px solid rgba(124, 58, 237, 0.2);
+        border-radius: 16px;
+        padding: 1.5rem;
+        margin-bottom: 1.5rem;
+    }
+
+    .answer-card {
+        background: rgba(26, 23, 48, 0.8);
+        border: 1px solid rgba(124, 58, 237, 0.15);
+        border-radius: 16px;
+        margin-bottom: 1.5rem;
+        overflow: hidden;
+        transition: all 0.2s ease;
+    }
+
+    .answer-card:hover {
+        border-color: rgba(124, 58, 237, 0.4);
+        box-shadow: 0 8px 25px rgba(124, 58, 237, 0.2);
+    }
+
+    .answer-card .card-header {
+        background: rgba(124, 58, 237, 0.1);
+        border-bottom: 1px solid rgba(124, 58, 237, 0.15);
+        padding: 1rem 1.5rem;
+    }
+
+    .answer-card .card-body {
+        padding: 1.5rem;
+    }
+
+    .answer-content {
+        background: rgba(12, 10, 29, 0.4);
+        border: 1px solid rgba(124, 58, 237, 0.1);
+        border-radius: 12px;
+        padding: 1rem;
+        margin-bottom: 1rem;
+        color: #E5E7EB;
+    }
+
+    .thread-container {
+        margin-top: 1rem;
+        padding-top: 1rem;
+        border-top: 1px solid rgba(124, 58, 237, 0.15);
+    }
+
+    .comment-item {
+        background: rgba(12, 10, 29, 0.3);
+        border-radius: 12px;
+        padding: 0.875rem 1rem;
+        margin-bottom: 0.75rem;
+        border-left: 3px solid rgba(124, 58, 237, 0.5);
+    }
+
+    .comment-item.is-reply {
+        margin-left: 2rem;
+        border-left-color: rgba(6, 182, 212, 0.5);
+    }
+
+    .comment-author {
+        font-weight: 600;
+        color: #A78BFA;
+        font-size: 0.9rem;
+    }
+
+    .comment-time {
+        font-size: 0.75rem;
+        color: #6B7280;
+    }
+
+    .comment-text {
+        color: #D1D5DB;
+        margin-top: 0.375rem;
+    }
+
+    .reply-form {
+        margin-left: 2rem;
+        margin-top: 0.5rem;
+    }
+
+    .mark-section {
+        background: rgba(34, 197, 94, 0.1);
+        border: 1px solid rgba(34, 197, 94, 0.2);
+        border-radius: 12px;
+        padding: 1rem;
+        margin-top: 1rem;
+    }
+
+    .mark-section.pending {
+        background: rgba(251, 191, 36, 0.1);
+        border-color: rgba(251, 191, 36, 0.2);
+    }
+
+    .status-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 4px 12px;
+        border-radius: 50px;
+        font-size: 0.8rem;
+        font-weight: 600;
+    }
+
+    .status-badge.reviewed {
+        background: rgba(34, 197, 94, 0.15);
+        color: #22C55E;
+    }
+
+    .status-badge.pending {
+        background: rgba(251, 191, 36, 0.15);
+        color: #FBBF24;
+    }
+
+    .question-nav {
+        display: flex;
+        gap: 0.5rem;
+        flex-wrap: wrap;
+        margin-bottom: 1rem;
+    }
+
+    .question-nav .btn {
+        padding: 0.5rem 1rem;
+        border-radius: 8px;
+        font-weight: 500;
+    }
+
+    .question-nav .btn.active {
+        background: linear-gradient(135deg, #7C3AED, #6D28D9);
+        color: white;
+        border: none;
+    }
+
+    .empty-state {
+        text-align: center;
+        padding: 3rem;
+        color: #6B7280;
+    }
+
+    .empty-state .emoji-icon {
+        font-size: 4rem;
+        margin-bottom: 1rem;
+        opacity: 0.5;
+    }
+
+    .user-avatar {
+        width: 36px;
+        height: 36px;
+        border-radius: 50%;
+        object-fit: cover;
+    }
+
+    .btn-primary {
+        background: linear-gradient(135deg, #7C3AED 0%, #A78BFA 100%);
+        border: none;
+        box-shadow: 0 0 20px rgba(124, 58, 237, 0.3);
+    }
+
+    .btn-primary:hover {
+        box-shadow: 0 0 30px rgba(124, 58, 237, 0.5);
+        transform: translateY(-1px);
+    }
+
+    .form-control, .form-select {
+        background-color: rgba(12, 10, 29, 0.6);
+        border: 1px solid rgba(124, 58, 237, 0.2);
+        color: #F3F4F6;
+        border-radius: 10px;
+    }
+
+    .form-control:focus, .form-select:focus {
+        background-color: rgba(12, 10, 29, 0.8);
+        border-color: #7C3AED;
+        box-shadow: 0 0 15px rgba(124, 58, 237, 0.25);
+        color: #F3F4F6;
+    }
+
+    .back-link {
+        color: #A78BFA;
+        text-decoration: none;
+        display: inline-flex;
+        align-items: center;
+        gap: 0.5rem;
+        margin-bottom: 1rem;
+        transition: color 0.2s;
+    }
+
+    .back-link:hover {
+        color: #C4B5FD;
+    }
+
+    .loading-spinner {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        padding: 3rem;
+    }
+
+    .loading-spinner .spinner-border {
+        color: #7C3AED;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+    <a href="{{ url_for('competitions_page') }}" class="back-link">
+        <i class="fas fa-arrow-left"></i> Back to Competitions
+    </a>
+
+    <div class="page-header">
+        <div class="d-flex justify-content-between align-items-center flex-wrap gap-3">
+            <div>
+                <h1>💬 Discussion Review</h1>
+                <p class="text-muted mb-0 mt-2">Review and discuss submitted answers for discussion questions</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Competition Selector -->
+    <div class="competition-selector">
+        <div class="row g-3 align-items-end">
+            <div class="col-md-6">
+                <label class="form-label text-muted">Select Competition</label>
+                <select id="competitionSelect" class="form-select">
+                    <option value="">-- Select a competition --</option>
+                </select>
+            </div>
+            <div class="col-md-4">
+                <label class="form-label text-muted">Filter by Status</label>
+                <select id="statusFilter" class="form-select">
+                    <option value="all">All Submissions</option>
+                    <option value="pending">Pending Review</option>
+                    <option value="reviewed">Reviewed</option>
+                </select>
+            </div>
+            <div class="col-md-2">
+                <button class="btn btn-primary w-100" onclick="loadDiscussionAnswers()">
+                    <i class="fas fa-search me-2"></i>Load
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Competition Info -->
+    <div id="competitionInfo" class="d-none mb-4">
+        <div class="card" style="background: rgba(26, 23, 48, 0.8); border: 1px solid rgba(124, 58, 237, 0.2);">
+            <div class="card-body">
+                <h5 id="compTitle" class="card-title" style="color: #E5E7EB;"></h5>
+                <p id="compDescription" class="card-text text-muted"></p>
+                <div class="d-flex gap-3 flex-wrap">
+                    <span class="badge bg-primary" id="compQuestionCount"></span>
+                    <span class="badge bg-secondary" id="compSubmissionCount"></span>
+                    <span class="badge bg-info" id="compPendingCount"></span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Question Navigation -->
+    <div id="questionNav" class="question-nav d-none"></div>
+
+    <!-- Answers Container -->
+    <div id="answersContainer">
+        <div class="empty-state">
+            <div class="emoji-icon">📋</div>
+            <h4>Select a Competition</h4>
+            <p>Choose a competition above to view and discuss submitted answers</p>
+        </div>
+    </div>
+</div>
+
+<!-- Reply Modal -->
+<div class="modal fade" id="replyModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content" style="background: rgba(26, 23, 48, 0.98); border: 1px solid rgba(124, 58, 237, 0.2);">
+            <div class="modal-header" style="border-bottom: 1px solid rgba(124, 58, 237, 0.15);">
+                <h5 class="modal-title" style="color: #E5E7EB;">Reply to Comment</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <input type="hidden" id="replyCompId">
+                <input type="hidden" id="replyUserId">
+                <input type="hidden" id="replyQuestionIndex">
+                <input type="hidden" id="replyParentCommentId">
+                <div class="mb-3">
+                    <label class="form-label text-muted">Your Reply</label>
+                    <textarea id="replyText" class="form-control" rows="3" placeholder="Write your reply..."></textarea>
+                </div>
+            </div>
+            <div class="modal-footer" style="border-top: 1px solid rgba(124, 58, 237, 0.15);">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" onclick="submitReply()">
+                    <i class="fas fa-reply me-2"></i>Reply
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Mark Answer Modal -->
+<div class="modal fade" id="markAnswerModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content" style="background: rgba(26, 23, 48, 0.98); border: 1px solid rgba(124, 58, 237, 0.2);">
+            <div class="modal-header" style="border-bottom: 1px solid rgba(124, 58, 237, 0.15);">
+                <h5 class="modal-title" style="color: #E5E7EB;">Mark Answer</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <input type="hidden" id="markCompId">
+                <input type="hidden" id="markUserId">
+                <input type="hidden" id="markQuestionIndex">
+                <div class="mb-3">
+                    <label class="form-label text-muted">Points to Award</label>
+                    <input type="number" id="markPoints" class="form-control" min="0" value="1">
+                    <small class="text-muted">Enter the points to award for this answer</small>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label text-muted">Feedback Comment (optional)</label>
+                    <textarea id="markComment" class="form-control" rows="3" placeholder="Provide feedback for the participant..."></textarea>
+                </div>
+            </div>
+            <div class="modal-footer" style="border-top: 1px solid rgba(124, 58, 237, 0.15);">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-success" onclick="submitMark()">
+                    <i class="fas fa-check me-2"></i>Mark & Notify
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    // Auth helpers
+    function getAuthToken() {
+        return localStorage.getItem('token') || sessionStorage.getItem('token') || (document.cookie.split('; ').find(r=>r.startsWith('auth_token=')) || '').split('=')[1] || null;
+    }
+
+    const token = getAuthToken();
+    let userId = localStorage.getItem('userId');
+    let isAdmin = false;
+    let currentCompetition = null;
+    let currentQuestionIndex = 0;
+
+    // Decode userId from token if not in storage
+    if (!userId && token) {
+        try {
+            const payloadPart = token.split('.')[1];
+            const payloadJson = atob(payloadPart.replace(/-/g, '+').replace(/_/g, '/'));
+            const payload = JSON.parse(payloadJson);
+            if (payload && payload.user_id) {
+                userId = String(payload.user_id);
+                localStorage.setItem('userId', userId);
+            }
+        } catch (e) {}
+    }
+
+    function escapeHtml(text) {
+        if (!text) return '';
+        return String(text)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#039;');
+    }
+
+    // Load competitions with discussion questions
+    async function loadCompetitions() {
+        try {
+            const res = await fetch('/api/competitions', {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            const data = await res.json();
+            const competitions = data.data?.competitions || [];
+
+            // Filter competitions that have discussion questions
+            const discussionComps = competitions.filter(comp => 
+                (comp.questions || []).some(q => q.type === 'discussion')
+            );
+
+            const select = document.getElementById('competitionSelect');
+            select.innerHTML = '<option value="">-- Select a competition --</option>';
+            
+            discussionComps.forEach(comp => {
+                const discussionCount = (comp.questions || []).filter(q => q.type === 'discussion').length;
+                const opt = document.createElement('option');
+                opt.value = comp.id || comp._id;
+                opt.textContent = `${comp.title} (${discussionCount} discussion Q${discussionCount > 1 ? 's' : ''})`;
+                select.appendChild(opt);
+            });
+
+            // Check URL params for pre-selected competition
+            const urlParams = new URLSearchParams(window.location.search);
+            const preselectedComp = urlParams.get('competition');
+            if (preselectedComp) {
+                select.value = preselectedComp;
+                loadDiscussionAnswers();
+            }
+        } catch (e) {
+            console.error('Error loading competitions:', e);
+        }
+    }
+
+    // Load user profile to check admin status
+    async function loadProfile() {
+        try {
+            const res = await fetch('/api/users/profile', {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            if (res.ok) {
+                const data = await res.json();
+                if (data.data?.is_admin) isAdmin = true;
+            }
+        } catch (e) {}
+    }
+
+    // Load discussion answers for selected competition
+    async function loadDiscussionAnswers() {
+        const compId = document.getElementById('competitionSelect').value;
+        if (!compId) {
+            alert('Please select a competition');
+            return;
+        }
+
+        const container = document.getElementById('answersContainer');
+        container.innerHTML = '<div class="loading-spinner"><div class="spinner-border" role="status"></div></div>';
+
+        try {
+            const res = await fetch(`/api/competitions/${compId}`, {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            const data = await res.json();
+            currentCompetition = data.data;
+
+            // Update competition info
+            document.getElementById('competitionInfo').classList.remove('d-none');
+            document.getElementById('compTitle').textContent = currentCompetition.title;
+            document.getElementById('compDescription').textContent = currentCompetition.description || 'No description';
+
+            // Count discussion questions and submissions
+            const discussionQuestions = (currentCompetition.questions || [])
+                .map((q, i) => ({ ...q, index: i }))
+                .filter(q => q.type === 'discussion');
+
+            let totalSubmissions = 0;
+            let pendingSubmissions = 0;
+
+            discussionQuestions.forEach(q => {
+                (currentCompetition.participants || []).forEach(p => {
+                    const answer = (p.answers || []).find(a => parseInt(a.question_id) === q.index);
+                    if (answer) {
+                        totalSubmissions++;
+                        if (!answer.is_reviewed) pendingSubmissions++;
+                    }
+                });
+            });
+
+            document.getElementById('compQuestionCount').textContent = `${discussionQuestions.length} Discussion Questions`;
+            document.getElementById('compSubmissionCount').textContent = `${totalSubmissions} Submissions`;
+            document.getElementById('compPendingCount').textContent = `${pendingSubmissions} Pending Review`;
+
+            // Build question navigation
+            const questionNav = document.getElementById('questionNav');
+            questionNav.classList.remove('d-none');
+            questionNav.innerHTML = discussionQuestions.map((q, i) => `
+                <button class="btn btn-outline-primary ${i === 0 ? 'active' : ''}" 
+                        onclick="showQuestion(${q.index}, this)">
+                    Q${q.index + 1}
+                </button>
+            `).join('');
+
+            if (discussionQuestions.length > 0) {
+                currentQuestionIndex = discussionQuestions[0].index;
+                renderAnswers();
+            } else {
+                container.innerHTML = `
+                    <div class="empty-state">
+                        <div class="emoji-icon">🤔</div>
+                        <h4>No Discussion Questions</h4>
+                        <p>This competition doesn't have any discussion questions</p>
+                    </div>
+                `;
+            }
+        } catch (e) {
+            console.error('Error loading competition:', e);
+            container.innerHTML = `
+                <div class="alert alert-danger">
+                    Failed to load competition data. Please try again.
+                </div>
+            `;
+        }
+    }
+
+    function showQuestion(questionIndex, btnElement) {
+        currentQuestionIndex = questionIndex;
+        
+        // Update active button
+        document.querySelectorAll('.question-nav .btn').forEach(btn => btn.classList.remove('active'));
+        if (btnElement) btnElement.classList.add('active');
+        
+        renderAnswers();
+    }
+
+    function renderAnswers() {
+        const container = document.getElementById('answersContainer');
+        const statusFilter = document.getElementById('statusFilter').value;
+        
+        if (!currentCompetition) {
+            container.innerHTML = '<div class="empty-state"><p>No competition loaded</p></div>';
+            return;
+        }
+
+        const question = currentCompetition.questions[currentQuestionIndex];
+        if (!question || question.type !== 'discussion') {
+            container.innerHTML = '<div class="empty-state"><p>Invalid question</p></div>';
+            return;
+        }
+
+        const isCreator = currentCompetition.created_by === userId;
+        const canMark = isCreator || isAdmin;
+
+        // Collect all answers for this question
+        const answersData = [];
+        (currentCompetition.participants || []).forEach(p => {
+            const answer = (p.answers || []).find(a => parseInt(a.question_id) === currentQuestionIndex);
+            if (answer) {
+                answersData.push({
+                    participant: p,
+                    answer: answer
+                });
+            }
+        });
+
+        // Apply status filter
+        const filteredAnswers = answersData.filter(a => {
+            if (statusFilter === 'pending') return !a.answer.is_reviewed;
+            if (statusFilter === 'reviewed') return a.answer.is_reviewed;
+            return true;
+        });
+
+        if (filteredAnswers.length === 0) {
+            container.innerHTML = `
+                <div class="empty-state">
+                    <div class="emoji-icon">📭</div>
+                    <h4>No Submissions Found</h4>
+                    <p>${statusFilter !== 'all' ? 'Try changing the status filter' : 'No one has answered this question yet'}</p>
+                </div>
+            `;
+            return;
+        }
+
+        // Build answer cards HTML
+        const html = `
+            <div class="mb-3">
+                <h5 style="color: #E5E7EB;">Question ${currentQuestionIndex + 1}</h5>
+                <p class="text-muted">${escapeHtml(question.text)}</p>
+            </div>
+            ${filteredAnswers.map(({ participant, answer }) => {
+                const username = participant.username || participant.user_id;
+                const avatar = participant.avatar_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(username)}&background=6366f1&color=fff`;
+                const isReviewed = answer.is_reviewed;
+                const points = answer.points || 0;
+                const comments = answer.comments || [];
+
+                return `
+                    <div class="answer-card">
+                        <div class="card-header d-flex justify-content-between align-items-center">
+                            <div class="d-flex align-items-center gap-3">
+                                <img src="${avatar}" class="user-avatar" alt="${escapeHtml(username)}">
+                                <div>
+                                    <strong style="color: #E5E7EB;">${escapeHtml(username)}</strong>
+                                    <div class="text-muted small">Submitted ${new Date(answer.submitted_at).toLocaleString()}</div>
+                                </div>
+                            </div>
+                            <span class="status-badge ${isReviewed ? 'reviewed' : 'pending'}">
+                                ${isReviewed ? `✓ Reviewed (${points} pts)` : '⏳ Pending Review'}
+                            </span>
+                        </div>
+                        <div class="card-body">
+                            <div class="answer-content">
+                                ${escapeHtml(answer.answer)}
+                            </div>
+
+                            ${canMark ? `
+                                <div class="mark-section ${isReviewed ? '' : 'pending'}">
+                                    <div class="d-flex justify-content-between align-items-center">
+                                        <div>
+                                            ${isReviewed ? 
+                                                `<span class="text-success"><i class="fas fa-check-circle me-2"></i>Marked with ${points} points</span>` :
+                                                `<span class="text-warning"><i class="fas fa-clock me-2"></i>Awaiting review</span>`
+                                            }
+                                        </div>
+                                        <button class="btn btn-sm ${isReviewed ? 'btn-outline-success' : 'btn-success'}" 
+                                                onclick="openMarkModal('${currentCompetition.id}', '${participant.user_id}', ${currentQuestionIndex}, ${points})">
+                                            <i class="fas fa-${isReviewed ? 'edit' : 'star'} me-1"></i>
+                                            ${isReviewed ? 'Update Mark' : 'Mark Answer'}
+                                        </button>
+                                    </div>
+                                </div>
+                            ` : ''}
+
+                            <div class="thread-container">
+                                <h6 style="color: #A78BFA;"><i class="fas fa-comments me-2"></i>Discussion Thread (${comments.length})</h6>
+                                
+                                <div class="comments-list" id="comments_${participant.user_id}_${currentQuestionIndex}">
+                                    ${renderComments(comments, participant.user_id)}
+                                </div>
+
+                                <!-- Add comment form -->
+                                <div class="mt-3">
+                                    <div class="input-group">
+                                        <input type="text" class="form-control" 
+                                               id="comment_input_${participant.user_id}_${currentQuestionIndex}"
+                                               placeholder="Add a comment...">
+                                        <button class="btn btn-primary" 
+                                                onclick="submitComment('${currentCompetition.id}', '${participant.user_id}', ${currentQuestionIndex})">
+                                            <i class="fas fa-paper-plane"></i>
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }).join('')}
+        `;
+
+        container.innerHTML = html;
+    }
+
+    function renderComments(comments, participantId) {
+        if (!comments || comments.length === 0) {
+            return '<p class="text-muted small">No comments yet. Start the discussion!</p>';
+        }
+
+        return comments.map((comment, index) => {
+            const isReply = comment.parent_id !== undefined;
+            const replies = comment.replies || [];
+            
+            return `
+                <div class="comment-item ${isReply ? 'is-reply' : ''}">
+                    <div class="d-flex justify-content-between align-items-start">
+                        <div>
+                            <span class="comment-author">${escapeHtml(comment.username || comment.user_id)}</span>
+                            <span class="comment-time ms-2">${new Date(comment.created_at).toLocaleString()}</span>
+                        </div>
+                        ${!isReply ? `
+                            <button class="btn btn-link btn-sm p-0" style="color: #A78BFA;" 
+                                    onclick="openReplyModal('${currentCompetition.id}', '${participantId}', ${currentQuestionIndex}, '${index}')">
+                                <i class="fas fa-reply"></i> Reply
+                            </button>
+                        ` : ''}
+                    </div>
+                    <div class="comment-text">${escapeHtml(comment.text)}</div>
+                    ${replies.length > 0 ? replies.map(reply => `
+                        <div class="comment-item is-reply mt-2">
+                            <span class="comment-author">${escapeHtml(reply.username || reply.user_id)}</span>
+                            <span class="comment-time ms-2">${new Date(reply.created_at).toLocaleString()}</span>
+                            <div class="comment-text">${escapeHtml(reply.text)}</div>
+                        </div>
+                    `).join('') : ''}
+                </div>
+            `;
+        }).join('');
+    }
+
+    // Submit a new comment
+    async function submitComment(compId, participantUserId, questionIndex) {
+        const input = document.getElementById(`comment_input_${participantUserId}_${questionIndex}`);
+        const text = input.value.trim();
+        if (!text) return;
+
+        try {
+            const res = await fetch(`/api/competitions/${compId}/answers/${participantUserId}/${questionIndex}/comment`, {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ text })
+            });
+
+            if (res.ok) {
+                input.value = '';
+                // Reload to show new comment
+                await loadDiscussionAnswers();
+            } else {
+                const data = await res.json();
+                alert(data.message || 'Failed to post comment');
+            }
+        } catch (e) {
+            console.error('Error posting comment:', e);
+            alert('Failed to post comment');
+        }
+    }
+
+    // Open reply modal
+    function openReplyModal(compId, userId, questionIndex, parentCommentId) {
+        document.getElementById('replyCompId').value = compId;
+        document.getElementById('replyUserId').value = userId;
+        document.getElementById('replyQuestionIndex').value = questionIndex;
+        document.getElementById('replyParentCommentId').value = parentCommentId;
+        document.getElementById('replyText').value = '';
+        new bootstrap.Modal(document.getElementById('replyModal')).show();
+    }
+
+    // Submit reply
+    async function submitReply() {
+        const compId = document.getElementById('replyCompId').value;
+        const userId = document.getElementById('replyUserId').value;
+        const questionIndex = parseInt(document.getElementById('replyQuestionIndex').value);
+        const parentCommentId = document.getElementById('replyParentCommentId').value;
+        const text = document.getElementById('replyText').value.trim();
+
+        if (!text) {
+            alert('Please enter a reply');
+            return;
+        }
+
+        try {
+            const res = await fetch(`/api/competitions/${compId}/answers/${userId}/${questionIndex}/reply`, {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ text, parent_comment_id: parentCommentId })
+            });
+
+            if (res.ok) {
+                bootstrap.Modal.getInstance(document.getElementById('replyModal')).hide();
+                await loadDiscussionAnswers();
+            } else {
+                const data = await res.json();
+                alert(data.message || 'Failed to post reply');
+            }
+        } catch (e) {
+            console.error('Error posting reply:', e);
+            alert('Failed to post reply');
+        }
+    }
+
+    // Open mark modal
+    function openMarkModal(compId, userId, questionIndex, currentPoints) {
+        document.getElementById('markCompId').value = compId;
+        document.getElementById('markUserId').value = userId;
+        document.getElementById('markQuestionIndex').value = questionIndex;
+        document.getElementById('markPoints').value = currentPoints || 1;
+        document.getElementById('markComment').value = '';
+        new bootstrap.Modal(document.getElementById('markAnswerModal')).show();
+    }
+
+    // Submit mark
+    async function submitMark() {
+        const compId = document.getElementById('markCompId').value;
+        const userId = document.getElementById('markUserId').value;
+        const questionIndex = parseInt(document.getElementById('markQuestionIndex').value);
+        const points = parseInt(document.getElementById('markPoints').value) || 0;
+        const comment = document.getElementById('markComment').value.trim();
+
+        try {
+            const res = await fetch(`/api/competitions/${compId}/answers/${userId}/${questionIndex}/mark`, {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ points, comment })
+            });
+
+            if (res.ok) {
+                bootstrap.Modal.getInstance(document.getElementById('markAnswerModal')).hide();
+                alert('Answer marked successfully!');
+                await loadDiscussionAnswers();
+            } else {
+                const data = await res.json();
+                alert(data.message || 'Failed to mark answer');
+            }
+        } catch (e) {
+            console.error('Error marking answer:', e);
+            alert('Failed to mark answer');
+        }
+    }
+
+    // Status filter change handler
+    document.getElementById('statusFilter').addEventListener('change', renderAnswers);
+
+    // Initialize
+    document.addEventListener('DOMContentLoaded', async () => {
+        if (!token) {
+            window.location.href = "{{ url_for('auth_page') }}";
+            return;
+        }
+        await loadProfile();
+        await loadCompetitions();
+    });
+</script>
+{% endblock %}

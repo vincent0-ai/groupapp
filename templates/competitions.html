@@ -353,36 +353,6 @@
         </div>
     </div>
 
-    <!-- Mark Answer Modal -->
-    <div class="modal fade" id="markAnswerModal" tabindex="-1">
-        <div class="modal-dialog">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title">Mark Answer</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                </div>
-                <div class="modal-body">
-                    <input type="hidden" id="markModalCompId">
-                    <input type="hidden" id="markModalParticipant">
-                    <input type="hidden" id="markModalQuestion">
-
-                    <div class="mb-3">
-                        <label class="form-label">Points</label>
-                        <input type="number" id="markPointsInput" class="form-control" value="0">
-                    </div>
-                    <div class="mb-3">
-                        <label class="form-label">Comment (optional)</label>
-                        <textarea id="markCommentInput" class="form-control" rows="3"></textarea>
-                    </div>
-                </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                    <button type="button" class="btn btn-primary" onclick="submitMarkFromModal()">Save & Notify</button>
-                </div>
-            </div>
-        </div>
-    </div>
-
 {% endblock %}
 
 {% block scripts %}
@@ -533,10 +503,8 @@
                     }
 
                     if (q.type === 'discussion') {
-                        // Discussion question - free text + thread
-                        const commentsHtml = (answerData && answerData.comments || []).map(c => `
-                            <div class="border rounded p-2 mb-1 small"><strong>${c.user_id}</strong>: ${escapeHtml(c.text)} <br><small class="text-muted">${new Date(c.created_at).toLocaleString()}</small></div>
-                        `).join('');
+                        // Discussion question - link to discussion review page for threads
+                        const commentsCount = (answerData && answerData.comments || []).length;
 
                         return `
                             <div class="card mb-3">
@@ -557,8 +525,12 @@
                                         <div class="mt-3">
                                             <div class="fw-semibold small mb-1">Your submission</div>
                                             <div class="border rounded p-2 mb-2 small">${escapeHtml(answerData.answer || '')}</div>
-                                            <div id="answerComments_${i}_${participant?.user_id || ''}">${commentsHtml}</div>
-                                            ${isJoined ? `<div class="input-group mt-2"><input class="form-control form-control-sm" id="comment_input_${i}" placeholder="Add comment"><button class="btn btn-sm btn-outline-primary" onclick="postComment('${comp.id}', '${participant.user_id}', ${i})">Comment</button></div>` : ''}
+                                            <div class="d-flex justify-content-between align-items-center mt-2">
+                                                <span class="text-muted small">${commentsCount > 0 ? commentsCount + ' comment' + (commentsCount > 1 ? 's' : '') : 'No comments yet'}</span>
+                                                <a href="/discussion-review?competition=${comp.id}" class="btn btn-sm btn-outline-primary">
+                                                    <i class="fas fa-comments me-1"></i>View Discussion Thread
+                                                </a>
+                                            </div>
                                         </div>
                                     ` : ''}
                                 </div>
@@ -741,6 +713,7 @@
                 document.getElementById('viewCompParticipants').textContent = (comp.participants?.length || 0) + ' participants';
                 
                 // Build questions and show submitted answers/comments for review
+                const hasDiscussionQuestions = (comp.questions || []).some(q => q.type === 'discussion');
                 const questionsHtml = (comp.questions || []).map((q, i) => {
                     // gather all participant answers for this question
                     const answersForQ = (comp.participants || []).map(p => {
@@ -749,16 +722,33 @@
                         return { user: p.user_id, username: p.username || p.user_id, answer: ans };
                     }).filter(Boolean);
 
+                    // For discussion questions, show summary and link to review page
+                    if (q.type === 'discussion') {
+                        const pendingCount = answersForQ.filter(a => !a.answer.is_reviewed).length;
+                        const reviewedCount = answersForQ.filter(a => a.answer.is_reviewed).length;
+                        
+                        return `
+                            <div class="list-group-item">
+                                <strong>Q${i+1}:</strong> ${escapeHtml(q.text)}
+                                <div class="mt-2 small text-muted">(Discussion Question)</div>
+                                <div class="mt-2 d-flex justify-content-between align-items-center">
+                                    <div>
+                                        <span class="badge bg-secondary me-2">${answersForQ.length} submissions</span>
+                                        ${pendingCount > 0 ? `<span class="badge bg-warning text-dark me-2">${pendingCount} pending</span>` : ''}
+                                        ${reviewedCount > 0 ? `<span class="badge bg-success">${reviewedCount} reviewed</span>` : ''}
+                                    </div>
+                                    <a href="/discussion-review?competition=${comp.id}" class="btn btn-sm btn-primary">
+                                        <i class="fas fa-comments me-1"></i>View Discussion
+                                    </a>
+                                </div>
+                            </div>
+                        `;
+                    }
+
+                    // For choice questions, show full answer details
                     const answersListHtml = answersForQ.length ? answersForQ.map(a => {
                         const ans = a.answer;
-                        const reviewedHtml = ans.is_reviewed ? `<span class="badge bg-success ms-2">${ans.points || 0} pts</span>` : `<span class="badge bg-warning text-dark ms-2">Pending</span>`;
-                        const commentsHtml = (ans.comments || []).map(c => `<div class="small text-muted mb-1"><strong>${c.user_id}</strong>: ${escapeHtml(c.text)} <small class="text-muted">${new Date(c.created_at).toLocaleString()}</small></div>`).join('');
-                        // Show mark button only to competition creator (or admins in future)
-                        const markBtn = (comp.created_by === userId || isAdmin) ? `<button class="btn btn-sm btn-outline-primary ms-2" onclick="openMarkModal('${comp.id}', '${a.user}', ${i}, ${ans.points || 0})">Mark</button>` : '';
-
-                        // allow commenting only for participants or competition creator
-                        const isParticipantGlobal = (comp.participants || []).some(p => p.user_id === userId);
-                        const commentInput = (isParticipantGlobal || comp.created_by === userId) ? `<div class="input-group mt-2"><input class="form-control form-control-sm" id="comment_input_view_${comp.id}_${a.user}_${i}" placeholder="Add comment"><button class="btn btn-sm btn-outline-primary" onclick="postComment('${comp.id}', '${a.user}', ${i})">Comment</button></div>` : `<div class="small text-muted mt-2">Only participants can comment.</div>`;
+                        const reviewedHtml = ans.is_correct ? `<span class="badge bg-success ms-2">Correct</span>` : `<span class="badge bg-danger ms-2">Incorrect</span>`;
 
                         return `
                             <div class="list-group-item">
@@ -766,10 +756,8 @@
                                     <div>
                                         <div class="fw-semibold">${escapeHtml(a.username || a.user)}</div>
                                         <div class="small mt-1 mb-1">${escapeHtml(ans.answer || '')}</div>
-                                        ${commentsHtml}
-                                        ${commentInput}
                                     </div>
-                                    <div class="text-end">${reviewedHtml}${markBtn}</div>
+                                    <div class="text-end">${reviewedHtml}</div>
                                 </div>
                             </div>
                         `;
@@ -778,12 +766,27 @@
                     return `
                         <div class="list-group-item">
                             <strong>Q${i+1}:</strong> ${escapeHtml(q.text)}
-                            ${q.type === 'discussion' ? '<div class="mt-2 small text-muted">(Discussion)</div>' : `<br><small class="text-muted">Options: ${Array.isArray(q.options) ? q.options.join(', ') : q.options}</small>`}
+                            <br><small class="text-muted">Options: ${Array.isArray(q.options) ? q.options.join(', ') : q.options} | Correct: ${q.correct_answer}</small>
                             <div class="mt-2">${answersListHtml}</div>
                         </div>
                     `;
                 }).join('');
-                document.getElementById('viewCompQuestions').innerHTML = questionsHtml || '<p class="text-muted">No questions available.</p>';
+                
+                // Add link to discussion review page if there are discussion questions
+                const discussionLinkHtml = hasDiscussionQuestions && (comp.created_by === userId || isAdmin) ? `
+                    <div class="alert mb-3" style="background: rgba(124, 58, 237, 0.15); border: 1px solid rgba(124, 58, 237, 0.3);">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <span style="color: #A78BFA;">
+                                <i class="fas fa-star me-2"></i>This competition has discussion questions that need review
+                            </span>
+                            <a href="/discussion-review?competition=${comp.id}" class="btn btn-sm btn-primary">
+                                Open Discussion Review
+                            </a>
+                        </div>
+                    </div>
+                ` : '';
+                
+                document.getElementById('viewCompQuestions').innerHTML = discussionLinkHtml + (questionsHtml || '<p class="text-muted">No questions available.</p>');
 
                 const joinBtn = document.getElementById('viewCompJoinBtn');
                 // Prepare join behavior: check user's groups and let them choose if needed
@@ -898,76 +901,6 @@
                 new bootstrap.Modal(document.getElementById('viewCompModal')).show();
             } catch (error) {
                 console.error('Error viewing competition:', error);
-            }
-        }
-
-        // Post a comment on an answer
-        async function postComment(compId, participantUserId, questionIndex) {
-            // Look for view-specific input first, then fallback to generic per-question input
-            const viewInputId = `comment_input_view_${compId}_${participantUserId}_${questionIndex}`;
-            const genericInputId = `comment_input_${questionIndex}`;
-            const input = document.getElementById(viewInputId) || document.getElementById(genericInputId);
-            if (!input) return;
-            const text = input.value.trim();
-            if (!text) return;
-            try {
-                const res = await fetch(`/api/competitions/${compId}/answers/${participantUserId}/${questionIndex}/comment`, {
-                    method: 'POST',
-                    headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ text })
-                });
-                if (res.ok) {
-                    input.value = '';
-                    // Refresh view
-                    await viewCompetition(compId);
-                } else {
-                    const d = await res.json();
-                    await showCustomAlert(d.message || 'Failed to post comment', 'Error');
-                }
-            } catch (e) {
-                console.error('Error posting comment', e);
-            }
-        }
-
-        // Mark an answer (owner/admin)
-        function openMarkModal(compId, participantUserId, questionIndex, currentPoints = 0) {
-            // Populate modal fields and show
-            document.getElementById('markModalCompId').value = compId;
-            document.getElementById('markModalParticipant').value = participantUserId;
-            document.getElementById('markModalQuestion').value = questionIndex;
-            document.getElementById('markPointsInput').value = currentPoints || 0;
-            document.getElementById('markCommentInput').value = '';
-            const modalEl = document.getElementById('markAnswerModal');
-            const modal = new bootstrap.Modal(modalEl);
-            modal.show();
-        }
-
-        async function submitMarkFromModal() {
-            const compId = document.getElementById('markModalCompId').value;
-            const participantUserId = document.getElementById('markModalParticipant').value;
-            const questionIndex = parseInt(document.getElementById('markModalQuestion').value);
-            const points = parseInt(document.getElementById('markPointsInput').value) || 0;
-            const comment = document.getElementById('markCommentInput').value.trim();
-
-            try {
-                const res = await fetch(`/api/competitions/${compId}/answers/${participantUserId}/${questionIndex}/mark`, {
-                    method: 'POST',
-                    headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ points, comment })
-                });
-                if (res.ok) {
-                    const modalEl = document.getElementById('markAnswerModal');
-                    const modal = bootstrap.Modal.getInstance(modalEl);
-                    if (modal) modal.hide();
-                    await showCustomAlert('Answer marked', 'Success');
-                    await viewCompetition(compId);
-                } else {
-                    const d = await res.json();
-                    await showCustomAlert(d.message || 'Failed to mark answer', 'Error');
-                }
-            } catch (e) {
-                console.error('Error marking from modal', e);
-                await showCustomAlert('An error occurred', 'Error');
             }
         }
 
