@@ -216,7 +216,7 @@
             <h1>Competitions</h1>
             <div class="mt-2 mt-md-0">
                 <a href="{{ url_for('main.create_competition_page') }}" class="btn btn-primary">
-                    ➕ Create Competition
+                    Create Competition
                 </a>
             </div>
         </div>
@@ -1032,8 +1032,13 @@
                         }
                         
                         if (isCreator) {
-                            // Creator sees Review button to review discussion answers
-                            actionBtn = `<a href="/discussion-review?competition=${comp.id}" class="btn btn-sm btn-primary">Review</a>`;
+                            // Creator sees Review button only if there are discussion questions
+                            const hasDiscussionQuestions = (comp.questions || []).some(q => q.type === 'discussion');
+                            if (hasDiscussionQuestions) {
+                                actionBtn = `<a href="/discussion-review?competition=${comp.id}" class="btn btn-sm btn-primary">Review</a>`;
+                            } else {
+                                actionBtn = `<button class="btn btn-sm btn-outline-secondary" onclick="viewCompetition('${comp.id}')">View</button>`;
+                            }
                         } else if (isParticipant) {
                             actionBtn = `<button class="btn btn-sm btn-warning" onclick="playCompetition('${comp.id}')">Play</button>`;
                         } else {

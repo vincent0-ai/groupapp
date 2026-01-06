@@ -80,6 +80,53 @@
     .comment-item.is-reply {
         margin-left: 2rem;
         border-left-color: rgba(6, 182, 212, 0.5);
+        background: rgba(6, 182, 212, 0.05);
+    }
+
+    .comment-item.is-nested-reply {
+        margin-left: 3.5rem;
+        border-left-color: rgba(167, 139, 250, 0.4);
+        background: rgba(167, 139, 250, 0.03);
+    }
+
+    .reply-form-inline {
+        margin-left: 2rem;
+        margin-top: 0.5rem;
+        padding: 0.75rem;
+        background: rgba(6, 182, 212, 0.08);
+        border-radius: 10px;
+        border: 1px solid rgba(6, 182, 212, 0.2);
+        display: none;
+    }
+
+    .reply-form-inline.show {
+        display: block;
+        animation: slideDown 0.2s ease-out;
+    }
+
+    .custom-mark-form {
+        margin-top: 1rem;
+        padding: 1rem;
+        background: rgba(124, 58, 237, 0.08);
+        border-radius: 10px;
+        border: 1px solid rgba(124, 58, 237, 0.2);
+        display: none;
+    }
+
+    .custom-mark-form.show {
+        display: block;
+        animation: slideDown 0.2s ease-out;
+    }
+
+    @keyframes slideDown {
+        from {
+            opacity: 0;
+            transform: translateY(-10px);
+        }
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
     }
 
     .comment-author {
@@ -289,62 +336,6 @@
         <div class="empty-state">
             <h4>Select a Competition</h4>
             <p>Choose a competition above to view and discuss submitted answers</p>
-        </div>
-    </div>
-</div>
-
-<!-- Reply Modal -->
-<div class="modal fade" id="replyModal" tabindex="-1">
-    <div class="modal-dialog">
-        <div class="modal-content" style="background: rgba(26, 23, 48, 0.98); border: 1px solid rgba(124, 58, 237, 0.2);">
-            <div class="modal-header" style="border-bottom: 1px solid rgba(124, 58, 237, 0.15);">
-                <h5 class="modal-title" style="color: #E5E7EB;">Reply to Comment</h5>
-                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
-            </div>
-            <div class="modal-body">
-                <input type="hidden" id="replyCompId">
-                <input type="hidden" id="replyUserId">
-                <input type="hidden" id="replyQuestionIndex">
-                <input type="hidden" id="replyParentCommentId">
-                <div class="mb-3">
-                    <label class="form-label text-muted">Your Reply</label>
-                    <textarea id="replyText" class="form-control" rows="3" placeholder="Write your reply..."></textarea>
-                </div>
-            </div>
-            <div class="modal-footer" style="border-top: 1px solid rgba(124, 58, 237, 0.15);">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                <button type="button" class="btn btn-primary" onclick="submitReply()">Reply</button>
-            </div>
-        </div>
-    </div>
-</div>
-
-<!-- Mark Answer Modal -->
-<div class="modal fade" id="markAnswerModal" tabindex="-1">
-    <div class="modal-dialog">
-        <div class="modal-content" style="background: rgba(26, 23, 48, 0.98); border: 1px solid rgba(124, 58, 237, 0.2);">
-            <div class="modal-header" style="border-bottom: 1px solid rgba(124, 58, 237, 0.15);">
-                <h5 class="modal-title" style="color: #E5E7EB;">Mark Answer</h5>
-                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
-            </div>
-            <div class="modal-body">
-                <input type="hidden" id="markCompId">
-                <input type="hidden" id="markUserId">
-                <input type="hidden" id="markQuestionIndex">
-                <div class="mb-3">
-                    <label class="form-label text-muted">Points to Award</label>
-                    <input type="number" id="markPoints" class="form-control" min="0" value="1">
-                    <small class="text-muted">Enter the points to award for this answer (1 for correct, 0 for incorrect)</small>
-                </div>
-                <div class="mb-3">
-                    <label class="form-label text-muted">Feedback Comment (optional)</label>
-                    <textarea id="markComment" class="form-control" rows="3" placeholder="Provide feedback for the participant..."></textarea>
-                </div>
-            </div>
-            <div class="modal-footer" style="border-top: 1px solid rgba(124, 58, 237, 0.15);">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                <button type="button" class="btn btn-success" onclick="submitMark()">Save</button>
-            </div>
         </div>
     </div>
 </div>
@@ -603,7 +594,7 @@
 
                             ${canMark ? `
                                 <div class="mark-section ${isReviewed ? '' : 'pending'}">
-                                    <div class="d-flex justify-content-between align-items-center">
+                                    <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
                                         <div>
                                             ${isReviewed ? 
                                                 `<span class="${points > 0 ? 'text-success' : 'text-danger'}">Marked: ${points > 0 ? 'Correct' : 'Incorrect'} (${points} pts)</span>` :
@@ -620,13 +611,43 @@
                                                 Incorrect
                                             </button>
                                             <button class="btn btn-sm btn-outline-secondary" 
-                                                    onclick="openMarkModal('${currentCompetition.id}', '${participant.user_id}', ${currentQuestionIndex}, ${points})">
+                                                    onclick="toggleCustomMarkForm('${participant.user_id}', ${currentQuestionIndex})">
                                                 Custom
                                             </button>
                                         </div>
                                     </div>
+                                    
+                                    <!-- Inline Custom Mark Form -->
+                                    <div class="custom-mark-form" id="customMarkForm_${participant.user_id}_${currentQuestionIndex}">
+                                        <div class="row g-2 align-items-end">
+                                            <div class="col-md-3">
+                                                <label class="form-label text-muted small">Points</label>
+                                                <input type="number" class="form-control form-control-sm" 
+                                                       id="customPoints_${participant.user_id}_${currentQuestionIndex}" 
+                                                       min="0" value="${points || 1}">
+                                            </div>
+                                            <div class="col-md-6">
+                                                <label class="form-label text-muted small">Feedback (optional)</label>
+                                                <input type="text" class="form-control form-control-sm" 
+                                                       id="customComment_${participant.user_id}_${currentQuestionIndex}" 
+                                                       placeholder="Add feedback...">
+                                            </div>
+                                            <div class="col-md-3">
+                                                <div class="d-flex gap-1">
+                                                    <button class="btn btn-sm btn-success flex-grow-1" 
+                                                            onclick="submitCustomMark('${currentCompetition.id}', '${participant.user_id}', ${currentQuestionIndex})">
+                                                        Save
+                                                    </button>
+                                                    <button class="btn btn-sm btn-outline-secondary" 
+                                                            onclick="toggleCustomMarkForm('${participant.user_id}', ${currentQuestionIndex})">
+                                                        Cancel
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
                                 </div>
-                            ` : ''}}
+                            ` : ''}
 
                             <div class="thread-container">
                                 <h6 style="color: #A78BFA;">Discussion Thread (${comments.length})</h6>
@@ -665,6 +686,7 @@
         return comments.map((comment, index) => {
             const isReply = comment.parent_id !== undefined;
             const replies = comment.replies || [];
+            const commentId = `${participantId}_${currentQuestionIndex}_${index}`;
             
             return `
                 <div class="comment-item ${isReply ? 'is-reply' : ''}">
@@ -675,14 +697,34 @@
                         </div>
                         ${!isReply ? `
                             <button class="btn btn-link btn-sm p-0" style="color: #A78BFA;" 
-                                    onclick="openReplyModal('${currentCompetition.id}', '${participantId}', ${currentQuestionIndex}, '${index}')">
+                                    onclick="toggleReplyForm('${commentId}')">
                                 Reply
                             </button>
                         ` : ''}
                     </div>
                     <div class="comment-text">${escapeHtml(comment.text)}</div>
+                    
+                    ${!isReply ? `
+                        <!-- Inline Reply Form -->
+                        <div class="reply-form-inline" id="replyForm_${commentId}">
+                            <div class="input-group input-group-sm">
+                                <input type="text" class="form-control" 
+                                       id="replyInput_${commentId}"
+                                       placeholder="Write a reply...">
+                                <button class="btn btn-primary" 
+                                        onclick="submitInlineReply('${currentCompetition.id}', '${participantId}', ${currentQuestionIndex}, '${index}')">
+                                    Reply
+                                </button>
+                                <button class="btn btn-outline-secondary" 
+                                        onclick="toggleReplyForm('${commentId}')">
+                                    Cancel
+                                </button>
+                            </div>
+                        </div>
+                    ` : ''}
+                    
                     ${replies.length > 0 ? replies.map(reply => `
-                        <div class="comment-item is-reply mt-2">
+                        <div class="comment-item is-nested-reply mt-2">
                             <span class="comment-author">${escapeHtml(reply.username || reply.user_id)}</span>
                             <span class="comment-time ms-2">${new Date(reply.created_at).toLocaleString()}</span>
                             <div class="comment-text">${escapeHtml(reply.text)}</div>
@@ -723,23 +765,22 @@
         }
     }
 
-    // Open reply modal
-    function openReplyModal(compId, userId, questionIndex, parentCommentId) {
-        document.getElementById('replyCompId').value = compId;
-        document.getElementById('replyUserId').value = userId;
-        document.getElementById('replyQuestionIndex').value = questionIndex;
-        document.getElementById('replyParentCommentId').value = parentCommentId;
-        document.getElementById('replyText').value = '';
-        new bootstrap.Modal(document.getElementById('replyModal')).show();
+    // Toggle reply form visibility
+    function toggleReplyForm(commentId) {
+        const form = document.getElementById(`replyForm_${commentId}`);
+        if (form) {
+            form.classList.toggle('show');
+            if (form.classList.contains('show')) {
+                document.getElementById(`replyInput_${commentId}`).focus();
+            }
+        }
     }
 
-    // Submit reply
-    async function submitReply() {
-        const compId = document.getElementById('replyCompId').value;
-        const userId = document.getElementById('replyUserId').value;
-        const questionIndex = parseInt(document.getElementById('replyQuestionIndex').value);
-        const parentCommentId = document.getElementById('replyParentCommentId').value;
-        const text = document.getElementById('replyText').value.trim();
+    // Submit inline reply
+    async function submitInlineReply(compId, participantUserId, questionIndex, parentCommentIndex) {
+        const commentId = `${participantUserId}_${questionIndex}_${parentCommentIndex}`;
+        const input = document.getElementById(`replyInput_${commentId}`);
+        const text = input.value.trim();
 
         if (!text) {
             alert('Please enter a reply');
@@ -747,17 +788,16 @@
         }
 
         try {
-            const res = await fetch(`/api/competitions/${compId}/answers/${userId}/${questionIndex}/reply`, {
+            const res = await fetch(`/api/competitions/${compId}/answers/${participantUserId}/${questionIndex}/reply`, {
                 method: 'POST',
                 headers: {
                     'Authorization': `Bearer ${token}`,
                     'Content-Type': 'application/json'
                 },
-                body: JSON.stringify({ text, parent_comment_id: parentCommentId })
+                body: JSON.stringify({ text, parent_comment_id: parentCommentIndex })
             });
 
             if (res.ok) {
-                bootstrap.Modal.getInstance(document.getElementById('replyModal')).hide();
                 await loadDiscussionAnswers();
             } else {
                 const data = await res.json();
@@ -769,14 +809,15 @@
         }
     }
 
-    // Open mark modal
-    function openMarkModal(compId, oduserId, questionIndex, currentPoints) {
-        document.getElementById('markCompId').value = compId;
-        document.getElementById('markUserId').value = oduserId;
-        document.getElementById('markQuestionIndex').value = questionIndex;
-        document.getElementById('markPoints').value = currentPoints || 1;
-        document.getElementById('markComment').value = '';
-        new bootstrap.Modal(document.getElementById('markAnswerModal')).show();
+    // Toggle custom mark form visibility
+    function toggleCustomMarkForm(participantUserId, questionIndex) {
+        const form = document.getElementById(`customMarkForm_${participantUserId}_${questionIndex}`);
+        if (form) {
+            form.classList.toggle('show');
+            if (form.classList.contains('show')) {
+                document.getElementById(`customPoints_${participantUserId}_${questionIndex}`).focus();
+            }
+        }
     }
 
     // Quick mark as Correct (1 point) or Incorrect (0 points)
@@ -803,16 +844,13 @@
         }
     }
 
-    // Submit mark
-    async function submitMark() {
-        const compId = document.getElementById('markCompId').value;
-        const userId = document.getElementById('markUserId').value;
-        const questionIndex = parseInt(document.getElementById('markQuestionIndex').value);
-        const points = parseInt(document.getElementById('markPoints').value) || 0;
-        const comment = document.getElementById('markComment').value.trim();
+    // Submit custom mark from inline form
+    async function submitCustomMark(compId, participantUserId, questionIndex) {
+        const points = parseInt(document.getElementById(`customPoints_${participantUserId}_${questionIndex}`).value) || 0;
+        const comment = document.getElementById(`customComment_${participantUserId}_${questionIndex}`).value.trim();
 
         try {
-            const res = await fetch(`/api/competitions/${compId}/answers/${userId}/${questionIndex}/mark`, {
+            const res = await fetch(`/api/competitions/${compId}/answers/${participantUserId}/${questionIndex}/mark`, {
                 method: 'POST',
                 headers: {
                     'Authorization': `Bearer ${token}`,
@@ -822,8 +860,6 @@
             });
 
             if (res.ok) {
-                bootstrap.Modal.getInstance(document.getElementById('markAnswerModal')).hide();
-                alert('Answer marked successfully!');
                 await loadDiscussionAnswers();
             } else {
                 const data = await res.json();
