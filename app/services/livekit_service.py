@@ -60,16 +60,34 @@ class LiveKitService:
 
     def _run_coro(self, coro):
         """Run coroutine and return result; use background loop if available."""
-        if self._loop and self._loop.is_running():
+        # First check if we're already in an event loop
+        try:
+            loop = asyncio.get_running_loop()
+        except RuntimeError:
+            loop = None
+        
+        if loop is not None:
+            # Already in an event loop - use background loop or nest if possible
+            if self._loop and self._loop.is_running():
+                fut = asyncio.run_coroutine_threadsafe(coro, self._loop)
+                return fut.result(timeout=10)
+            else:
+                # Start a background loop if we don't have one
+                self._start_background_loop()
+                fut = asyncio.run_coroutine_threadsafe(coro, self._loop)
+                return fut.result(timeout=10)
+        elif self._loop and self._loop.is_running():
             fut = asyncio.run_coroutine_threadsafe(coro, self._loop)
-            return fut.result()
+            return fut.result(timeout=10)
         else:
-            # Fallback to running in current thread
+            # No running loop - safe to use asyncio.run
             try:
                 return asyncio.run(coro)
-            except Exception:
-                # As a last resort, run synchronously if possible
-                raise
+            except RuntimeError:
+                # Last resort: start background loop
+                self._start_background_loop()
+                fut = asyncio.run_coroutine_threadsafe(coro, self._loop)
+                return fut.result(timeout=10)
 
     def create_access_token(self, user_id: str, user_name: str, room_name: str, permissions: Any) -> str:
         """
@@ -281,22 +299,42 @@ class LiveKitService:
             else:
                 return []
 
-        # The SDK's list_participants signature varies between versions (kwarg 'room' vs positional).
+        # The SDK's list_participants signature varies between versions.
+        # Newer SDK uses ListParticipantsRequest object
+        coro = None
         try:
-            coro = self.lkapi.room.list_participants(room=room_name)
+            # Try newer SDK pattern with api.ListParticipantsRequest
+            if hasattr(api, 'ListParticipantsRequest'):
+                req = api.ListParticipantsRequest(room=room_name)
+                coro = self.lkapi.room.list_participants(req)
+            else:
+                # Try older patterns
+                coro = self.lkapi.room.list_participants(room=room_name)
         except TypeError:
             try:
                 coro = self.lkapi.room.list_participants(room_name)
             except TypeError:
                 # Fall back to calling without args
                 coro = self.lkapi.room.list_participants()
-        result = self._run_coro(coro)
-        # Try to close any underlying aiohttp session to avoid 'Unclosed client session' warnings
+        
+        if coro is None:
+            return []
+            
         try:
-            self.maybe_close_session()
-        except Exception:
-            pass
-        return result
+            result = self._run_coro(coro)
+            # Result might be a ListParticipantsResponse object
+            if hasattr(result, 'participants'):
+                return result.participants
+            return result if result else []
+        except Exception as e:
+            print(f"list_participants error: {e}")
+            return []
+        finally:
+            # Try to close any underlying aiohttp session to avoid 'Unclosed client session' warnings
+            try:
+                self.maybe_close_session()
+            except Exception:
+                pass
 
     def maybe_close_session(self):
         """Attempt to close underlying aiohttp ClientSession if present on the LiveKit API client."""
