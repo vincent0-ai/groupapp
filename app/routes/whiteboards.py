@@ -263,23 +263,27 @@ def get_livekit_token(wb_id):
         livekit_service = LiveKitService()
         room_name = f'whiteboard:{wb_id}'
         # Use sync helper which will run the underlying coroutine on the appropriate loop
-        participants = livekit_service.list_participants(room_name)
+        participants_list = livekit_service.list_participants(room_name) or []
         max_participants = current_app.config['MAX_PARTICIPANTS_PER_ROOM']
 
         # Check if the user is already in the room before checking the limit
-        is_already_in_room = any(getattr(p, 'identity', None) == user_id for p in participants)
+        # Handle both object with identity attribute and dict with identity key
+        def get_identity(p):
+            if hasattr(p, 'identity'):
+                return p.identity
+            if isinstance(p, dict):
+                return p.get('identity')
+            return None
+        
+        is_already_in_room = any(get_identity(p) == user_id for p in participants_list)
 
-        if not is_already_in_room and len(participants) >= max_participants:
+        if not is_already_in_room and len(participants_list) >= max_participants:
             return error_response(f'This session is full (max {max_participants} participants).', 429)
 
     except Exception as e:
         # If the room doesn't exist on LiveKit server, list_participants will fail.
         # This is fine, it just means the room is not full.
         print(f"Could not check participant list (room may not exist yet): {e}")
-        try:
-            livekit_service.maybe_close_session()
-        except Exception:
-            pass
 
 
     # Determine permissions from the whiteboard document

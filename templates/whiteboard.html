@@ -201,17 +201,17 @@
             left: 0;
             width: 100%;
             z-index: 1020;
-            background: var(--dark-surface);
+            background: rgba(12, 10, 29, 0.98); /* Nearly opaque dark background for contrast */
             padding: 10px 15px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.3);
-            border-bottom: 1px solid var(--dark-border);
+            box-shadow: 0 2px 10px rgba(0,0,0,0.5);
+            border-bottom: 2px solid var(--dark-border);
             /* keep controls on a single horizontal line and allow scrolling */
             flex-wrap: nowrap !important;
             overflow-x: auto;
             justify-content: flex-start;
             border-radius: 0 !important;
             border: none !important;
-            border-bottom: 1px solid var(--dark-border) !important;
+            border-bottom: 2px solid var(--dark-border) !important;
             /* Ensure it's always visible and not covered */
             backdrop-filter: blur(10px);
             -webkit-backdrop-filter: blur(10px);
@@ -242,6 +242,38 @@
             padding: 8px 12px !important;
             font-size: 14px !important;
             border-radius: 8px !important;
+        }
+
+        /* High contrast button colors for mobile visibility */
+        #sessionControls .btn-outline-success {
+            background: rgba(25, 135, 84, 0.2) !important;
+            border-color: #198754 !important;
+            color: #75d69c !important;
+        }
+        #sessionControls .btn-outline-warning {
+            background: rgba(255, 193, 7, 0.2) !important;
+            border-color: #ffc107 !important;
+            color: #ffe066 !important;
+        }
+        #sessionControls .btn-outline-info {
+            background: rgba(13, 202, 240, 0.2) !important;
+            border-color: #0dcaf0 !important;
+            color: #7edcf0 !important;
+        }
+        #sessionControls .btn-outline-primary {
+            background: rgba(124, 58, 237, 0.2) !important;
+            border-color: #7c3aed !important;
+            color: #b794f6 !important;
+        }
+        #sessionControls .btn-outline-secondary {
+            background: rgba(108, 117, 125, 0.2) !important;
+            border-color: #6c757d !important;
+            color: #b0b7bd !important;
+        }
+        #sessionControls .btn-outline-danger, #sessionControls .btn-danger {
+            background: rgba(220, 53, 69, 0.3) !important;
+            border-color: #dc3545 !important;
+            color: #f1aeb5 !important;
         }
 
         /* When the whiteboard is fullscreen we hide the floating controls in
@@ -661,21 +693,21 @@
             liveBtn.id = 'liveBtn';
             liveBtn.className = 'btn btn-sm btn-outline-success';
             liveBtn.setAttribute('aria-label', 'Join Call');
-            liveBtn.innerHTML = '<span class="btn-text"> Join Call</span>';
+            liveBtn.innerHTML = '📞<span class="btn-text"> Join Call</span>';
 
             const muteBtn = document.createElement('button');
             muteBtn.id = 'muteBtn';
             muteBtn.className = 'btn btn-sm btn-outline-warning';
             muteBtn.setAttribute('aria-label', 'Mute');
             muteBtn.disabled = true;
-            muteBtn.innerHTML = '<span class="btn-text"> Mute</span>';
+            muteBtn.innerHTML = '🎙️<span class="btn-text"> Mute</span>';
 
             const screenShareBtn = document.createElement('button');
             screenShareBtn.id = 'screenShareBtn';
             screenShareBtn.className = 'btn btn-sm btn-outline-info';
             screenShareBtn.setAttribute('aria-label', 'Share Screen');
             screenShareBtn.disabled = true;
-            screenShareBtn.innerHTML = '<span class="btn-text"> Share Screen</span>';
+            screenShareBtn.innerHTML = '🖥️<span class="btn-text"> Share</span>';
             if (!supportsDisplayMedia) {
                 screenShareBtn.disabled = true;
                 screenShareBtn.title = 'Screen sharing not supported on this device or browser';
@@ -686,13 +718,13 @@
             watchScreenBtn.className = 'btn btn-sm btn-outline-primary';
             watchScreenBtn.setAttribute('aria-label', 'Watch Screen');
             watchScreenBtn.disabled = true;
-            watchScreenBtn.innerHTML = '<span class="btn-text"> Watch Screen</span>';
+            watchScreenBtn.innerHTML = '👁️<span class="btn-text"> Watch</span>';
 
             const raiseBtn = document.createElement('button');
             raiseBtn.id = 'raiseBtn';
             raiseBtn.className = 'btn btn-sm btn-outline-secondary';
             raiseBtn.setAttribute('aria-label', 'Raise Hand');
-            raiseBtn.innerHTML = '<span class="btn-text"> Raise Hand</span>';
+            raiseBtn.innerHTML = '✋<span class="btn-text"> Raise</span>';
 
             const leaveSessionBtn = document.createElement('button');
             leaveSessionBtn.id = 'leaveSessionBtn';
@@ -1020,9 +1052,57 @@
 
                 participants = (wb.participants || []).reduce((acc, p) => {
                     const uid = p.id || p._id;
-                    acc[uid] = { name: p.username || p.full_name || `User ${String(uid).substr(-4)}`, avatar_url: p.avatar_url || '', can_draw: (wb.can_draw || []).map(String).includes(String(uid)), can_speak: (wb.can_speak || []).map(String).includes(String(uid)), can_share_screen: (wb.can_share_screen || []).map(String).includes(String(uid)) };
+                    acc[uid] = { 
+                        name: p.username || p.full_name || `User ${String(uid).substr(-4)}`, 
+                        avatar_url: p.avatar_url || '', 
+                        can_draw: (wb.can_draw || []).map(String).includes(String(uid)), 
+                        can_speak: (wb.can_speak || []).map(String).includes(String(uid)), 
+                        can_share_screen: (wb.can_share_screen || []).map(String).includes(String(uid)) 
+                    };
                     return acc;
                 }, {});
+                
+                // Always ensure creator is in the participants list
+                const creatorId = String(wb.created_by);
+                if (!participants[creatorId]) {
+                    // Fetch creator info if not already included
+                    try {
+                        const creatorResp = await fetch(`/api/users/${creatorId}/profile`, {
+                            headers: { 'Authorization': `Bearer ${token}` }
+                        });
+                        if (creatorResp.ok) {
+                            const creatorData = await creatorResp.json();
+                            const creatorProfile = creatorData.data || creatorData;
+                            participants[creatorId] = {
+                                name: creatorProfile.full_name || creatorProfile.username || 'Session Owner',
+                                avatar_url: creatorProfile.avatar_url || '',
+                                can_draw: true,
+                                can_speak: true,
+                                can_share_screen: true
+                            };
+                        }
+                    } catch (e) {
+                        // Fallback: add a minimal creator entry
+                        participants[creatorId] = {
+                            name: 'Session Owner',
+                            avatar_url: '',
+                            can_draw: true,
+                            can_speak: true,
+                            can_share_screen: true
+                        };
+                    }
+                }
+                
+                // Ensure current user is also in the list
+                if (!participants[userId]) {
+                    participants[userId] = {
+                        name: 'You',
+                        avatar_url: '',
+                        can_draw: canDraw,
+                        can_speak: canSpeak,
+                        can_share_screen: canShareScreen
+                    };
+                }
                 
                 canDraw = isCreator || (wb.can_draw || []).map(String).includes(userId);
                 canSpeak = isCreator || (wb.can_speak || []).map(String).includes(userId);
@@ -1129,22 +1209,21 @@
         
         socket.on('connect', () => {
             socket.emit('join_room', { room: `whiteboard:${sessionId}`, user_id: userId });
-            // Ensure current user is in participants list
-            if (!participants[userId]) {
-                participants[userId] = { 
-                    name: userProfile?.full_name || userProfile?.username || 'You',
-                    avatar_url: userProfile?.avatar_url || '',
-                    can_draw: false,
-                    can_speak: false,
-                    can_share_screen: false
-                };
-                renderParticipants();
-            }
+            // Request the current list of online users in this room
+            setTimeout(() => {
+                socket.emit('get_online_users', { room: `whiteboard:${sessionId}` });
+            }, 500);
         });
         socket.on('user_joined', (data) => {
             const p = data.profile;
             if (p && !participants[p.id]) {
-                participants[p.id] = { name: p.full_name || p.username, avatar_url: p.avatar_url };
+                participants[p.id] = { 
+                    name: p.full_name || p.username || 'Unknown', 
+                    avatar_url: p.avatar_url || '',
+                    can_draw: false,
+                    can_speak: false,
+                    can_share_screen: false
+                };
                 renderParticipants();
             }
         });
@@ -1156,9 +1235,10 @@
             users.forEach(u => {
                 const p = u.profile;
                 if (!p || !p.id) return;
-                if (!participants[p.id]) {
-                    participants[p.id] = {
-                        name: p.full_name || p.username || (`User ${String(p.id).slice(-4)}`),
+                const pid = String(p.id);
+                if (!participants[pid]) {
+                    participants[pid] = {
+                        name: p.full_name || p.username || (`User ${String(pid).slice(-4)}`),
                         avatar_url: p.avatar_url || '',
                         can_draw: false,
                         can_speak: false,
@@ -1167,11 +1247,20 @@
                     changed = true;
                 } else {
                     // merge profile updates without clobbering permission flags
-                    participants[p.id].name = p.full_name || p.username || participants[p.id].name;
-                    participants[p.id].avatar_url = p.avatar_url || participants[p.id].avatar_url;
+                    const oldName = participants[pid].name;
+                    const newName = p.full_name || p.username;
+                    if (newName && newName !== oldName) {
+                        participants[pid].name = newName;
+                        changed = true;
+                    }
+                    if (p.avatar_url && p.avatar_url !== participants[pid].avatar_url) {
+                        participants[pid].avatar_url = p.avatar_url;
+                        changed = true;
+                    }
                 }
             });
-            if (changed) renderParticipants();
+            // Always re-render to ensure accurate participant list
+            renderParticipants();
         });
         socket.on('user_left', (data) => {
             delete participants[data.user_id];
