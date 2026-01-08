@@ -19,7 +19,7 @@
 
     canvas {
         border: 2px solid var(--dark-border);
-        background: var(--dark-canvas);
+        background: #FFFFFF;
         cursor: crosshair;
         border-radius: 8px;
         touch-action: none;
@@ -1067,7 +1067,7 @@
                 if (!participants[creatorId]) {
                     // Fetch creator info if not already included
                     try {
-                        const creatorResp = await fetch(`/api/users/${creatorId}/profile`, {
+                        const creatorResp = await fetch(`/api/users/${creatorId}`, {
                             headers: { 'Authorization': `Bearer ${token}` }
                         });
                         if (creatorResp.ok) {
@@ -1093,15 +1093,46 @@
                     }
                 }
                 
-                // Ensure current user is also in the list
+                // Ensure current user is also in the list with their actual profile
                 if (!participants[userId]) {
-                    participants[userId] = {
-                        name: 'You',
-                        avatar_url: '',
-                        can_draw: canDraw,
-                        can_speak: canSpeak,
-                        can_share_screen: canShareScreen
-                    };
+                    // Try to fetch current user's profile
+                    try {
+                        const userResp = await fetch(`/api/users/${userId}`, {
+                            headers: { 'Authorization': `Bearer ${token}` }
+                        });
+                        if (userResp.ok) {
+                            const userData = await userResp.json();
+                            const userProfile = userData.data || userData;
+                            participants[userId] = {
+                                name: userProfile.full_name || userProfile.username || 'You',
+                                avatar_url: userProfile.avatar_url || '',
+                                can_draw: isCreator || canDraw,
+                                can_speak: isCreator || canSpeak,
+                                can_share_screen: isCreator || canShareScreen
+                            };
+                        } else {
+                            participants[userId] = {
+                                name: 'You',
+                                avatar_url: '',
+                                can_draw: isCreator || canDraw,
+                                can_speak: isCreator || canSpeak,
+                                can_share_screen: isCreator || canShareScreen
+                            };
+                        }
+                    } catch (e) {
+                        participants[userId] = {
+                            name: 'You',
+                            avatar_url: '',
+                            can_draw: isCreator || canDraw,
+                            can_speak: isCreator || canSpeak,
+                            can_share_screen: isCreator || canShareScreen
+                        };
+                    }
+                } else {
+                    // Update permissions for existing user entry
+                    participants[userId].can_draw = isCreator || canDraw;
+                    participants[userId].can_speak = isCreator || canSpeak;
+                    participants[userId].can_share_screen = isCreator || canShareScreen;
                 }
                 
                 canDraw = isCreator || (wb.can_draw || []).map(String).includes(userId);
@@ -1216,14 +1247,25 @@
         });
         socket.on('user_joined', (data) => {
             const p = data.profile;
-            if (p && !participants[p.id]) {
-                participants[p.id] = { 
-                    name: p.full_name || p.username || 'Unknown', 
-                    avatar_url: p.avatar_url || '',
-                    can_draw: false,
-                    can_speak: false,
-                    can_share_screen: false
-                };
+            if (p && p.id) {
+                const pid = String(p.id);
+                if (!participants[pid]) {
+                    participants[pid] = { 
+                        name: p.full_name || p.username || 'Unknown', 
+                        avatar_url: p.avatar_url || '',
+                        can_draw: false,
+                        can_speak: false,
+                        can_share_screen: false
+                    };
+                } else {
+                    // Update name if available
+                    if (p.full_name || p.username) {
+                        participants[pid].name = p.full_name || p.username;
+                    }
+                    if (p.avatar_url) {
+                        participants[pid].avatar_url = p.avatar_url;
+                    }
+                }
                 renderParticipants();
             }
         });

@@ -43,16 +43,25 @@ class LiveKitService:
             self.lkapi = types.SimpleNamespace(room=types.SimpleNamespace())
 
     def _start_background_loop(self):
-        if self._loop and self._loop.is_running():
+        # Only create a new loop if we don't have one or if our thread isn't alive
+        if self._loop and self._loop.is_running() and self._loop_thread and self._loop_thread.is_alive():
             return
+        
+        # Create a new event loop for background use
         self._loop = asyncio.new_event_loop()
 
         def _run_loop(loop: asyncio.AbstractEventLoop):
             asyncio.set_event_loop(loop)
-            loop.run_forever()
+            try:
+                loop.run_forever()
+            except RuntimeError:
+                pass  # Ignore if loop is already running
 
         self._loop_thread = threading.Thread(target=_run_loop, args=(self._loop,), daemon=True)
         self._loop_thread.start()
+        # Give the thread a moment to start
+        import time
+        time.sleep(0.01)
 
     async def _create_client_coro(self):
         # Run inside the running loop so aiohttp will find the loop
