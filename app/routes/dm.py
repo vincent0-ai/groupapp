@@ -85,11 +85,39 @@ def get_dm_threads():
         }).sort('last_message_at', -1))
         
         # Enrich with other user's profile
+        if not threads:
+            return jsonify({'success': True, 'data': []})
+
+        # Collect all other user IDs and mapping
+        other_user_ids = []
+        thread_to_other_user = {}
+        for thread in threads:
+            p_ids = [p for p in thread['participants'] if p != user_id]
+            if p_ids:
+                other_id = p_ids[0]
+                other_user_ids.append(ObjectId(other_id))
+                thread_to_other_user[thread['_id']] = other_id
+
+        # Batch fetch users
+        users_cursor = db.db.users.find({'_id': {'$in': other_user_ids}})
+        users_map = {str(u['_id']): u for u in users_cursor}
+
+        # Batch fetch unread counts using aggregation
+        unread_counts_agg = list(db.db.dm_messages.aggregate([
+            {'$match': {
+                'thread_id': {'$in': [t['_id'] for t in threads]},
+                'sender_id': {'$ne': ObjectId(user_id)},
+                'read': False
+            }},
+            {'$group': {'_id': '$thread_id', 'count': {'$sum': 1}}}
+        ]))
+        unread_map = {str(item['_id']): item['count'] for item in unread_counts_agg}
+
         result = []
         for thread in threads:
-            other_user_id = [p for p in thread['participants'] if p != user_id][0]
-            other_user = db.find_one('users', {'_id': ObjectId(other_user_id)})
-            
+            other_user_id = thread_to_other_user.get(thread['_id'])
+            other_user = users_map.get(str(other_user_id))
+
             result.append({
                 '_id': str(thread['_id']),
                 'other_user': {
@@ -100,11 +128,7 @@ def get_dm_threads():
                 },
                 'last_message': thread.get('last_message'),
                 'last_message_at': serialize_document(thread.get('last_message_at')) if thread.get('last_message_at') else None,
-                'unread_count': db.db.dm_messages.count_documents({
-                    'thread_id': thread['_id'],
-                    'sender_id': ObjectId(other_user_id),
-                    'read': False
-                })
+                'unread_count': unread_map.get(str(thread['_id']), 0)
             })
         
         return jsonify({'success': True, 'data': result})
@@ -186,9 +210,17 @@ def get_dm_messages(thread_id):
         })
         
         # Format messages
+        if not messages:
+            return jsonify({'success': True, 'data': []})
+
+        # Batch fetch senders
+        sender_ids = list(set(msg['sender_id'] for msg in messages))
+        users_cursor = db.db.users.find({'_id': {'$in': sender_ids}})
+        users_map = {str(u['_id']): u for u in users_cursor}
+
         result = []
         for msg in messages:
-            sender = db.find_one('users', {'_id': msg['sender_id']})
+            sender = users_map.get(str(msg['sender_id']))
             content = html.escape(msg.get('content', ''))
             
             result.append({
@@ -283,16 +315,22 @@ def get_unread_dm_count():
         db = Database()
         # Find all threads the user is in
         threads = list(db.db.dm_threads.find({'participants': g.user_id}))
+        if not threads:
+            return jsonify({'success': True, 'data': {'unread_count': 0}})
+
+        thread_ids = [t['_id'] for t in threads]
         
-        total_unread = 0
-        for thread in threads:
-            other_user_id = [p for p in thread['participants'] if p != g.user_id][0]
-            count = db.db.dm_messages.count_documents({
-                'thread_id': thread['_id'],
-                'sender_id': ObjectId(other_user_id),
+        # Count all unread messages from other participants in these threads
+        unread_agg = list(db.db.dm_messages.aggregate([
+            {'$match': {
+                'thread_id': {'$in': thread_ids},
+                'sender_id': {'$ne': ObjectId(g.user_id)},
                 'read': False
-            })
-            total_unread += count
+            }},
+            {'$group': {'_id': None, 'total': {'$sum': 1}}}
+        ]))
+
+        total_unread = unread_agg[0]['total'] if unread_agg else 0
         
         return jsonify({'success': True, 'data': {'unread_count': total_unread}})
     except Exception as e:
