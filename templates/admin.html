@@ -420,7 +420,7 @@ function renderPagination(elementId, currentPage, totalPages, callback) {
     if (totalPages > 1) {
         html += `
             <li class="page-item ${currentPage === 1 ? 'disabled' : ''}">
-                <a class="page-link" href="#" onclick="event.preventDefault(); ${currentPage > 1 ? 'callback(' + (currentPage - 1) + ')' : ''}">Previous</a>
+                <a class="page-link" href="#" data-page="${currentPage - 1}">Previous</a>
             </li>
         `;
         
@@ -428,7 +428,7 @@ function renderPagination(elementId, currentPage, totalPages, callback) {
             if (i === 1 || i === totalPages || (i >= currentPage - 2 && i <= currentPage + 2)) {
                 html += `
                     <li class="page-item ${i === currentPage ? 'active' : ''}">
-                        <a class="page-link" href="#" onclick="event.preventDefault(); callback(${i})">${i}</a>
+                        <a class="page-link" href="#" data-page="${i}">${i}</a>
                     </li>
                 `;
             } else if (i === currentPage - 3 || i === currentPage + 3) {
@@ -438,63 +438,23 @@ function renderPagination(elementId, currentPage, totalPages, callback) {
         
         html += `
             <li class="page-item ${currentPage === totalPages ? 'disabled' : ''}">
-                <a class="page-link" href="#" onclick="event.preventDefault(); ${currentPage < totalPages ? 'callback(' + (currentPage + 1) + ')' : ''}">Next</a>
+                <a class="page-link" href="#" data-page="${currentPage + 1}">Next</a>
             </li>
         `;
     }
     
     container.innerHTML = html;
-    
-    // Attach callback to window so onclick works (hacky but simple)
-    // Better to add event listeners but this is quick
-    window.callback = callback; 
-    // Wait, window.callback will be overwritten. 
-    // We need to bind the callback properly.
-    // The onclick in HTML string refers to global scope.
-    // Let's fix this by not using inline onclick for the callback logic if possible, 
-    // or by assigning unique global functions.
-    // Actually, since I'm generating HTML string, I can't easily pass the closure 'callback'.
-    // I'll just assign it to a property on the element and use event delegation or just use a global helper.
-}
 
-// Fix for pagination callback
-window.loadUsersPage = (p) => loadUsers(p, document.getElementById('userSearch').value);
-window.loadGroupsPage = (p) => loadGroups(p, document.getElementById('groupSearch').value);
-
-// Re-implement renderPagination to use specific global functions
-function renderPagination(elementId, currentPage, totalPages, callback) {
-    const container = document.getElementById(elementId);
-    const callbackName = elementId === 'userPagination' ? 'loadUsersPage' : 'loadGroupsPage';
-    
-    let html = '';
-    
-    if (totalPages > 1) {
-        html += `
-            <li class="page-item ${currentPage === 1 ? 'disabled' : ''}">
-                <a class="page-link" href="#" onclick="event.preventDefault(); ${callbackName}(${currentPage - 1})">Previous</a>
-            </li>
-        `;
-        
-        for (let i = 1; i <= totalPages; i++) {
-            if (i === 1 || i === totalPages || (i >= currentPage - 2 && i <= currentPage + 2)) {
-                html += `
-                    <li class="page-item ${i === currentPage ? 'active' : ''}">
-                        <a class="page-link" href="#" onclick="event.preventDefault(); ${callbackName}(${i})">${i}</a>
-                    </li>
-                `;
-            } else if (i === currentPage - 3 || i === currentPage + 3) {
-                html += `<li class="page-item disabled"><span class="page-link">...</span></li>`;
+    // Add event listeners instead of using inline onclick
+    container.querySelectorAll('.page-link').forEach(link => {
+        link.addEventListener('click', (e) => {
+            e.preventDefault();
+            const page = parseInt(link.getAttribute('data-page'));
+            if (page && page >= 1 && page <= totalPages && page !== currentPage) {
+                callback(page);
             }
-        }
-        
-        html += `
-            <li class="page-item ${currentPage === totalPages ? 'disabled' : ''}">
-                <a class="page-link" href="#" onclick="event.preventDefault(); ${callbackName}(${currentPage + 1})">Next</a>
-            </li>
-        `;
-    }
-    
-    container.innerHTML = html;
+        });
+    });
 }
 </script>
 {% endblock %}
